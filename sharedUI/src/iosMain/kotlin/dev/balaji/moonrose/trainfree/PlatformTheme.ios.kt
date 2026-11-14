@@ -6,6 +6,8 @@ import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
+import dev.balaji.moonrose.trainfree.model.AppFont
+import dev.balaji.moonrose.trainfree.model.AppFontSize
 import dev.balaji.moonrose.trainfree.model.Appearance
 
 // M3's default neutral tokens (Surface, OutlineVariant, etc.) are derived from
@@ -39,7 +41,12 @@ private val iosDarkColorScheme = darkColorScheme(
 )
 
 @Composable
-actual fun PlatformTheme(appearance: Appearance, content: @Composable () -> Unit) {
+actual fun PlatformTheme(
+    appearance: Appearance,
+    appFont: AppFont,
+    appFontSize: AppFontSize,
+    content: @Composable () -> Unit,
+) {
     MaterialTheme(
         colorScheme = if (appearance.isDark(isSystemInDarkTheme())) iosDarkColorScheme else iosLightColorScheme,
         content = content,

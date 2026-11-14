@@ -240,7 +240,7 @@ private fun DayCell(day: CalendarDay, onDayClick: (Long) -> Unit, modifier: Modi
         )
         Box(
             Modifier
-                .size(28.dp)
+                .size(32.dp)
                 .clip(CircleShape)
                 .background(
                     if (day.isToday) MaterialTheme.colorScheme.primaryContainer else Color.Transparent,

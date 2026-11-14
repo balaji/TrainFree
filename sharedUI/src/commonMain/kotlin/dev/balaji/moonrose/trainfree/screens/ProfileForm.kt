@@ -73,17 +73,6 @@ fun ProfileForm(
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         OutlinedTextField(
-            value = uiState.name,
-            onValueChange = formState::updateName,
-            label = { Text(stringResource(Res.string.name)) },
-            isError = uiState.nameError != null,
-            supportingText = uiState.nameError?.let { error ->
-                { Text(profileNameErrorText(error)) }
-            },
-            singleLine = true,
-            modifier = Modifier.fillMaxWidth().then(collapseWheels),
-        )
-        OutlinedTextField(
             value = uiState.age,
             onValueChange = formState::updateAge,
             label = { Text(stringResource(Res.string.age)) },

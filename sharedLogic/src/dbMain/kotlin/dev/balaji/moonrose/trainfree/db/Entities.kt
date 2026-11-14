@@ -19,7 +19,6 @@ import dev.balaji.moonrose.trainfree.model.WeightUnit
 data class ProfileEntity(
     // Single-row table by convention: the one local user always has id = 1.
     @PrimaryKey val id: Long = 1,
-    val name: String,
     val age: Int?,
     val gender: String?,
     val weight: Double?,

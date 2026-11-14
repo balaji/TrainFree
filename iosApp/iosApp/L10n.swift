@@ -229,15 +229,9 @@ enum L10n {
     static let createProfile = String(localized: "create_profile", defaultValue: "Create Profile")
 
     // MARK: - Profile validation
-    static func profileNameTooLong(_ max: Int) -> String {
-        String(localized: "profile_name_too_long", defaultValue: "Name must be at most \(max) characters")
-    }
-    static let profileNameLettersOnly = String(localized: "profile_name_letters_only", defaultValue: "Name must contain only letters")
     static func profileAgeRange(_ min: Int, _ max: Int) -> String {
         String(localized: "profile_age_range", defaultValue: "Age must be between \(min) and \(max)")
     }
-    // iOS-only
-    static let profileNameInvalid = String(localized: "profile_name_invalid", defaultValue: "Invalid name")
 
     // MARK: - Settings
     static let settings = String(localized: "settings", defaultValue: "Settings")
@@ -262,6 +256,14 @@ enum L10n {
     static let restSoundAntares = String(localized: "rest_sound_antares", defaultValue: "Antares")
     static let restSoundAltair = String(localized: "rest_sound_altair", defaultValue: "Altair")
     static let restSoundDeneb = String(localized: "rest_sound_deneb", defaultValue: "Deneb")
+    static let fontOptions = String(localized: "font_options", defaultValue: "Font")
+    static let fontSystemUi = String(localized: "font_system_ui", defaultValue: "System UI")
+    static let fontGoogleSans = String(localized: "font_google_sans", defaultValue: "Google Sans")
+    static let fontInter = String(localized: "font_inter", defaultValue: "Inter")
+    static let fontSize = String(localized: "font_size", defaultValue: "Font size")
+    static let fontSizeDefault = String(localized: "font_size_default", defaultValue: "Default")
+    static let fontSizeLarger = String(localized: "font_size_larger", defaultValue: "Larger")
+    static let fontSizeLargest = String(localized: "font_size_largest", defaultValue: "Largest")
     static func restTimerSoundLabel(_ sound: RestTimerSound) -> String {
         switch sound {
         case .none: return restSoundNone

@@ -24,6 +24,51 @@ enum class Appearance(val value: String) {
 }
 
 /**
+ * App typeface option (used on Android). Persisted as the lowercase [value]
+ * string in user_settings.
+ */
+enum class AppFont(val value: String) {
+    SYSTEM_UI("system_ui"),
+    GOOGLE_SANS("google_sans"),
+    INTER("inter"),
+    ;
+
+    companion object {
+        fun fromValue(value: String?): AppFont = entries.firstOrNull { it.value == value } ?: SYSTEM_UI
+    }
+}
+
+/**
+ * Proportional font-size multipliers for [AppFontSize].
+ *
+ * Active preset (Option 3 — +1.5pt / +3pt on 16.sp base body text):
+ * - [FONT_SIZE_LARGER_SCALE] = 1.10f
+ * - [FONT_SIZE_LARGEST_SCALE] = 1.20f
+ *
+ * Alternative preset to experiment with (Option 1 — +2pt / +4pt on 16.sp base body text):
+ * - [FONT_SIZE_LARGER_SCALE] = 1.125f
+ * - [FONT_SIZE_LARGEST_SCALE] = 1.25f
+ */
+const val FONT_SIZE_DEFAULT_SCALE = 1.0f
+const val FONT_SIZE_LARGER_SCALE = 1.10f
+const val FONT_SIZE_LARGEST_SCALE = 1.20f
+
+/**
+ * App font-size scale option (used on Android). Persisted as the lowercase
+ * [value] string in user_settings.
+ */
+enum class AppFontSize(val value: String, val scaleFactor: Float) {
+    DEFAULT("default", FONT_SIZE_DEFAULT_SCALE),
+    LARGER("larger", FONT_SIZE_LARGER_SCALE),
+    LARGEST("largest", FONT_SIZE_LARGEST_SCALE),
+    ;
+
+    companion object {
+        fun fromValue(value: String?): AppFontSize = entries.firstOrNull { it.value == value } ?: DEFAULT
+    }
+}
+
+/**
  * Weight and distance display units. Persisted as the lowercase [value] string
  * in user_settings and on recorded work-set, session-set, and body-metric rows
  * so each logged number keeps the unit it was entered in and converts cleanly
@@ -148,6 +193,10 @@ data class UserSettings(
     val restTimerDurationSeconds: Int = DEFAULT_REST_TIMER_SECONDS,
     /** Audio tone played when the between-set rest timer reaches zero. */
     val restTimerSound: RestTimerSound = RestTimerSound.DEFAULT,
+    /** App typeface option (used on Android). */
+    val appFont: AppFont = AppFont.SYSTEM_UI,
+    /** App font-size scale option (used on Android). */
+    val appFontSize: AppFontSize = AppFontSize.DEFAULT,
     /**
      * Progression cards the user configured on the Progress tab, display
      * order. Empty means "never configured" — the Progress tab then defaults

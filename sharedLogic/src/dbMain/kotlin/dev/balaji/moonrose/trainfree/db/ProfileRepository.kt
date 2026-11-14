@@ -13,7 +13,6 @@ object ProfileRepository {
         AppDb.db.profileDao().observe().map { it?.toDomain() }
 
     suspend fun save(
-        name: String,
         age: Int?,
         gender: String?,
         weight: Double?,
@@ -24,7 +23,6 @@ object ProfileRepository {
         AppDb.db.profileDao().upsert(
             ProfileEntity(
                 id = PROFILE_ID,
-                name = name,
                 age = age,
                 gender = gender,
                 weight = weight,
@@ -39,7 +37,6 @@ object ProfileRepository {
 private fun ProfileEntity.toDomain() =
     Profile(
         id = id,
-        name = name,
         age = age,
         gender = gender,
         weight = weight,
