@@ -105,3 +105,18 @@ data class Exercise(
     val builtin: Boolean,
     val otherBodyParts: List<String> = emptyList(),
 )
+
+/**
+ * Orders exercises with already-performed ones (`setCount > 0`) at the top in
+ * descending order of completed sets, breaking ties (including `0 == 0` for
+ * unperformed exercises) alphabetically by name (case-insensitive).
+ */
+fun sortExercisesBySetCount(
+    exercises: List<Exercise>,
+    setCounts: Map<Long, Int>,
+): List<Exercise> =
+    exercises.sortedWith(
+        compareByDescending<Exercise> { (setCounts[it.id] ?: 0).coerceAtLeast(0) }
+            .thenBy { it.name.lowercase() }
+            .thenBy { it.name },
+    )

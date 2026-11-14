@@ -56,6 +56,7 @@ import dev.balaji.moonrose.trainfree.db.ExerciseDeleteError
 import dev.balaji.moonrose.trainfree.db.ExerciseRepository
 import dev.balaji.moonrose.trainfree.db.InsightsRepository
 import dev.balaji.moonrose.trainfree.model.Exercise
+import dev.balaji.moonrose.trainfree.model.sortExercisesBySetCount
 import dev.balaji.moonrose.trainfree.navigation.ExerciseCreateRoute
 import dev.balaji.moonrose.trainfree.navigation.ExerciseDetailRoute
 import dev.balaji.moonrose.trainfree.navigation.LocalBottomFabPadding
@@ -109,8 +110,8 @@ private fun ExercisesBody(
 ) {
     val exercises by ExerciseRepository.exercises.collectAsState(initial = null)
     val setCountRows by InsightsRepository.observeCompletedSetCountsByExercise()
-        .collectAsState(initial = emptyList())
-    val setCounts = remember(setCountRows) { setCountRows.associate { it.exerciseId to it.setCount } }
+        .collectAsState(initial = null)
+    val setCounts = remember(setCountRows) { setCountRows?.associate { it.exerciseId to it.setCount } }
     val scope = rememberCoroutineScope()
     var query by remember { mutableStateOf("") }
     var selectedBodyPart by remember { mutableStateOf<String?>(null) }
@@ -124,12 +125,13 @@ private fun ExercisesBody(
     val equipmentOptions = remember(exercises) {
         exercises.orEmpty().mapNotNull { it.equipment }.distinct().sorted()
     }
-    val filtered = remember(exercises, query, selectedBodyPart, selectedEquipment) {
-        exercises.orEmpty().filter { exercise ->
+    val filtered = remember(exercises, setCounts, query, selectedBodyPart, selectedEquipment) {
+        val matching = exercises.orEmpty().filter { exercise ->
             (selectedBodyPart == null || exercise.bodyPart == selectedBodyPart) &&
                 (selectedEquipment == null || exercise.equipment == selectedEquipment) &&
                 (query.isBlank() || exercise.name.contains(query, ignoreCase = true))
         }
+        if (setCounts != null) sortExercisesBySetCount(matching, setCounts) else matching
     }
     val (customExercises, builtinExercises) = remember(filtered) {
         filtered.partition { !it.builtin }
@@ -185,10 +187,10 @@ private fun ExercisesBody(
                     items(customExercises, key = Exercise::id) { exercise ->
                         if (allowDelete) {
                             SwipeToDeleteRow(key = exercise.id, onDelete = { deleteTarget = exercise }) {
-                                ExerciseRow(exercise, setCounts[exercise.id] ?: 0, onOpen)
+                                ExerciseRow(exercise, setCounts?.get(exercise.id) ?: 0, onOpen)
                             }
                         } else {
-                            ExerciseRow(exercise, setCounts[exercise.id] ?: 0, onOpen)
+                            ExerciseRow(exercise, setCounts?.get(exercise.id) ?: 0, onOpen)
                         }
                     }
                     if (builtinExercises.isNotEmpty()) {
@@ -199,7 +201,7 @@ private fun ExercisesBody(
                     }
                 }
                 items(builtinExercises, key = Exercise::id) { exercise ->
-                    ExerciseRow(exercise, setCounts[exercise.id] ?: 0, onOpen)
+                    ExerciseRow(exercise, setCounts?.get(exercise.id) ?: 0, onOpen)
                 }
             }
         }

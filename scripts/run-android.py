@@ -118,12 +118,38 @@ def list_avds() -> list[str]:
     return [line.strip() for line in res.stdout.splitlines() if line.strip()]
 
 
+def get_running_avd_name(adb: str, serial: str) -> str:
+    """Return the AVD name for a running emulator serial, or empty string."""
+    if not serial.startswith("emulator-"):
+        return ""
+    res = subprocess.run(
+        [adb, "-s", serial, "emu", "avd", "name"],
+        capture_output=True,
+        text=True,
+    )
+    if res.returncode == 0:
+        lines = [line.strip() for line in res.stdout.splitlines() if line.strip()]
+        if lines and lines[0] != "OK" and not lines[0].startswith("KO"):
+            return lines[0]
+    prop = subprocess.run(
+        [adb, "-s", serial, "shell", "getprop", "ro.boot.qemu.avd_name"],
+        capture_output=True,
+        text=True,
+    )
+    if prop.returncode == 0:
+        name = prop.stdout.strip()
+        if name:
+            return name
+    return ""
+
+
 def resolve_target_serial(adb: str, target: str) -> tuple[str, str]:
     """Return (resolved_serial, avd_name_to_boot_if_needed)."""
     devices = list_connected_devices(adb)
     if not target:
         if len(devices) == 1:
-            return devices[0][0], AVD_NAME
+            serial = devices[0][0]
+            return serial, get_running_avd_name(adb, serial) or AVD_NAME
         if len(devices) > 1:
             serials = ", ".join(s for s, _, _ in devices)
             sys.exit(
@@ -135,7 +161,7 @@ def resolve_target_serial(adb: str, target: str) -> tuple[str, str]:
     # Exact serial match first.
     for serial, _, _ in devices:
         if serial == target:
-            return serial, AVD_NAME
+            return serial, get_running_avd_name(adb, serial) or AVD_NAME
 
     # Case-insensitive substring match against serial or `adb devices -l` metadata (e.g. model:XQ_GE54).
     needle = target.lower()
@@ -145,9 +171,26 @@ def resolve_target_serial(adb: str, target: str) -> tuple[str, str]:
         if needle in line.lower()
     ]
     if len(matches) == 1:
-        return matches[0], AVD_NAME
+        serial = matches[0]
+        return serial, get_running_avd_name(adb, serial) or AVD_NAME
     if len(matches) > 1:
         sys.exit(f"Error: target '{target}' matched multiple connected devices: {', '.join(matches)}")
+
+    # Check running emulators by their AVD name (exact match first, then substring).
+    running_avds = [
+        (serial, get_running_avd_name(adb, serial))
+        for serial, _, _ in devices
+        if serial.startswith("emulator-")
+    ]
+    for avd_matches in (
+        [(s, a) for s, a in running_avds if a and a.lower() == needle],
+        [(s, a) for s, a in running_avds if a and needle in a.lower()],
+    ):
+        if len(avd_matches) == 1:
+            return avd_matches[0]
+        if len(avd_matches) > 1:
+            desc = ", ".join(f"{s} ({a})" for s, a in avd_matches)
+            sys.exit(f"Error: target '{target}' matched multiple running emulators: {desc}")
 
     # Not a currently connected device: check if it matches an AVD name.
     avds = list_avds()
@@ -194,9 +237,14 @@ def wait_for_boot(adb: str, timeout_sec: int = 180) -> bool:
     return False
 
 
-def boot_emulator(adb: str, avd_name: str = AVD_NAME) -> None:
+def emulator_log_path() -> Path:
+    """Return the path to the emulator stdout/stderr log file."""
+    return Path(tempfile.gettempdir()) / "trainfree-emulator.log"
+
+
+def boot_emulator(adb: str, avd_name: str = AVD_NAME) -> subprocess.Popen:
     emulator = require_tool("emulator")
-    log_path = Path(tempfile.gettempdir()) / "trainfree-emulator.log"
+    log_path = emulator_log_path()
     print(f'Starting emulator "{avd_name}" (log: {log_path})...')
 
     popen_kwargs: dict = {}
@@ -214,7 +262,7 @@ def boot_emulator(adb: str, avd_name: str = AVD_NAME) -> None:
     cmd = [emulator, "-avd", avd_name, "-no-snapshot"]
 
     with log_path.open("wb") as log_file:
-        subprocess.Popen(
+        return subprocess.Popen(
             cmd,
             stdin=subprocess.DEVNULL,
             stdout=log_file,
@@ -250,7 +298,7 @@ def ensure_device_ready(adb: str, target: str = "") -> str:
             sys.exit(f"Error: connected device '{serial}' is not responsive.")
 
     existing_serials = {s for s, _, _ in list_connected_devices(adb)}
-    boot_emulator(adb, avd_name)
+    proc = boot_emulator(adb, avd_name)
 
     deadline = time.monotonic() + 60
     new_serial = ""
@@ -259,10 +307,20 @@ def ensure_device_ready(adb: str, target: str = "") -> str:
         if current:
             new_serial = current[0]
             break
+        if proc.poll() is not None:
+            sys.exit(
+                f'Error: Emulator "{avd_name}" exited early (code {proc.returncode}). '
+                f"See log: {emulator_log_path()}"
+            )
         time.sleep(1)
 
-    if new_serial:
-        os.environ["ANDROID_SERIAL"] = new_serial
+    if not new_serial:
+        sys.exit(
+            f'Error: Timed out waiting for emulator "{avd_name}" to register with adb. '
+            f"See log: {emulator_log_path()}"
+        )
+
+    os.environ["ANDROID_SERIAL"] = new_serial
 
     if not wait_for_boot(adb):
         sys.exit("Error: Emulator failed to finish booting.")

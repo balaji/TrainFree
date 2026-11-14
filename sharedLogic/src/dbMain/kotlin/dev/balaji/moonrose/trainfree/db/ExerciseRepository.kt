@@ -2,8 +2,9 @@ package dev.balaji.moonrose.trainfree.db
 
 import androidx.sqlite.SQLiteException
 import dev.balaji.moonrose.trainfree.model.Exercise
+import dev.balaji.moonrose.trainfree.model.sortExercisesBySetCount
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.combine
 
 enum class ExerciseUpdateError {
     DuplicateName,
@@ -22,7 +23,13 @@ enum class ExerciseDeleteError {
 
 object ExerciseRepository {
     val exercises: Flow<List<Exercise>> =
-        AppDb.db.exerciseDao().observeAll().map { entities -> entities.map { it.toDomain() } }
+        combine(
+            AppDb.db.exerciseDao().observeAll(),
+            AppDb.db.workoutSessionDetailDao().observeCompletedSetCountsByExercise(PROFILE_ID),
+        ) { entities, setCountRows ->
+            val setCounts = setCountRows.associate { it.exerciseId to it.setCount }
+            sortExercisesBySetCount(entities.map { it.toDomain() }, setCounts)
+        }
 
     suspend fun getAll(): List<Exercise> =
         AppDb.db.exerciseDao().getAll().map { it.toDomain() }

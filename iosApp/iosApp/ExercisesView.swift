@@ -7,7 +7,7 @@ struct ExercisesView: View {
     var onExerciseSelected: ((Exercise) -> Void)? = nil
 
     @State private var exercises: [Exercise]?
-    @State private var setCountsByExercise: [Int64: Int] = [:]
+    @State private var setCountsByExercise: [Int64: Int]?
     @State private var searchText = ""
     @State private var selectedBodyPart: String?
     @State private var selectedEquipment: String?
@@ -25,10 +25,19 @@ struct ExercisesView: View {
     }
 
     private var filtered: [Exercise] {
-        (exercises ?? []).filter { exercise in
+        let matching = (exercises ?? []).filter { exercise in
             (selectedBodyPart == nil || exercise.bodyPart == selectedBodyPart) &&
                 (selectedEquipment == nil || exercise.equipment == selectedEquipment) &&
                 (searchText.isEmpty || exercise.name.localizedCaseInsensitiveContains(searchText))
+        }
+        guard let counts = setCountsByExercise else { return matching }
+        return matching.sorted { lhs, rhs in
+            let lhsCount = max(0, counts[lhs.id] ?? 0)
+            let rhsCount = max(0, counts[rhs.id] ?? 0)
+            if lhsCount != rhsCount {
+                return lhsCount > rhsCount
+            }
+            return lhs.name.localizedCaseInsensitiveCompare(rhs.name) == .orderedAscending
         }
     }
 
@@ -207,12 +216,12 @@ struct ExercisesView: View {
                     Button {
                         onSelect(exercise)
                     } label: {
-                        ExerciseRowLabel(exercise: exercise, setCount: setCountsByExercise[exercise.id] ?? 0)
+                        ExerciseRowLabel(exercise: exercise, setCount: setCountsByExercise?[exercise.id] ?? 0)
                     }
                     .foregroundStyle(.primary)
                 } else {
                     NavigationLink(value: exercise.id) {
-                        ExerciseRowLabel(exercise: exercise, setCount: setCountsByExercise[exercise.id] ?? 0)
+                        ExerciseRowLabel(exercise: exercise, setCount: setCountsByExercise?[exercise.id] ?? 0)
                     }
                 }
             }
