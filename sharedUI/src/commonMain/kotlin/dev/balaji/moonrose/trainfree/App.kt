@@ -98,7 +98,11 @@ private data class TabSpec(val route: TopLevelRoute, val icon: ImageVector)
 @Preview
 fun App() {
     val settings by UserSettingsRepository.settings.collectAsState(initial = UserSettings())
-    PlatformTheme(appearance = settings.appearance) {
+    PlatformTheme(
+        appearance = settings.appearance,
+        appFont = settings.appFont,
+        appFontSize = settings.appFontSize,
+    ) {
         val hasProfile by produceState<Boolean?>(initialValue = null) {
             ProfileRepository.profile.collect { value = it != null }
         }

@@ -33,7 +33,6 @@ struct ProfileView: View {
                 } else {
                     List {
                         Section {
-                            LabeledContent(L10n.name, value: profile.name)
                             LabeledContent(L10n.age, value: profile.age.map { "\($0)" } ?? "—")
                             LabeledContent(L10n.gender, value: profile.gender.map(L10n.genderLabel) ?? "—")
                             LabeledContent(L10n.weight, value: profile.weight.map { weightValueText($0.doubleValue) } ?? "—")
@@ -73,7 +72,7 @@ struct ProfileView: View {
                                 ) {
                                     Image(systemName: "sun.max.fill").tag(Appearance.light)
                                     Image(systemName: "moon.fill").tag(Appearance.dark)
-                                    Image(systemName: "circle.lefthalf.filled").tag(Appearance.system)
+                                    Image(systemName: "iphone").tag(Appearance.system)
                                 }
                                 segmentedSettingRow(
                                     L10n.weightUnits,

@@ -19,7 +19,6 @@ class ProfileFormStateTest {
     private var savedProfile: SavedProfile? = null
 
     private data class SavedProfile(
-        val name: String,
         val age: Int?,
         val gender: String?,
         val weight: Double?,
@@ -37,9 +36,9 @@ class ProfileFormStateTest {
     ) = ProfileFormState(
         initial = initial,
         unit = unit,
-        saveProfile = { name, age, gender, weight, height ->
+        saveProfile = { age, gender, weight, height ->
             events.add("profile")
-            savedProfile = SavedProfile(name, age, gender, weight, height)
+            savedProfile = SavedProfile(age, gender, weight, height)
         },
         saveUnit = { chosen ->
             events.add("unit")
@@ -51,7 +50,6 @@ class ProfileFormStateTest {
     @Test
     fun switchingUnitsOnEmptyFormKeepsWeightBlankAndUntouchedHeightNullOnSave() {
         val form = newForm()
-        form.updateName("Alex")
         form.updateUnit(WeightUnit.IMPERIAL)
 
         val ui = form.uiState.value
@@ -73,7 +71,6 @@ class ProfileFormStateTest {
     @Test
     fun switchingToImperialConvertsUserEnteredWeightAndHeightAndPersistsUnit() {
         val form = newForm()
-        form.updateName("Alex")
         form.updateWeight("80")
         form.updateHeight("180")
         form.updateUnit(WeightUnit.IMPERIAL)
@@ -94,7 +91,6 @@ class ProfileFormStateTest {
     @Test
     fun switchingUnitsWithImperialInputConvertsToMetricAndSavesMetric() {
         val form = newForm(unit = WeightUnit.IMPERIAL)
-        form.updateName("Sam")
         form.updateWeight("150")
         form.updateHeightFeetInches(feet = 5, inches = 10)
         form.updateUnit(WeightUnit.METRIC)
@@ -115,7 +111,6 @@ class ProfileFormStateTest {
     fun togglingUnitsWithoutEditingPrefilledProfilePreservesExactStoredNumbers() {
         val initial = Profile(
             id = 1L,
-            name = "Jordan",
             age = 30,
             gender = "other",
             weight = 80.0,
@@ -139,7 +134,6 @@ class ProfileFormStateTest {
     fun clearingPrefilledMetricHeightThenSwitchingToImperialSavesNull() {
         val initial = Profile(
             id = 1L,
-            name = "Jordan",
             age = null,
             gender = null,
             weight = 80.0,
@@ -158,7 +152,6 @@ class ProfileFormStateTest {
     @Test
     fun noopWheelUpdateDoesNotMarkHeightEdited() {
         val form = newForm(unit = WeightUnit.IMPERIAL)
-        form.updateName("Alex")
         // Compose WheelPicker fires onSelectedIndex for the initial 5 ft 7 in on open.
         form.updateHeightFeetInches(feet = 5, inches = 7)
         form.save {}
@@ -167,12 +160,13 @@ class ProfileFormStateTest {
     }
 
     @Test
-    fun invalidNamePreventsSavingProfileOrUnit() {
+    fun invalidAgePreventsSavingProfileOrUnit() {
         val form = newForm()
+        form.updateAge("200")
         form.updateUnit(WeightUnit.IMPERIAL)
         form.save {}
 
-        assertEquals(ProfileNameError.REQUIRED, form.uiState.value.nameError)
+        assertTrue(form.uiState.value.ageError)
         assertTrue(events.isEmpty())
         assertNull(savedUnit)
         assertNull(savedProfile)

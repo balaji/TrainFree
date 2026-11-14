@@ -28,6 +28,8 @@ struct WorkoutSessionView: View {
     @State private var plateNumericMode = false
     @State private var weightUnit: WeightUnit = .metric
     @State private var restRemainingSeconds = 0
+    @State private var activeRowID: SessionSetRowID?
+    @State private var focusTrigger = 0
 
     private var sessionStartDate: Date? {
         guard uiState.startedAt > 0 else { return nil }
@@ -85,6 +87,7 @@ struct WorkoutSessionView: View {
                         // custom keyboard, unresponsive to taps. Resign
                         // first responder first so the alert always shows on top.
                         dismissKeyboard()
+                        activeRowID = nil
                         showDiscardConfirm = true
                     } label: {
                         Image(systemName: "xmark")
@@ -94,6 +97,7 @@ struct WorkoutSessionView: View {
                 ToolbarItem(placement: .primaryAction) {
                     Button {
                         dismissKeyboard()
+                        activeRowID = nil
                         if uiState.hasCompletedSets {
                             // Dismissal happens via followActiveSession() once
                             // the session leaves the in-progress state.
@@ -145,14 +149,6 @@ struct WorkoutSessionView: View {
         } message: {
             Text(L10n.nothingToSaveMessage)
         }
-    }
-
-    /// Resigns whatever text field is currently first responder — including
-    /// the plate keyboard's UIKit-backed field, which SwiftUI's own focus
-    /// system doesn't know about and so won't resign on its own before an
-    /// `.alert()` presents.
-    private func dismissKeyboard() {
-        UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
     }
 
     private func bootstrap() async {
@@ -248,65 +244,99 @@ struct WorkoutSessionView: View {
 
     @ViewBuilder
     private func sessionBody(formState: WorkoutSessionFormState) -> some View {
-        List {
-            ForEach(Array(uiState.exercises.enumerated()), id: \.element.id) { exIndex, exercise in
-                Section {
-                    SessionExerciseSection(
-                        exIndex: exIndex,
-                        exercise: exercise,
-                        formState: formState,
-                        plateKeyboard: plateKeyboard,
-                        plateNumericMode: plateNumericMode,
-                        weightUnit: weightUnit,
-                        restTimerSetIndex: (uiState.restTimer?.exerciseId == exercise.id && restRemainingSeconds > 0)
-                            ? Int(uiState.restTimer!.setIndex)
-                            : nil,
-                        restRemainingSeconds: restRemainingSeconds,
-                        restTotalSeconds: Int(uiState.restTimer?.durationSeconds ?? WorkoutSessionFormStateKt.REST_TIMER_DURATION_SECONDS)
-                    )
-                } header: {
-                    HStack {
-                        Text(exercise.exercise.name)
-                            .font(.headline)
-                            .foregroundStyle(Color.accentColor)
-                            .textCase(nil)
-                            .reorderHandle(
-                                onStart: { startY in
-                                    withAnimation(.easeOut(duration: 0.15)) {
-                                        reorder.begin(index: exIndex, fingerY: startY)
-                                    }
-                                    UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-                                },
-                                onChanged: { y in reorder.update(fingerY: y) },
-                                onEnded: { commitReorder() }
-                            )
-                        Spacer()
-                        Menu {
-                            Button(role: .destructive) {
-                                formState.removeExercise(exerciseIndex: Int32(exIndex))
-                            } label: {
-                                Label(L10n.deleteExercise, systemImage: "trash")
+        ScrollViewReader { proxy in
+            List {
+                ForEach(Array(uiState.exercises.enumerated()), id: \.element.id) { exIndex, exercise in
+                    Section {
+                        SessionExerciseSection(
+                            exIndex: exIndex,
+                            exercise: exercise,
+                            formState: formState,
+                            plateKeyboard: plateKeyboard,
+                            plateNumericMode: plateNumericMode,
+                            weightUnit: weightUnit,
+                            restTimerSetIndex: (uiState.restTimer?.exerciseId == exercise.id && restRemainingSeconds > 0)
+                                ? Int(uiState.restTimer!.setIndex)
+                                : nil,
+                            restRemainingSeconds: restRemainingSeconds,
+                            restTotalSeconds: Int(uiState.restTimer?.durationSeconds ?? WorkoutSessionFormStateKt.REST_TIMER_DURATION_SECONDS),
+                            onActivateRow: { setIdx in
+                                activeRowID = SessionSetRowID(exerciseId: exercise.id, setIndex: setIdx)
+                                focusTrigger += 1
+                            },
+                            onClearActiveRow: {
+                                activeRowID = nil
                             }
-                        } label: {
-                            Image(systemName: "ellipsis.circle")
-                                .foregroundStyle(.secondary)
-                                // Enlarges the tap target without growing the header.
-                                .contentShape(Rectangle())
+                        )
+                    } header: {
+                        HStack {
+                            Text(exercise.exercise.name)
+                                .font(.headline)
+                                .foregroundStyle(Color.accentColor)
+                                .textCase(nil)
+                                .reorderHandle(
+                                    onStart: { startY in
+                                        activeRowID = nil
+                                        withAnimation(.easeOut(duration: 0.15)) {
+                                            reorder.begin(index: exIndex, fingerY: startY)
+                                        }
+                                        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                                    },
+                                    onChanged: { y in reorder.update(fingerY: y) },
+                                    onEnded: { commitReorder() }
+                                )
+                            Spacer()
+                            Menu {
+                                Button(role: .destructive) {
+                                    formState.removeExercise(exerciseIndex: Int32(exIndex))
+                                } label: {
+                                    Label(L10n.deleteExercise, systemImage: "trash")
+                                }
+                            } label: {
+                                Image(systemName: "ellipsis.circle")
+                                    .foregroundStyle(.secondary)
+                                    // Enlarges the tap target without growing the header.
+                                    .contentShape(Rectangle())
+                            }
+                            .textCase(nil)
                         }
-                        .textCase(nil)
+                    }
+                }
+
+                Section {
+                    Button {
+                        showExercisePicker = true
+                    } label: {
+                        Label(L10n.addExercise, systemImage: "plus")
                     }
                 }
             }
-
-            Section {
-                Button {
-                    showExercisePicker = true
-                } label: {
-                    Label(L10n.addExercise, systemImage: "plus")
+            .scrollDisabled(reorder.activeIndex != nil)
+            .onChange(of: focusTrigger) { _, _ in
+                if let activeRowID {
+                    withAnimation(.easeOut(duration: 0.25)) {
+                        proxy.scrollTo(activeRowID)
+                    }
                 }
             }
+            .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardDidShowNotification)) { _ in
+                if let activeRowID {
+                    withAnimation(.easeOut(duration: 0.2)) {
+                        proxy.scrollTo(activeRowID)
+                    }
+                }
+            }
+            .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardDidChangeFrameNotification)) { _ in
+                if let activeRowID {
+                    withAnimation(.easeOut(duration: 0.2)) {
+                        proxy.scrollTo(activeRowID)
+                    }
+                }
+            }
+            .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillHideNotification)) { _ in
+                activeRowID = nil
+            }
         }
-        .scrollDisabled(reorder.activeIndex != nil)
     }
 
     private func commitReorder() {
@@ -321,6 +351,11 @@ struct WorkoutSessionView: View {
     }
 }
 
+private struct SessionSetRowID: Hashable {
+    let exerciseId: Int64
+    let setIndex: Int
+}
+
 private struct SessionExerciseSection: View {
     let exIndex: Int
     let exercise: DraftSessionExercise
@@ -331,6 +366,8 @@ private struct SessionExerciseSection: View {
     let restTimerSetIndex: Int?
     let restRemainingSeconds: Int
     let restTotalSeconds: Int
+    let onActivateRow: (Int) -> Void
+    let onClearActiveRow: () -> Void
 
     private var setsCount: Int { Int(exercise.sets.count) }
 
@@ -373,12 +410,16 @@ private struct SessionExerciseSection: View {
                     plateKeyboard: exercise.usesPlateKeyboard ? plateKeyboard : nil,
                     plateNumericMode: plateNumericMode,
                     onOpenPlateKeypad: {
+                        onActivateRow(setIdx)
                         plateKeyboard?.open(
                             exerciseIndex: Int32(exIndex),
                             setIndex: Int32(setIdx),
                             exerciseId: exercise.exercise.id,
                             currentValue: set.actualWeight
                         )
+                    },
+                    onFieldFocused: {
+                        onActivateRow(setIdx)
                     },
                     onSetTypeChange: { setType in
                         formState.setSetType(
@@ -408,9 +449,13 @@ private struct SessionExerciseSection: View {
                         )
                     },
                     onToggleCompleted: {
+                        dismissKeyboard()
+                        onClearActiveRow()
+                        plateKeyboard?.close()
                         formState.toggleCompleted(exerciseIndex: Int32(exIndex), setIndex: Int32(setIdx))
                     }
                 )
+                .id(SessionSetRowID(exerciseId: exercise.id, setIndex: setIdx))
                 .listRowSeparator(.hidden)
                 .swipeActions(edge: .trailing, allowsFullSwipe: true) {
                     // The last remaining set can't be deleted; delete the
@@ -464,6 +509,7 @@ private struct SessionSetRow: View {
     let plateKeyboard: BarbellKeyboardState?
     let plateNumericMode: Bool
     let onOpenPlateKeypad: () -> Void
+    let onFieldFocused: () -> Void
     let onSetTypeChange: (SetType) -> Void
     let onWeightChange: (String) -> Void
     let onRepsChange: (String) -> Void
@@ -471,6 +517,12 @@ private struct SessionSetRow: View {
     let onDistanceChange: (String) -> Void
     let onToggleCompleted: () -> Void
 
+    private enum FocusedColumn: Hashable {
+        case weight
+        case field(SetField)
+    }
+
+    @FocusState private var focusedColumn: FocusedColumn?
     @State private var pop = false
 
     var body: some View {
@@ -505,6 +557,7 @@ private struct SessionSetRow: View {
                     )
                     .keyboardType(.decimalPad)
                     .multilineTextAlignment(.center)
+                    .focused($focusedColumn, equals: .weight)
                 }
             }
             .frame(maxWidth: .infinity)
@@ -534,8 +587,14 @@ private struct SessionSetRow: View {
         }
         .scaleEffect(pop ? 1.04 : 1)
         .listRowBackground(set.completed ? Color.green.opacity(0.15) : nil)
+        .onChange(of: focusedColumn) { _, newValue in
+            if newValue != nil {
+                onFieldFocused()
+            }
+        }
         .onChange(of: set.completed) { _, completed in
             guard completed else { return }
+            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
             withAnimation(.easeOut(duration: 0.12)) { pop = true }
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.12) {
                 withAnimation(.easeOut(duration: 0.18)) { pop = false }
@@ -551,6 +610,7 @@ private struct SessionSetRow: View {
         switch field {
         case .duration:
             actualBox(
+                field: field,
                 placeholder: set.targetDuration.isEmpty ? L10n.durationPlaceholder : set.targetDuration,
                 value: set.actualDuration,
                 keyboard: .numberPad,
@@ -558,6 +618,7 @@ private struct SessionSetRow: View {
             )
         case .distance:
             actualBox(
+                field: field,
                 placeholder: set.targetDistance.isEmpty ? "0" : set.targetDistance,
                 value: set.actualDistance,
                 keyboard: .decimalPad,
@@ -565,6 +626,7 @@ private struct SessionSetRow: View {
             )
         default:
             actualBox(
+                field: field,
                 placeholder: set.targetReps.isEmpty ? "0" : set.targetReps,
                 value: set.actualReps,
                 keyboard: .numberPad,
@@ -574,6 +636,7 @@ private struct SessionSetRow: View {
     }
 
     private func actualBox(
+        field: SetField,
         placeholder: String,
         value: String,
         keyboard: UIKeyboardType,
@@ -582,6 +645,7 @@ private struct SessionSetRow: View {
         TextField(placeholder, text: Binding(get: { value }, set: onChange))
             .keyboardType(keyboard)
             .multilineTextAlignment(.center)
+            .focused($focusedColumn, equals: .field(field))
             .frame(maxWidth: .infinity)
             .padding(.vertical, 6)
             .background(Color(.secondarySystemBackground))
@@ -626,4 +690,12 @@ private struct RestTimerCountdownRow: View {
         .padding(.vertical, 4)
         .listRowBackground(Color.green.opacity(0.08))
     }
+}
+
+/// Resigns whatever text field is currently first responder — including
+/// the plate keyboard's UIKit-backed field, which SwiftUI's own focus
+/// system doesn't know about and so won't resign on its own before an
+/// `.alert()` presents.
+private func dismissKeyboard() {
+    UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
 }

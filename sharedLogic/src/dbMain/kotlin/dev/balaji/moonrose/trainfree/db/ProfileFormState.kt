@@ -12,14 +12,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
-/**
- * Why the name is invalid; the UI layers supply the localized message
- * (with [MAX_NAME_LENGTH] as the argument for [TOO_LONG]).
- */
-enum class ProfileNameError { REQUIRED, TOO_LONG, INVALID_CHARS }
-
 data class ProfileFormUiState(
-    val name: String = "",
     val age: String = "",
     val gender: String? = null,
     val unit: WeightUnit = WeightUnit.METRIC,
@@ -30,13 +23,11 @@ data class ProfileFormUiState(
     /** Wheel-picker height; only used when the form's unit is imperial. */
     val heightFeet: Int = 5,
     val heightInches: Int = 7,
-    val nameError: ProfileNameError? = null,
     /** True when the age is not a number in [MIN_AGE]..[MAX_AGE]; the UI supplies the localized message. */
     val ageError: Boolean = false,
     val saving: Boolean = false,
 )
 
-const val MAX_NAME_LENGTH = 50
 const val MIN_AGE = 1
 const val MAX_AGE = 120
 private const val MIN_WHEEL_FEET = 3
@@ -66,7 +57,6 @@ class ProfileFormState internal constructor(
     initial: Profile? = null,
     unit: WeightUnit = WeightUnit.METRIC,
     private val saveProfile: suspend (
-        name: String,
         age: Int?,
         gender: String?,
         weight: Double?,
@@ -78,9 +68,8 @@ class ProfileFormState internal constructor(
     constructor(initial: Profile? = null, unit: WeightUnit = WeightUnit.METRIC) : this(
         initial = initial,
         unit = unit,
-        saveProfile = { name, age, gender, weight, height ->
+        saveProfile = { age, gender, weight, height ->
             ProfileRepository.save(
-                name = name,
                 age = age,
                 gender = gender,
                 weight = weight,
@@ -100,7 +89,6 @@ class ProfileFormState internal constructor(
 
     private val _uiState = MutableStateFlow(
         ProfileFormUiState(
-            name = initial?.name ?: "",
             age = initial?.age?.toString() ?: "",
             gender = initial?.gender,
             unit = unit,
@@ -111,11 +99,6 @@ class ProfileFormState internal constructor(
         ),
     )
     val uiState: StateFlow<ProfileFormUiState> = _uiState.asStateFlow()
-
-    fun updateName(value: String) {
-        val filtered = value.filter { it.isLetter() || it == ' ' }.take(MAX_NAME_LENGTH)
-        _uiState.value = _uiState.value.copy(name = filtered, nameError = null)
-    }
 
     fun updateAge(value: String) {
         _uiState.value = _uiState.value.copy(age = value.filterDigits(), ageError = false)
@@ -173,10 +156,8 @@ class ProfileFormState internal constructor(
 
     fun save(onSaved: () -> Unit) {
         val state = _uiState.value
-        val nameError = validateName(state.name)
-        val ageError = hasAgeError(state.age)
-        if (nameError != null || ageError) {
-            _uiState.value = state.copy(nameError = nameError, ageError = ageError)
+        if (hasAgeError(state.age)) {
+            _uiState.value = state.copy(ageError = true)
             return
         }
         _uiState.value = state.copy(saving = true)
@@ -185,7 +166,6 @@ class ProfileFormState internal constructor(
             // profile observer doesn't transition to tabs with a stale unit.
             saveUnit(state.unit)
             saveProfile(
-                state.name.trim(),
                 state.age.toIntOrNull(),
                 state.gender,
                 weightKgToSave(state),
@@ -218,16 +198,6 @@ class ProfileFormState internal constructor(
                 else -> HeightConversion.feetInchesToCm(state.heightFeet, state.heightInches)
             }
         }
-    }
-}
-
-private fun validateName(name: String): ProfileNameError? {
-    val trimmed = name.trim()
-    return when {
-        trimmed.isEmpty() -> ProfileNameError.REQUIRED
-        trimmed.length > MAX_NAME_LENGTH -> ProfileNameError.TOO_LONG
-        !trimmed.all { it.isLetter() || it == ' ' } -> ProfileNameError.INVALID_CHARS
-        else -> null
     }
 }
 

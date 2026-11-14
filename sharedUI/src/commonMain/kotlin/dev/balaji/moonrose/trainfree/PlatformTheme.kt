@@ -1,10 +1,17 @@
 package dev.balaji.moonrose.trainfree
 
 import androidx.compose.runtime.Composable
+import dev.balaji.moonrose.trainfree.model.AppFont
+import dev.balaji.moonrose.trainfree.model.AppFontSize
 import dev.balaji.moonrose.trainfree.model.Appearance
 
 @Composable
-expect fun PlatformTheme(appearance: Appearance = Appearance.SYSTEM, content: @Composable () -> Unit)
+expect fun PlatformTheme(
+    appearance: Appearance = Appearance.SYSTEM,
+    appFont: AppFont = AppFont.SYSTEM_UI,
+    appFontSize: AppFontSize = AppFontSize.DEFAULT,
+    content: @Composable () -> Unit,
+)
 
 /** Resolves the appearance setting to dark-mode on/off; SYSTEM follows the OS. */
 internal fun Appearance.isDark(systemInDarkTheme: Boolean): Boolean = when (this) {

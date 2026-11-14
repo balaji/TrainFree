@@ -645,7 +645,6 @@ object ChatToolbox {
 
         if (profile != null) {
             val parts = buildList {
-                add("name: ${profile.name}")
                 profile.age?.let { add("age: $it") }
                 profile.gender?.let { add("gender: $it") }
                 profile.weight?.let {
@@ -661,7 +660,11 @@ object ChatToolbox {
                     add("height: $heightText")
                 }
             }
-            lines += "Profile: ${parts.joinToString(", ")}."
+            if (parts.isNotEmpty()) {
+                lines += "Profile: ${parts.joinToString(", ")}."
+            } else {
+                lines += "Profile: configured."
+            }
 
             val weightKg = trend?.latest?.let { settings.weightUnit.toKilograms(it) } ?: profile.weight
             val heightCm = profile.height

@@ -18,7 +18,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
-import androidx.compose.material.icons.filled.Brightness6
+import androidx.compose.material.icons.filled.Smartphone
 import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.LightMode
 import androidx.compose.material3.AlertDialog
@@ -57,6 +57,8 @@ import dev.balaji.moonrose.trainfree.calendar.WeekStart
 import dev.balaji.moonrose.trainfree.db.ProfileRepository
 import dev.balaji.moonrose.trainfree.db.TestDataRepository
 import dev.balaji.moonrose.trainfree.db.UserSettingsRepository
+import dev.balaji.moonrose.trainfree.model.AppFont
+import dev.balaji.moonrose.trainfree.model.AppFontSize
 import dev.balaji.moonrose.trainfree.model.Appearance
 import dev.balaji.moonrose.trainfree.model.MAX_REST_TIMER_SECONDS
 import dev.balaji.moonrose.trainfree.model.MIN_REST_TIMER_SECONDS
@@ -150,8 +152,6 @@ private fun ProfileDetails(profile: Profile, onEdit: () -> Unit) {
             ),
         verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
-        ProfileField(stringResource(Res.string.name), profile.name)
-        HorizontalDivider()
         ProfileField(stringResource(Res.string.age), profile.age?.toString())
         HorizontalDivider()
         ProfileField(stringResource(Res.string.gender), profile.gender?.let { genderLabel(it) })
@@ -223,6 +223,14 @@ private fun SettingsSection() {
         } else {
             scope.launch { UserSettingsRepository.setNotificationsEnabled(false) }
         }
+    }
+    HorizontalDivider()
+    AppFontRow(current.appFont) { font ->
+        scope.launch { UserSettingsRepository.setAppFont(font) }
+    }
+    HorizontalDivider()
+    AppFontSizeRow(current.appFontSize) { size ->
+        scope.launch { UserSettingsRepository.setAppFontSize(size) }
     }
     if (showNotificationsDeniedHint) {
         val openNotificationSettings = rememberNotificationSettingsOpener()
@@ -508,7 +516,7 @@ private fun AppearanceSettingRow(selected: Appearance, onSelect: (Appearance) ->
                     imageVector = when (appearance) {
                         Appearance.LIGHT -> Icons.Filled.LightMode
                         Appearance.DARK -> Icons.Filled.DarkMode
-                        Appearance.SYSTEM -> Icons.Filled.Brightness6
+                        Appearance.SYSTEM -> Icons.Filled.Smartphone
                     },
                     contentDescription = appearanceLabel(appearance),
                 )
@@ -573,9 +581,12 @@ private fun RestTimerDurationRow(
 }
 
 @Composable
-private fun RestTimerSoundRow(
-    selected: RestTimerSound,
-    onSelect: (RestTimerSound) -> Unit,
+private fun <T> DropdownSettingRow(
+    label: String,
+    options: List<T>,
+    selected: T,
+    optionLabel: @Composable (T) -> String,
+    onSelect: (T) -> Unit,
 ) {
     var expanded by remember { mutableStateOf(false) }
     Row(
@@ -583,24 +594,66 @@ private fun RestTimerSoundRow(
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(stringResource(Res.string.rest_timer_sound), style = MaterialTheme.typography.bodyLarge)
+        Text(label, style = MaterialTheme.typography.bodyLarge)
         Box {
             OutlinedButton(onClick = { expanded = true }) {
-                Text(restTimerSoundLabel(selected))
+                Text(optionLabel(selected))
             }
             DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
-                RestTimerSound.entries.forEach { sound ->
+                options.forEach { option ->
                     DropdownMenuItem(
-                        text = { Text(restTimerSoundLabel(sound)) },
+                        text = { Text(optionLabel(option)) },
                         onClick = {
                             expanded = false
-                            onSelect(sound)
+                            onSelect(option)
                         },
                     )
                 }
             }
         }
     }
+}
+
+@Composable
+private fun RestTimerSoundRow(
+    selected: RestTimerSound,
+    onSelect: (RestTimerSound) -> Unit,
+) {
+    DropdownSettingRow(
+        label = stringResource(Res.string.rest_timer_sound),
+        options = RestTimerSound.entries,
+        selected = selected,
+        optionLabel = { restTimerSoundLabel(it) },
+        onSelect = onSelect,
+    )
+}
+
+@Composable
+private fun AppFontRow(
+    selected: AppFont,
+    onSelect: (AppFont) -> Unit,
+) {
+    DropdownSettingRow(
+        label = stringResource(Res.string.font_options),
+        options = AppFont.entries,
+        selected = selected,
+        optionLabel = { appFontLabel(it) },
+        onSelect = onSelect,
+    )
+}
+
+@Composable
+private fun AppFontSizeRow(
+    selected: AppFontSize,
+    onSelect: (AppFontSize) -> Unit,
+) {
+    DropdownSettingRow(
+        label = stringResource(Res.string.font_size),
+        options = AppFontSize.entries,
+        selected = selected,
+        optionLabel = { appFontSizeLabel(it) },
+        onSelect = onSelect,
+    )
 }
 
 @Composable

@@ -5,20 +5,8 @@ import SharedUI
 // the shared ProfileFormState. L10n.genderLabel maps them for display.
 private let genderOptions = ["male", "female", "other", "prefer_not_to_say"]
 
-/// Localized messages for the language-neutral validation errors the shared
-/// form state emits; mirrors sharedUI's profileNameErrorText. The length
-/// bound matches MAX_NAME_LENGTH in the shared ProfileFormState.
-private func nameErrorText(_ error: ProfileNameError) -> String {
-    switch error {
-    case .required: return L10n.nameRequired
-    case .tooLong: return L10n.profileNameTooLong(50)
-    case .invalidChars: return L10n.profileNameLettersOnly
-    default: return L10n.profileNameInvalid
-    }
-}
-
 private enum ProfileFormField: Hashable {
-    case name, age, weight, height
+    case age, weight, height
 }
 
 /// Native SwiftUI replacement for the Compose `ProfileForm`, bound to the
@@ -51,21 +39,6 @@ struct ProfileFormView: View {
     var body: some View {
         Form {
             Section {
-                LabeledContent(L10n.name) {
-                    TextField("", text: Binding(
-                        get: { uiState.name },
-                        set: { formState.updateName(value: $0) }
-                    ))
-                    .multilineTextAlignment(.trailing)
-                    .focused($focusedField, equals: .name)
-                }
-
-                if let nameError = uiState.nameError {
-                    Text(nameErrorText(nameError))
-                        .font(.caption)
-                        .foregroundStyle(.red)
-                }
-
                 LabeledContent(L10n.age) {
                     TextField("", text: Binding(
                         get: { uiState.age },

@@ -192,6 +192,14 @@
     <string name="rest_sound_antares">Antares</string>
     <string name="rest_sound_altair">Altair</string>
     <string name="rest_sound_deneb">Deneb</string>
+    <string name="font_options">Font</string>
+    <string name="font_system_ui">System UI</string>
+    <string name="font_google_sans">Google Sans</string>
+    <string name="font_inter">Inter</string>
+    <string name="font_size">Font size</string>
+    <string name="font_size_default">Default</string>
+    <string name="font_size_larger">Larger</string>
+    <string name="font_size_largest">Largest</string>
 
     <!-- Developer tools -->
     <string name="developer">Developer</string>
@@ -286,8 +294,6 @@
     <string name="insight_narration_loading">Reading your training data and writing a note about this trend.</string>
 
     <!-- Profile validation -->
-    <string name="profile_name_too_long">Name must be at most %1$s characters</string>
-    <string name="profile_name_letters_only">Name must contain only letters</string>
     <string name="profile_age_range">Age must be between %1$s and %2$s</string>
 
     <!-- Sample programs -->

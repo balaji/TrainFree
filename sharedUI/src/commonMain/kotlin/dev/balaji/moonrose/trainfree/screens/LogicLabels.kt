@@ -5,15 +5,15 @@ import dev.balaji.moonrose.trainfree.calendar.WeekMath
 import dev.balaji.moonrose.trainfree.chat.ChatMessage
 import dev.balaji.moonrose.trainfree.chat.ChatSuggestedPrompt
 import dev.balaji.moonrose.trainfree.db.MAX_AGE
-import dev.balaji.moonrose.trainfree.db.MAX_NAME_LENGTH
 import dev.balaji.moonrose.trainfree.db.MIN_AGE
-import dev.balaji.moonrose.trainfree.db.ProfileNameError
 import dev.balaji.moonrose.trainfree.insights.BmiCategory
 import dev.balaji.moonrose.trainfree.insights.BmiClassification
 import dev.balaji.moonrose.trainfree.insights.BmiFormula
 import dev.balaji.moonrose.trainfree.insights.InsightCard
 import dev.balaji.moonrose.trainfree.insights.InsightMath
 import dev.balaji.moonrose.trainfree.insights.OneRmFormula
+import dev.balaji.moonrose.trainfree.model.AppFont
+import dev.balaji.moonrose.trainfree.model.AppFontSize
 import dev.balaji.moonrose.trainfree.model.HeightConversion
 import dev.balaji.moonrose.trainfree.model.RestTimerSound
 import dev.balaji.moonrose.trainfree.model.SampleProgram
@@ -26,7 +26,7 @@ import dev.balaji.moonrose.trainfree.sharedui.resources.*
 /*
  * Localized rendering of the language-neutral keys, enums, and structured
  * data that sharedLogic produces. sharedLogic never emits display text (see
- * e.g. InsightCard, SampleProgram, ProfileNameError); this file is where the
+ * e.g. InsightCard, SampleProgram); this file is where the
  * Compose UI turns those keys into strings. The iOS SwiftUI
  * shell keeps its own equivalent of these mappings.
  */
@@ -57,6 +57,24 @@ internal fun restTimerSoundLabel(sound: RestTimerSound): String = stringResource
         RestTimerSound.ANTARES -> Res.string.rest_sound_antares
         RestTimerSound.ALTAIR -> Res.string.rest_sound_altair
         RestTimerSound.DENEB -> Res.string.rest_sound_deneb
+    },
+)
+
+@Composable
+internal fun appFontLabel(font: AppFont): String = stringResource(
+    when (font) {
+        AppFont.SYSTEM_UI -> Res.string.font_system_ui
+        AppFont.GOOGLE_SANS -> Res.string.font_google_sans
+        AppFont.INTER -> Res.string.font_inter
+    },
+)
+
+@Composable
+internal fun appFontSizeLabel(size: AppFontSize): String = stringResource(
+    when (size) {
+        AppFontSize.DEFAULT -> Res.string.font_size_default
+        AppFontSize.LARGER -> Res.string.font_size_larger
+        AppFontSize.LARGEST -> Res.string.font_size_largest
     },
 )
 
@@ -249,13 +267,6 @@ internal fun genderLabel(key: String): String = when (key) {
     "other" -> stringResource(Res.string.gender_other)
     "prefer_not_to_say" -> stringResource(Res.string.gender_prefer_not_to_say)
     else -> key
-}
-
-@Composable
-internal fun profileNameErrorText(error: ProfileNameError): String = when (error) {
-    ProfileNameError.REQUIRED -> stringResource(Res.string.name_required)
-    ProfileNameError.TOO_LONG -> stringResource(Res.string.profile_name_too_long, MAX_NAME_LENGTH.toString())
-    ProfileNameError.INVALID_CHARS -> stringResource(Res.string.profile_name_letters_only)
 }
 
 @Composable

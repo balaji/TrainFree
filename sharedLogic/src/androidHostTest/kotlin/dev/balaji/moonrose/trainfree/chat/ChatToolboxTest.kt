@@ -208,7 +208,7 @@ class ChatToolboxTest {
     fun `body metrics converts imperial weight to kg for BMI`() {
         // Profile stores canonical kg (80.0) and cm (180.0); trend values are in display unit (lb).
         // Standard BMI = 80 / 1.8^2 = 24.69 -> Normal (WHO).
-        val profile = Profile(1L, "Alex", 30, "male", 80.0, 180.0)
+        val profile = Profile(1L, 30, "male", 80.0, 180.0)
         val trend = BodyWeightTrend(
             points = listOf(SparkPoint(20_000L, 178.0), SparkPoint(20_020L, 176.37)),
             latest = 176.37,

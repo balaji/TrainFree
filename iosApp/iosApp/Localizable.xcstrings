@@ -2109,40 +2109,6 @@
         }
       }
     },
-    "profile_name_too_long": {
-      "extractionState": "manual",
-      "localizations": {
-        "sv": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Namnet får vara högst %lld tecken"
-          }
-        },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Name must be at most %lld characters"
-          }
-        }
-      }
-    },
-    "profile_name_letters_only": {
-      "extractionState": "manual",
-      "localizations": {
-        "sv": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Namnet får bara innehålla bokstäver"
-          }
-        },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Name must contain only letters"
-          }
-        }
-      }
-    },
     "profile_age_range": {
       "extractionState": "manual",
       "localizations": {
@@ -2156,23 +2122,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Age must be between %1$lld and %2$lld"
-          }
-        }
-      }
-    },
-    "profile_name_invalid": {
-      "extractionState": "manual",
-      "localizations": {
-        "sv": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Ogiltigt namn"
-          }
-        },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Invalid name"
           }
         }
       }

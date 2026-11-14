@@ -77,13 +77,11 @@ import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
-import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import dev.balaji.moonrose.trainfree.db.DraftWorkSet
 import dev.balaji.moonrose.trainfree.db.RoutineDetailUiState
 import dev.balaji.moonrose.trainfree.db.RoutineFormState
@@ -702,8 +700,7 @@ private fun CompactInput(
         modifier = modifier,
         singleLine = true,
         keyboardOptions = KeyboardOptions(keyboardType = keyboardType),
-        textStyle = TextStyle(
-            fontSize = 14.sp,
+        textStyle = MaterialTheme.typography.bodyMedium.copy(
             textAlign = TextAlign.Center,
             color = MaterialTheme.colorScheme.onSurface,
         ),
@@ -725,8 +722,7 @@ private fun CompactInput(
                         // otherwise stack a two-digit placeholder vertically.
                         maxLines = 1,
                         softWrap = false,
-                        style = TextStyle(
-                            fontSize = 14.sp,
+                        style = MaterialTheme.typography.bodyMedium.copy(
                             textAlign = TextAlign.Center,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         ),

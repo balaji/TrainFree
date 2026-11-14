@@ -18,7 +18,6 @@ object DevSeed {
         CoroutineScope(Dispatchers.Main).launch {
             if (ProfileRepository.profile.first() != null) return@launch
             ProfileRepository.save(
-                name = "Test User",
                 age = 35,
                 gender = GENDER_KEYS.first(),
                 // Display unit defaults to metric on a fresh install.

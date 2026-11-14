@@ -25,10 +25,12 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
@@ -36,6 +38,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.relocation.BringIntoViewRequester
+import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
@@ -68,10 +72,12 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -80,24 +86,25 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.LocalPinnableContainer
 import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
-import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.compose.ui.focus.onFocusChanged
 import dev.balaji.moonrose.trainfree.db.BarbellKeyboardState
 import dev.balaji.moonrose.trainfree.db.DraftSessionExercise
@@ -172,7 +179,10 @@ fun WorkoutSessionScreen(route: WorkoutSessionRoute, onGoBack: () -> Unit) {
         WorkoutSessionBody(
             formState = formState,
             uiState = uiState,
-            modifier = Modifier.padding(padding),
+            modifier = Modifier
+                .padding(padding)
+                .consumeWindowInsets(padding)
+                .imePadding(),
         )
     }
 
@@ -298,6 +308,7 @@ private fun WorkoutSessionBody(
     val plateKeyboard = remember(formState) { BarbellKeyboardState(formState) }
     val plateState by plateKeyboard.uiState.collectAsState()
     val settings by UserSettingsRepository.settings.collectAsState(initial = UserSettings())
+    var listHeightPx by remember { mutableIntStateOf(0) }
     val restTimer = uiState.restTimer
     var restRemainingSeconds by remember(restTimer) {
         mutableLongStateOf(restTimer?.let { remainingSecondsUntil(it.endsAtMillis) } ?: 0L)
@@ -327,7 +338,10 @@ private fun WorkoutSessionBody(
             uiState.loading -> CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
             else -> Column(modifier = Modifier.fillMaxSize()) {
                 LazyColumn(
-                    modifier = Modifier.weight(1f).fillMaxWidth(),
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxWidth()
+                        .onSizeChanged { listHeightPx = it.height },
                     contentPadding = PaddingValues(bottom = 16.dp),
                 ) {
                     itemsIndexed(uiState.exercises, key = { _, ex -> ex.id }) { exIndex, exercise ->
@@ -335,6 +349,7 @@ private fun WorkoutSessionBody(
                             exercise = exercise,
                             exIndex = exIndex,
                             weightUnit = settings.weightUnit,
+                            listHeightPx = listHeightPx,
                             // Which of this card's sets the plate keypad is
                             // editing, or null when it targets another card.
                             plateKeypadSetIndex = plateState.setIndex.takeIf {
@@ -365,7 +380,12 @@ private fun WorkoutSessionBody(
                             },
                             onUpdateDistance = { setIdx, v -> formState.updateActualDistance(exIndex, setIdx, v) },
                             onSetTypeChange = { setIdx, setType -> formState.setSetType(exIndex, setIdx, setType) },
-                            onToggleCompleted = { setIdx -> formState.toggleCompleted(exIndex, setIdx) },
+                            onToggleCompleted = { setIdx ->
+                                focusManager.clearFocus()
+                                keyboardController?.hide()
+                                plateKeyboard.close()
+                                formState.toggleCompleted(exIndex, setIdx)
+                            },
                             onDelete = { formState.removeExercise(exIndex) },
                             onReorderStart = { startRootY ->
                                 focusManager.clearFocus()
@@ -565,6 +585,7 @@ private fun SessionExerciseCard(
     exercise: DraftSessionExercise,
     exIndex: Int,
     weightUnit: WeightUnit,
+    listHeightPx: Int,
     plateKeypadSetIndex: Int?,
     restTimerSetIndex: Int?,
     restRemainingSeconds: Long,
@@ -653,7 +674,7 @@ private fun SessionExerciseCard(
         ) {
             Text(
                 stringResource(Res.string.column_set),
-                modifier = Modifier.width(32.dp),
+                modifier = Modifier.width(36.dp),
                 style = MaterialTheme.typography.labelSmall,
                 textAlign = TextAlign.Center,
             )
@@ -699,6 +720,7 @@ private fun SessionExerciseCard(
                 canComplete = exercise.isSetReadyToComplete(setIdx),
                 usesPlateKeypad = exercise.usesPlateKeyboard,
                 plateKeypadActive = plateKeypadSetIndex == setIdx,
+                listHeightPx = listHeightPx,
                 onOpenPlateKeypad = { onOpenPlateKeypad(setIdx, set.actualWeight) },
                 onFieldFocused = onFieldFocused,
                 onDelete = { onRemoveSet(setIdx) },
@@ -744,6 +766,7 @@ private fun SessionSetRow(
     canComplete: Boolean,
     usesPlateKeypad: Boolean,
     plateKeypadActive: Boolean,
+    listHeightPx: Int,
     onOpenPlateKeypad: () -> Unit,
     onFieldFocused: () -> Unit,
     onDelete: () -> Unit,
@@ -755,6 +778,36 @@ private fun SessionSetRow(
     onToggleCompleted: () -> Unit,
 ) {
     val scope = rememberCoroutineScope()
+    val bringIntoViewRequester = remember { BringIntoViewRequester() }
+    var focusedFields by remember { mutableStateOf(emptySet<String>()) }
+    var focusTrigger by remember { mutableIntStateOf(0) }
+    var rowHeightPx by remember { mutableIntStateOf(0) }
+    val isEditing = plateKeypadActive || focusedFields.isNotEmpty()
+    val pinnableContainer = LocalPinnableContainer.current
+    DisposableEffect(isEditing) {
+        val handle = if (isEditing) pinnableContainer?.pin() else null
+        onDispose { handle?.release() }
+    }
+    val extraBottomPx = with(LocalDensity.current) { 12.dp.toPx() }
+    suspend fun bringRowIntoView() {
+        val targetRect = if (rowHeightPx > 0) {
+            Rect(0f, 0f, 1f, rowHeightPx + extraBottomPx)
+        } else {
+            null
+        }
+        bringIntoViewRequester.bringIntoView(targetRect)
+    }
+    LaunchedEffect(isEditing, focusTrigger) {
+        if (isEditing) {
+            bringRowIntoView()
+        }
+    }
+    LaunchedEffect(isEditing, listHeightPx) {
+        if (isEditing && listHeightPx > 0) {
+            delay(60L)
+            bringRowIntoView()
+        }
+    }
     val actionWidth = 72.dp
     val actionWidthPx = with(LocalDensity.current) { actionWidth.toPx() }
     val anchors = remember(actionWidthPx) {
@@ -767,6 +820,7 @@ private fun SessionSetRow(
         AnchoredDraggableState(initialValue = SessionSwipeAnchor.Closed, anchors = anchors)
     }
 
+    val haptics = LocalHapticFeedback.current
     val rowTint by animateColorAsState(
         if (set.completed) CompletedGreen.copy(alpha = 0.20f) else Color.Transparent,
     )
@@ -775,13 +829,19 @@ private fun SessionSetRow(
     var completedSeen by remember { mutableStateOf(set.completed) }
     LaunchedEffect(set.completed) {
         if (set.completed && !completedSeen) {
+            haptics.performHapticFeedback(HapticFeedbackType.LongPress)
             popScale.animateTo(1.04f, tween(durationMillis = 110))
             popScale.animateTo(1f, tween(durationMillis = 160))
         }
         completedSeen = set.completed
     }
 
-    Box(modifier = Modifier.fillMaxWidth()) {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .bringIntoViewRequester(bringIntoViewRequester)
+            .onSizeChanged { rowHeightPx = it.height },
+    ) {
         Box(
             modifier = Modifier
                 .matchParentSize()
@@ -821,7 +881,7 @@ private fun SessionSetRow(
                 setType = set.setType,
                 workingSetNumber = workingSetNumber,
                 onSetTypeChange = onSetTypeChange,
-                cellWidth = 32.dp,
+                cellWidth = 36.dp,
             )
             Text(
                 previous ?: "—",
@@ -837,7 +897,10 @@ private fun SessionSetRow(
                     value = set.actualWeight,
                     target = set.targetWeight,
                     active = plateKeypadActive,
-                    onClick = onOpenPlateKeypad,
+                    onClick = {
+                        focusTrigger++
+                        onOpenPlateKeypad()
+                    },
                     modifier = Modifier.weight(1f).padding(horizontal = 4.dp),
                 )
             } else {
@@ -846,18 +909,31 @@ private fun SessionSetRow(
                     target = set.targetWeight,
                     onValueChange = onUpdateWeight,
                     keyboardType = KeyboardType.Decimal,
-                    onFocused = onFieldFocused,
+                    onFocused = {
+                        focusTrigger++
+                        onFieldFocused()
+                    },
+                    onFocusStateChanged = { focused ->
+                        focusedFields = if (focused) focusedFields + "weight" else focusedFields - "weight"
+                    },
                     modifier = Modifier.weight(1f).padding(horizontal = 4.dp),
                 )
             }
             fields.forEach { field ->
+                val fieldKey = field.name
                 when (field) {
                     SetField.REPS -> CompactActualInput(
                         value = set.actualReps,
                         target = set.targetReps,
                         onValueChange = onUpdateReps,
                         keyboardType = KeyboardType.Number,
-                        onFocused = onFieldFocused,
+                        onFocused = {
+                            focusTrigger++
+                            onFieldFocused()
+                        },
+                        onFocusStateChanged = { focused ->
+                            focusedFields = if (focused) focusedFields + fieldKey else focusedFields - fieldKey
+                        },
                         modifier = Modifier.weight(1f).padding(horizontal = 4.dp),
                     )
                     SetField.DURATION -> CompactActualInput(
@@ -866,7 +942,13 @@ private fun SessionSetRow(
                         emptyPlaceholder = stringResource(Res.string.duration_placeholder),
                         onValueChange = onUpdateDuration,
                         keyboardType = KeyboardType.Number,
-                        onFocused = onFieldFocused,
+                        onFocused = {
+                            focusTrigger++
+                            onFieldFocused()
+                        },
+                        onFocusStateChanged = { focused ->
+                            focusedFields = if (focused) focusedFields + fieldKey else focusedFields - fieldKey
+                        },
                         modifier = Modifier.weight(1f).padding(horizontal = 4.dp),
                     )
                     SetField.DISTANCE -> CompactActualInput(
@@ -874,7 +956,13 @@ private fun SessionSetRow(
                         target = set.targetDistance,
                         onValueChange = onUpdateDistance,
                         keyboardType = KeyboardType.Decimal,
-                        onFocused = onFieldFocused,
+                        onFocused = {
+                            focusTrigger++
+                            onFieldFocused()
+                        },
+                        onFocusStateChanged = { focused ->
+                            focusedFields = if (focused) focusedFields + fieldKey else focusedFields - fieldKey
+                        },
                         modifier = Modifier.weight(1f).padding(horizontal = 4.dp),
                     )
                 }
@@ -1031,8 +1119,7 @@ private fun PlateWeightCell(
     ) {
         Text(
             value.ifEmpty { target.ifBlank { "0" } },
-            style = TextStyle(
-                fontSize = 14.sp,
+            style = MaterialTheme.typography.bodyMedium.copy(
                 textAlign = TextAlign.Center,
                 color = if (value.isEmpty()) {
                     MaterialTheme.colorScheme.onSurfaceVariant
@@ -1055,6 +1142,7 @@ private fun CompactActualInput(
     // for the duration box.
     emptyPlaceholder: String = "0",
     onFocused: (() -> Unit)? = null,
+    onFocusStateChanged: ((Boolean) -> Unit)? = null,
 ) {
     val interactionSource = remember { MutableInteractionSource() }
     if (onFocused != null) {
@@ -1071,16 +1159,18 @@ private fun CompactActualInput(
     BasicTextField(
         value = value,
         onValueChange = onValueChange,
-        modifier = if (onFocused == null) {
+        modifier = if (onFocused == null && onFocusStateChanged == null) {
             modifier
         } else {
-            modifier.onFocusChanged { if (it.isFocused) onFocused() }
+            modifier.onFocusChanged {
+                onFocusStateChanged?.invoke(it.isFocused)
+                if (it.isFocused) onFocused?.invoke()
+            }
         },
         singleLine = true,
         keyboardOptions = KeyboardOptions(keyboardType = keyboardType),
         interactionSource = interactionSource,
-        textStyle = TextStyle(
-            fontSize = 14.sp,
+        textStyle = MaterialTheme.typography.bodyMedium.copy(
             textAlign = TextAlign.Center,
             color = MaterialTheme.colorScheme.onSurface,
         ),
@@ -1102,8 +1192,7 @@ private fun CompactActualInput(
                         // otherwise stack a two-digit placeholder vertically.
                         maxLines = 1,
                         softWrap = false,
-                        style = TextStyle(
-                            fontSize = 14.sp,
+                        style = MaterialTheme.typography.bodyMedium.copy(
                             textAlign = TextAlign.Center,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         ),

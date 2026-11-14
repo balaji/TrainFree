@@ -4,6 +4,8 @@ import dev.balaji.moonrose.trainfree.calendar.WeekStart
 import dev.balaji.moonrose.trainfree.insights.BmiClassification
 import dev.balaji.moonrose.trainfree.insights.BmiFormula
 import dev.balaji.moonrose.trainfree.insights.OneRmFormula
+import dev.balaji.moonrose.trainfree.model.AppFont
+import dev.balaji.moonrose.trainfree.model.AppFontSize
 import dev.balaji.moonrose.trainfree.model.Appearance
 import dev.balaji.moonrose.trainfree.model.DEFAULT_REST_TIMER_SECONDS
 import dev.balaji.moonrose.trainfree.model.ProgressionCardConfig
@@ -20,6 +22,8 @@ internal const val SETTING_WEIGHT_UNIT = "weight_unit"
 internal const val SETTING_NOTIFICATIONS_ENABLED = "notifications_enabled"
 internal const val SETTING_REST_TIMER_DURATION = "rest_timer_duration_seconds"
 internal const val SETTING_REST_TIMER_SOUND = "rest_timer_sound"
+internal const val SETTING_APP_FONT = "app_font"
+internal const val SETTING_APP_FONT_SIZE = "app_font_size"
 internal const val SETTING_ONE_RM_FORMULA = "one_rm_formula"
 internal const val SETTING_BMI_FORMULA = "bmi_formula"
 internal const val SETTING_BMI_CLASSIFICATION = "bmi_classification"
@@ -53,6 +57,10 @@ object UserSettingsRepository {
 
     suspend fun setRestTimerSound(sound: RestTimerSound) =
         set(SETTING_REST_TIMER_SOUND, sound.value)
+
+    suspend fun setAppFont(font: AppFont) = set(SETTING_APP_FONT, font.value)
+
+    suspend fun setAppFontSize(size: AppFontSize) = set(SETTING_APP_FONT_SIZE, size.value)
 
     suspend fun setOneRmFormula(formula: OneRmFormula) = set(SETTING_ONE_RM_FORMULA, formula.value)
 
@@ -109,6 +117,8 @@ internal fun List<UserSettingEntity>.toUserSettings(): UserSettings {
             ?.let(::clampRestTimerSeconds)
             ?: DEFAULT_REST_TIMER_SECONDS,
         restTimerSound = RestTimerSound.fromValue(byKey[SETTING_REST_TIMER_SOUND]),
+        appFont = AppFont.fromValue(byKey[SETTING_APP_FONT]),
+        appFontSize = AppFontSize.fromValue(byKey[SETTING_APP_FONT_SIZE]),
         progressionCards = decodeProgressionCards(byKey[SETTING_PROGRESSION_CARDS]),
     )
 }

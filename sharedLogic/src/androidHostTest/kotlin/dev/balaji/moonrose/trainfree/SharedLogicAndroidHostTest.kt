@@ -4,11 +4,15 @@ import dev.balaji.moonrose.trainfree.db.DraftSessionExercise
 import dev.balaji.moonrose.trainfree.db.DraftSessionSet
 import dev.balaji.moonrose.trainfree.db.REST_TIMER_DURATION_MS
 import dev.balaji.moonrose.trainfree.db.RestTimerTarget
+import dev.balaji.moonrose.trainfree.db.SETTING_APP_FONT
+import dev.balaji.moonrose.trainfree.db.SETTING_APP_FONT_SIZE
 import dev.balaji.moonrose.trainfree.db.SETTING_REST_TIMER_DURATION
 import dev.balaji.moonrose.trainfree.db.SETTING_REST_TIMER_SOUND
 import dev.balaji.moonrose.trainfree.db.UserSettingEntity
 import dev.balaji.moonrose.trainfree.db.WorkoutSessionUiState
 import dev.balaji.moonrose.trainfree.db.toUserSettings
+import dev.balaji.moonrose.trainfree.model.AppFont
+import dev.balaji.moonrose.trainfree.model.AppFontSize
 import dev.balaji.moonrose.trainfree.model.DEFAULT_REST_TIMER_SECONDS
 import dev.balaji.moonrose.trainfree.model.Exercise
 import dev.balaji.moonrose.trainfree.model.RestTimerSound
@@ -200,5 +204,37 @@ class SharedLogicAndroidHostTest {
             UserSettingEntity(SETTING_REST_TIMER_SOUND, "none", 0L, 0L),
         ).toUserSettings()
         assertEquals(RestTimerSound.NONE, silent.restTimerSound)
+    }
+
+    @Test
+    fun userSettingsDecodesAppFontWithFallback() {
+        val defaults = emptyList<UserSettingEntity>().toUserSettings()
+        assertEquals(AppFont.SYSTEM_UI, defaults.appFont)
+
+        val googleSans = listOf(
+            UserSettingEntity(SETTING_APP_FONT, "google_sans", 0L, 0L),
+        ).toUserSettings()
+        assertEquals(AppFont.GOOGLE_SANS, googleSans.appFont)
+
+        val inter = listOf(
+            UserSettingEntity(SETTING_APP_FONT, "inter", 0L, 0L),
+        ).toUserSettings()
+        assertEquals(AppFont.INTER, inter.appFont)
+    }
+
+    @Test
+    fun userSettingsDecodesAppFontSizeWithFallback() {
+        val defaults = emptyList<UserSettingEntity>().toUserSettings()
+        assertEquals(AppFontSize.DEFAULT, defaults.appFontSize)
+
+        val larger = listOf(
+            UserSettingEntity(SETTING_APP_FONT_SIZE, "larger", 0L, 0L),
+        ).toUserSettings()
+        assertEquals(AppFontSize.LARGER, larger.appFontSize)
+
+        val largest = listOf(
+            UserSettingEntity(SETTING_APP_FONT_SIZE, "largest", 0L, 0L),
+        ).toUserSettings()
+        assertEquals(AppFontSize.LARGEST, largest.appFontSize)
     }
 }
