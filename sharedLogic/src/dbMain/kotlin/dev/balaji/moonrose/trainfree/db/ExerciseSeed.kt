@@ -2,18 +2,44 @@ package dev.balaji.moonrose.trainfree.db
 
 import androidx.room.RoomDatabase
 import androidx.sqlite.SQLiteConnection
+import androidx.sqlite.execSQL
 
 /**
- * Seeds the exercise catalog when the database is first created. There is no
- * exercise-creation UI yet, and workout logging is unusable with an empty catalog.
+ * Seeds the exercise catalog when the database is first created, and ensures
+ * builtin exercises are populated on open (e.g. after a destructive migration,
+ * where Room skips [onCreate]).
  */
 internal object ExerciseSeedCallback : RoomDatabase.Callback() {
     override fun onCreate(connection: SQLiteConnection) {
+        seed(connection)
+    }
+
+    override fun onOpen(connection: SQLiteConnection) {
+        if (hasBuiltinExercises(connection)) return
+        connection.execSQL("BEGIN EXCLUSIVE TRANSACTION")
+        runCatching {
+            if (!hasBuiltinExercises(connection)) {
+                seed(connection)
+            }
+        }.onSuccess {
+            connection.execSQL("END TRANSACTION")
+        }.onFailure {
+            connection.execSQL("ROLLBACK TRANSACTION")
+            throw it
+        }
+    }
+
+    private fun hasBuiltinExercises(connection: SQLiteConnection): Boolean =
+        connection.prepare("SELECT EXISTS(SELECT 1 FROM exercises WHERE builtin != 0)").use {
+            it.step() && it.getLong(0) != 0L
+        }
+
+    private fun seed(connection: SQLiteConnection) {
         val now = nowMillis()
         SEED_EXERCISES.forEach { seed ->
             val otherBodyParts = seed.otherBodyParts.joinToString(",")
             connection.prepare(
-                "INSERT INTO exercises " +
+                "INSERT OR IGNORE INTO exercises " +
                     "(name, description, exercise_type, body_part, other_body_parts, equipment, " +
                     "builtin, created_at, updated_at) " +
                     "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
