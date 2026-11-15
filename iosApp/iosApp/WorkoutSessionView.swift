@@ -1,12 +1,45 @@
 import SwiftUI
 import SharedUI
 
-/// Native SwiftUI workout session screen. Creates or resumes an in-progress
-/// session on appearance, then binds to the KMP-shared `WorkoutSessionFormState`.
+/// Native SwiftUI workout session screen. Supports live workouts (creates or
+/// resumes an in-progress session) as well as timerless logging/editing of
+/// completed workouts from the Journal calendar.
 struct WorkoutSessionView: View {
+    enum Mode: Hashable {
+        case live(routineId: Int64, title: String)
+        case logCompleted(epochDay: Int64, title: String)
+        case editCompleted(sessionId: Int64, title: String)
+
+        var defaultTitle: String {
+            switch self {
+            case .live(_, let title),
+                 .logCompleted(_, let title),
+                 .editCompleted(_, let title):
+                return title
+            }
+        }
+
+        var isLive: Bool {
+            if case .live = self { return true }
+            return false
+        }
+
+        var allowsRoutineTemplate: Bool {
+            if case .logCompleted = self { return true }
+            return false
+        }
+    }
+
     @Environment(\.dismiss) private var dismiss
-    let routineId: Int64
-    let title: String
+    let mode: Mode
+
+    init(routineId: Int64, title: String) {
+        self.mode = .live(routineId: routineId, title: title)
+    }
+
+    init(mode: Mode) {
+        self.mode = mode
+    }
 
     @State private var sessionId: Int64?
     @State private var formState: WorkoutSessionFormState?
@@ -16,11 +49,19 @@ struct WorkoutSessionView: View {
         saving: false,
         finished: false,
         discarded: false,
+        deleted: false,
         startedAt: 0,
-        restTimer: nil
+        restTimer: nil,
+        isLiveSession: true,
+        isEditingExisting: false,
+        hasUnsavedChanges: false,
+        sessionTitle: nil
     )
     @State private var showExercisePicker = false
+    @State private var showRoutinePicker = false
     @State private var showDiscardConfirm = false
+    @State private var showDiscardChangesConfirm = false
+    @State private var showDeleteConfirm = false
     @State private var showNothingToSave = false
     @State private var ownSessionObserved = false
     @State private var reorder = ExerciseReorderModel()
@@ -31,8 +72,15 @@ struct WorkoutSessionView: View {
     @State private var activeRowID: SessionSetRowID?
     @State private var focusTrigger = 0
 
+    private var effectiveTitle: String {
+        if let custom = uiState.sessionTitle, !custom.isEmpty {
+            return custom
+        }
+        return mode.defaultTitle
+    }
+
     private var sessionStartDate: Date? {
-        guard uiState.startedAt > 0 else { return nil }
+        guard mode.isLive, uiState.isLiveSession, uiState.startedAt > 0 else { return nil }
         return Date(timeIntervalSince1970: Double(uiState.startedAt) / 1000)
     }
 
@@ -60,14 +108,23 @@ struct WorkoutSessionView: View {
         .task(id: uiState.restTimer?.startedAtMillis) {
             await followRestTimer()
         }
-        .navigationTitle(title)
+        .navigationTitle(effectiveTitle)
         .navigationBarTitleDisplayMode(.inline)
-        .onAppear { WorkoutSessionPresentation.shared.sessionScreenDidAppear() }
-        .onDisappear { WorkoutSessionPresentation.shared.sessionScreenDidDisappear() }
+        .interactiveDismissDisabled(!mode.isLive && uiState.hasUnsavedChanges)
+        .onAppear {
+            if mode.isLive {
+                WorkoutSessionPresentation.shared.sessionScreenDidAppear()
+            }
+        }
+        .onDisappear {
+            if mode.isLive {
+                WorkoutSessionPresentation.shared.sessionScreenDidDisappear()
+            }
+        }
         .toolbar {
             ToolbarItem(placement: .principal) {
                 VStack(spacing: 0) {
-                    Text(title)
+                    Text(effectiveTitle)
                         .font(.headline)
                     if let sessionStartDate {
                         Text(sessionStartDate, style: .timer)
@@ -79,40 +136,73 @@ struct WorkoutSessionView: View {
             }
             if formState != nil {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button(role: .destructive) {
-                        // The plate keyboard's weight field is a raw UIKit
-                        // UITextField (opaque to SwiftUI's focus system), so
-                        // presenting .alert() while it's still first
-                        // responder can leave the alert stuck behind the
-                        // custom keyboard, unresponsive to taps. Resign
-                        // first responder first so the alert always shows on top.
-                        dismissKeyboard()
-                        activeRowID = nil
-                        showDiscardConfirm = true
-                    } label: {
-                        Image(systemName: "xmark")
+                    if mode.isLive {
+                        Button(role: .destructive) {
+                            // The plate keyboard's weight field is a raw UIKit
+                            // UITextField (opaque to SwiftUI's focus system), so
+                            // presenting .alert() while it's still first
+                            // responder can leave the alert stuck behind the
+                            // custom keyboard, unresponsive to taps. Resign
+                            // first responder first so the alert always shows on top.
+                            dismissKeyboard()
+                            activeRowID = nil
+                            showDiscardConfirm = true
+                        } label: {
+                            Image(systemName: "xmark")
+                        }
+                        .tint(.red)
+                    } else {
+                        Button(L10n.cancel) {
+                            dismissKeyboard()
+                            activeRowID = nil
+                            if uiState.hasUnsavedChanges {
+                                showDiscardChangesConfirm = true
+                            } else {
+                                dismiss()
+                            }
+                        }
                     }
-                    .tint(.red)
+                }
+                if !mode.isLive, uiState.isEditingExisting {
+                    ToolbarItem(placement: .topBarTrailing) {
+                        Button(role: .destructive) {
+                            dismissKeyboard()
+                            activeRowID = nil
+                            showDeleteConfirm = true
+                        } label: {
+                            Image(systemName: "trash")
+                        }
+                        .tint(.red)
+                    }
                 }
                 ToolbarItem(placement: .primaryAction) {
-                    Button {
-                        dismissKeyboard()
-                        activeRowID = nil
-                        if uiState.hasCompletedSets {
-                            // Dismissal happens via followActiveSession() once
-                            // the session leaves the in-progress state.
-                            formState?.finish { }
-                        } else {
-                            showNothingToSave = true
+                    if mode.isLive {
+                        Button {
+                            dismissKeyboard()
+                            activeRowID = nil
+                            if uiState.hasCompletedSets {
+                                // Dismissal happens via followActiveSession() once
+                                // the session leaves the in-progress state.
+                                formState?.finish { }
+                            } else {
+                                showNothingToSave = true
+                            }
+                        } label: {
+                            if uiState.saving {
+                                ProgressView()
+                            } else {
+                                Image(systemName: "checkmark")
+                            }
                         }
-                    } label: {
-                        if uiState.saving {
-                            ProgressView()
-                        } else {
-                            Image(systemName: "checkmark")
+                        .disabled(uiState.saving || uiState.loading)
+                    } else {
+                        Button(L10n.save) {
+                            dismissKeyboard()
+                            activeRowID = nil
+                            formState?.saveCompleted { }
                         }
+                        .disabled(!uiState.canSaveCompleted)
                     }
-                    .disabled(uiState.saving || uiState.loading)
                 }
             }
         }
@@ -131,6 +221,12 @@ struct WorkoutSessionView: View {
                 }
             }
         }
+        .sheet(isPresented: $showRoutinePicker) {
+            RoutineTemplatePickerSheet { routineId in
+                formState?.loadRoutine(routineId: routineId)
+                showRoutinePicker = false
+            }
+        }
         .alert(L10n.discardWorkoutTitle, isPresented: $showDiscardConfirm) {
             Button(L10n.discard, role: .destructive) {
                 // Dismissal happens via followActiveSession() once the
@@ -140,6 +236,22 @@ struct WorkoutSessionView: View {
             Button(L10n.cancel, role: .cancel) {}
         } message: {
             Text(L10n.discardWorkoutMessage)
+        }
+        .alert(L10n.discardChangesTitle, isPresented: $showDiscardChangesConfirm) {
+            Button(L10n.discard, role: .destructive) {
+                dismiss()
+            }
+            Button(L10n.keepEditing, role: .cancel) {}
+        } message: {
+            Text(L10n.discardChangesMessage)
+        }
+        .alert(L10n.deleteWorkoutTitle, isPresented: $showDeleteConfirm) {
+            Button(L10n.delete, role: .destructive) {
+                formState?.deleteCompletedSession { }
+            }
+            Button(L10n.cancel, role: .cancel) {}
+        } message: {
+            Text(L10n.deleteWorkoutMessage)
         }
         .alert(L10n.nothingToSaveTitle, isPresented: $showNothingToSave) {
             Button(L10n.yes, role: .destructive) {
@@ -157,26 +269,39 @@ struct WorkoutSessionView: View {
         // after the session was discarded elsewhere would silently start a
         // brand-new session from a screen the user is trying to leave.
         if formState == nil {
-            do {
-                let id = try await WorkoutSessionRepository.shared.resumeOrStart(routineId: routineId)
-                sessionId = id.int64Value
-                let state = WorkoutSessionRepository.shared.formState(sessionId: id.int64Value)
+            switch mode {
+            case .live(let routineId, _):
+                do {
+                    let id = try await WorkoutSessionRepository.shared.resumeOrStart(routineId: routineId)
+                    sessionId = id.int64Value
+                    let state = WorkoutSessionRepository.shared.formState(sessionId: id.int64Value)
+                    formState = state
+                    uiState = state.uiState.value
+                    updateRemainingSeconds(for: uiState.restTimer)
+                    plateKeyboard = BarbellKeyboardState(formState: state)
+                } catch {
+                    // Bootstrap failure is fatal for this screen; falling back to
+                    // dismiss is friendlier than showing a broken state.
+                    dismiss()
+                    return
+                }
+            case .logCompleted(let epochDay, _):
+                let state = WorkoutSessionRepository.shared.newCompletedLogFormState(epochDay: epochDay)
                 formState = state
                 uiState = state.uiState.value
-                updateRemainingSeconds(for: uiState.restTimer)
                 plateKeyboard = BarbellKeyboardState(formState: state)
-            } catch {
-                // Bootstrap failure is fatal for this screen; falling back to
-                // dismiss is friendlier than showing a broken state.
-                dismiss()
-                return
+            case .editCompleted(let targetSessionId, _):
+                let state = WorkoutSessionRepository.shared.editCompletedFormState(sessionId: targetSessionId)
+                formState = state
+                uiState = state.uiState.value
+                plateKeyboard = BarbellKeyboardState(formState: state)
             }
         }
         guard let formState else { return }
         for await value in formState.uiState {
             uiState = value
             updateRemainingSeconds(for: value.restTimer)
-            if value.finished || value.discarded {
+            if value.finished || value.discarded || value.deleted {
                 dismiss()
                 return
             }
@@ -210,7 +335,7 @@ struct WorkoutSessionView: View {
     /// Only acts once it has seen its own session, so an emission for an
     /// unrelated older session can't pop a screen that's still bootstrapping.
     private func followActiveSession() async {
-        guard let sessionId else { return }
+        guard mode.isLive, let sessionId else { return }
         for await session in WorkoutSessionRepository.shared.activeSession {
             if session?.sessionId == sessionId {
                 ownSessionObserved = true
@@ -226,7 +351,7 @@ struct WorkoutSessionView: View {
     /// are owned at the app root (`ContentView`) so navigating away doesn't
     /// interrupt the timer.
     private func followRestTimer() async {
-        guard let timer = uiState.restTimer else {
+        guard mode.isLive, let timer = uiState.restTimer else {
             restRemainingSeconds = 0
             return
         }
@@ -255,7 +380,8 @@ struct WorkoutSessionView: View {
                             plateKeyboard: plateKeyboard,
                             plateNumericMode: plateNumericMode,
                             weightUnit: weightUnit,
-                            restTimerSetIndex: (uiState.restTimer?.exerciseId == exercise.id && restRemainingSeconds > 0)
+                            isLiveSession: mode.isLive,
+                            restTimerSetIndex: (mode.isLive && uiState.restTimer?.exerciseId == exercise.id && restRemainingSeconds > 0)
                                 ? Int(uiState.restTimer!.setIndex)
                                 : nil,
                             restRemainingSeconds: restRemainingSeconds,
@@ -308,6 +434,13 @@ struct WorkoutSessionView: View {
                         showExercisePicker = true
                     } label: {
                         Label(L10n.addExercise, systemImage: "plus")
+                    }
+                    if mode.allowsRoutineTemplate {
+                        Button {
+                            showRoutinePicker = true
+                        } label: {
+                            Label(L10n.copyFromRoutine, systemImage: "list.bullet.rectangle")
+                        }
                     }
                 }
             }
@@ -363,6 +496,7 @@ private struct SessionExerciseSection: View {
     let plateKeyboard: BarbellKeyboardState?
     let plateNumericMode: Bool
     let weightUnit: WeightUnit
+    let isLiveSession: Bool
     let restTimerSetIndex: Int?
     let restRemainingSeconds: Int
     let restTotalSeconds: Int
@@ -392,7 +526,9 @@ private struct SessionExerciseSection: View {
                     Text(SetFieldColumns.label(for: field, weightUnit: weightUnit))
                         .frame(maxWidth: .infinity)
                 }
-                Spacer().frame(width: 28)
+                if isLiveSession {
+                    Spacer().frame(width: 28)
+                }
             }
             .font(.caption)
             .foregroundStyle(.secondary)
@@ -404,6 +540,7 @@ private struct SessionExerciseSection: View {
                     previous: previousLabel(setIdx),
                     set: set,
                     fields: fields,
+                    isLiveSession: isLiveSession,
                     readyToComplete: exercise.isSetReadyToComplete(setIndex: Int32(setIdx)),
                     plateKeyboard: exercise.usesPlateKeyboard ? plateKeyboard : nil,
                     plateNumericMode: plateNumericMode,
@@ -467,7 +604,7 @@ private struct SessionExerciseSection: View {
                     }
                 }
 
-                if restTimerSetIndex == setIdx {
+                if isLiveSession, restTimerSetIndex == setIdx {
                     RestTimerCountdownRow(
                         remainingSeconds: restRemainingSeconds,
                         totalSeconds: restTotalSeconds
@@ -498,6 +635,7 @@ private struct SessionSetRow: View {
     let set: DraftSessionSet
     /// Measured columns for the owning exercise's type, in display order.
     let fields: [SetField]
+    let isLiveSession: Bool
     /// Whether the set holds every value its type requires (from the shared
     /// `DraftSessionExercise.isSetReadyToComplete`, so the gating rule lives
     /// in Kotlin).
@@ -568,24 +706,26 @@ private struct SessionSetRow: View {
             }
 
             // A set needs every field its exercise type requires before it
-            // can be completed; stays enabled while checked so stale rows
-            // can be unchecked.
-            let canComplete = set.completed || readyToComplete
-            Button(action: onToggleCompleted) {
-                Image(systemName: set.completed ? "checkmark.square.fill" : "square")
-                    .foregroundStyle(
-                        set.completed
-                            ? Color.green
-                            : Color.secondary.opacity(canComplete ? 1 : 0.3)
-                    )
+            if isLiveSession {
+                // can be completed; stays enabled while checked so stale rows
+                // can be unchecked.
+                let canComplete = set.completed || readyToComplete
+                Button(action: onToggleCompleted) {
+                    Image(systemName: set.completed ? "checkmark.square.fill" : "square")
+                        .foregroundStyle(
+                            set.completed
+                                ? Color.green
+                                : Color.secondary.opacity(canComplete ? 1 : 0.3)
+                        )
+                }
+                .buttonStyle(.borderless)
+                .disabled(!canComplete)
+                .frame(width: 28)
             }
-            .buttonStyle(.borderless)
-            .disabled(!canComplete)
-            .frame(width: 28)
         }
         .scaleEffect(pop ? 1.04 : 1)
         .listRowBackground(
-            set.completed
+            (isLiveSession && set.completed)
                 ? (set.setType == .warmup ? Color.purple.opacity(0.15) : Color.green.opacity(0.15))
                 : nil
         )
@@ -691,6 +831,56 @@ private struct RestTimerCountdownRow: View {
         }
         .padding(.vertical, 4)
         .listRowBackground(Color.green.opacity(0.08))
+    }
+}
+
+private struct RoutineTemplatePickerSheet: View {
+    @Environment(\.dismiss) private var dismiss
+    let onRoutineSelected: (Int64) -> Void
+
+    @State private var programs: [Program] = []
+    @State private var routines: [Routine] = []
+
+    var body: some View {
+        NavigationStack {
+            Group {
+                if routines.isEmpty {
+                    ContentUnavailableView(L10n.noProgramsYet, systemImage: "list.bullet.rectangle")
+                } else {
+                    List {
+                        ForEach(programs, id: \.id) { program in
+                            let programRoutines = routines.filter { $0.programId == program.id }
+                            if !programRoutines.isEmpty {
+                                Section(program.name) {
+                                    ForEach(programRoutines, id: \.id) { routine in
+                                        Button(routine.name) {
+                                            onRoutineSelected(routine.id)
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            .navigationTitle(L10n.copyFromRoutine)
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button(L10n.cancel) { dismiss() }
+                }
+            }
+            .task {
+                for await list in ProgramRepository.shared.programs {
+                    programs = list
+                }
+            }
+            .task {
+                for await list in ProgramRepository.shared.routines {
+                    routines = list
+                }
+            }
+        }
     }
 }
 

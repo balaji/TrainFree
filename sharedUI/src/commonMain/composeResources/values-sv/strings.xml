@@ -24,7 +24,7 @@
     <!-- Tabs -->
     <string name="tab_exercises">Övningar</string>
     <string name="tab_workouts">Träningspass</string>
-    <string name="tab_history">Historik</string>
+    <string name="tab_journal">Dagbok</string>
     <string name="tab_progress">Framsteg</string>
 
     <!-- Active session / workout dialogs -->
@@ -222,15 +222,42 @@
     <string name="trend_down">Trend nedåt</string>
     <string name="trend_flat">Oförändrad</string>
 
-    <!-- Calendar / history -->
+    <!-- Calendar / journal -->
     <string name="show_calendar">Visa kalender</string>
-    <string name="show_workout_history">Visa träningshistorik</string>
+    <string name="show_workout_history">Visa dagbokslista</string>
     <string name="week_number_abbrev">V</string>
     <string name="no_completed_workouts">Inga slutförda pass</string>
+    <string name="no_journal_or_workouts">Inga pass eller dagboksanteckningar än</string>
+    <string name="log_completed_workout">Logga slutfört pass</string>
+    <string name="edit_existing_workout">Redigera befintligt pass</string>
+    <string name="write_journal">Skriv dagbok</string>
+    <string name="journal_entry_badge">Dagbok</string>
 
-    <!-- Day detail -->
+    <!-- Day detail & journal -->
     <string name="no_workouts_this_day">Inga slutförda pass den här dagen</string>
     <string name="workout">Träningspass</string>
+    <string name="journal">Dagbok</string>
+    <string name="edit_journal">Redigera dagbok</string>
+    <string name="log_workout_title">Logga pass</string>
+    <string name="edit_workout_title">Redigera pass</string>
+    <string name="copy_from_routine">Kopiera från rutin</string>
+    <string name="delete_workout">Ta bort pass</string>
+    <string name="delete_workout_title">Ta bort pass?</string>
+    <string name="delete_workout_message">Det här passet och alla dess loggade set kommer att tas bort.</string>
+    <string name="discard_changes_title">Kasta ändringar?</string>
+    <string name="discard_changes_message">Du har osparade ändringar. Lämna utan att spara?</string>
+    <string name="keep_editing">Fortsätt redigera</string>
+    <string name="journal_editor_placeholder">Skriv om ditt pass, din energi, dina tankar eller vad du vill…</string>
+    <string name="journal_tab_edit">Redigera</string>
+    <string name="journal_tab_preview">Förhandsgranska</string>
+    <string name="journal_preview_empty">Inget att förhandsgranska</string>
+    <string name="journal_word_count">%1$d / %2$d ord</string>
+    <string name="journal_format_bold">Fetstil</string>
+    <string name="journal_format_italic">Kursiv</string>
+    <string name="journal_format_heading">Rubrik</string>
+    <string name="journal_format_list">Punktlista</string>
+    <string name="delete_journal_title">Ta bort dagboksanteckning?</string>
+    <string name="delete_journal_message">Dagens dagboksanteckning kommer att tas bort.</string>
     <string name="warm_up">Uppvärmning</string>
     <string name="drop_set">Dropset</string>
     <string name="set_number">Set %1$d</string>
@@ -259,6 +286,8 @@
     <string name="month_oct_short">Okt</string>
     <string name="month_nov_short">Nov</string>
     <string name="month_dec_short">Dec</string>
+    <!-- e.g. "Nov'26": month abbreviation, 2-digit year -->
+    <string name="month_year_short">%1$s'%2$s</string>
     <!-- e.g. "7 jul 2026": day, month abbreviation, year -->
     <string name="day_title">%2$s %1$s %3$s</string>
 

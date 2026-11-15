@@ -2,50 +2,64 @@ package dev.balaji.moonrose.trainfree.db
 
 import dev.balaji.moonrose.trainfree.calendar.CalendarModel
 import dev.balaji.moonrose.trainfree.calendar.WeekMath
+import dev.balaji.moonrose.trainfree.journal.journalPreviewSnippet
 import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.map
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
 
 /**
- * One calendar day with at least one completed session, for the workout
- * history list. Primitive-typed for the SKIE bridge, like the calendar models.
+ * One calendar day with at least one completed workout or journal entry, for
+ * the journal list view. Primitive-typed for the SKIE bridge.
  */
-data class CompletedWorkoutDay(
+data class JournalDaySummary(
     val epochDay: Long,
     /** Routine names in session order; "Workout" for sessions without a routine. */
     val routineNames: List<String>,
+    val hasJournal: Boolean,
+    val journalPreview: String,
 )
 
 object CalendarRepository {
     /**
-     * Weekly calendar of completed workout sessions: continuous weeks (start
-     * day per the user_settings week-start) from min(earliest completed
-     * session, one year ago) through four weeks from now. Days are keyed on
-     * performed_at (session start), in the device timezone at emission time.
+     * Weekly calendar of completed workout sessions and journal entries:
+     * continuous weeks (start day per user_settings week-start) from
+     * min(earliest activity, one year ago) through four weeks from now.
+     * Workout days are keyed on performed_at in the device timezone at emission
+     * time; journal days are keyed on epoch_day directly.
      */
     @OptIn(ExperimentalTime::class)
     val calendar: Flow<CalendarModel> =
         combine(
             AppDb.db.workoutSessionDao().observeCompletedPerformedAt(PROFILE_ID),
+            AppDb.db.journalEntryDao().observeAllEpochDays(PROFILE_ID),
             UserSettingsRepository.settings,
-        ) { performedAt, settings ->
+        ) { performedAt, journalEpochDays, settings ->
             val weekStart = settings.weekStart
             val zone = TimeZone.currentSystemDefault()
             val completedDays = performedAt.mapTo(mutableSetOf()) { millis ->
                 Instant.fromEpochMilliseconds(millis).toLocalDateTime(zone).date.toEpochDays()
             }
+            val journalDays = journalEpochDays.toSet()
             val today = WeekMath.todayEpochDay()
             val currentWeekStart = WeekMath.weekStartOnOrBefore(today, weekStart)
-            val start = WeekMath.weekStartOnOrBefore(
-                minOf(completedDays.minOrNull() ?: today, today - 364),
-                weekStart,
+            val earliestActivity = minOf(
+                completedDays.minOrNull() ?: today,
+                journalDays.minOrNull() ?: today,
+                today - 364,
             )
+            val start = WeekMath.weekStartOnOrBefore(earliestActivity, weekStart)
             val end = currentWeekStart + 7 * 4 + 6
-            val weeks = WeekMath.buildWeeks(start, end, completedDays, today, weekStart)
+            val weeks = WeekMath.buildWeeks(
+                startEpochDay = start,
+                endEpochDay = end,
+                completedDays = completedDays,
+                todayEpochDay = today,
+                weekStart = weekStart,
+                journalDays = journalDays,
+            )
             CalendarModel(
                 weeks = weeks,
                 currentWeekIndex = weeks.indexOfFirst { it.weekStartEpochDay == currentWeekStart },
@@ -53,24 +67,32 @@ object CalendarRepository {
         }
 
     /**
-     * Days with completed sessions, most recent first, keyed on performed_at
-     * in the device timezone like [calendar]. The query returns sessions
-     * newest-first and groupBy preserves encounter order, so no re-sort is
-     * needed; names within a day are flipped back to chronological order.
+     * Days with completed sessions and/or journal entries, most recent first.
      */
     @OptIn(ExperimentalTime::class)
-    val completedWorkoutDays: Flow<List<CompletedWorkoutDay>> =
-        AppDb.db.workoutSessionDao().observeCompletedWithRoutineName(PROFILE_ID).map { rows ->
+    val journalDays: Flow<List<JournalDaySummary>> =
+        combine(
+            AppDb.db.workoutSessionDao().observeCompletedWithRoutineName(PROFILE_ID),
+            AppDb.db.journalEntryDao().observeAll(PROFILE_ID),
+        ) { sessionRows, journalRows ->
             val zone = TimeZone.currentSystemDefault()
-            rows
+            val workoutsByDay = sessionRows
                 .groupBy { row ->
                     Instant.fromEpochMilliseconds(row.performedAt).toLocalDateTime(zone).date.toEpochDays()
                 }
-                .map { (epochDay, sessions) ->
-                    CompletedWorkoutDay(
-                        epochDay = epochDay,
-                        routineNames = sessions.asReversed().map { it.routineName ?: "Workout" },
-                    )
+                .mapValues { (_, sessions) ->
+                    sessions.asReversed().map { it.routineName ?: "Workout" }
                 }
+            val journalsByDay = journalRows.associateBy { it.epochDay }
+            val allDays = (workoutsByDay.keys + journalsByDay.keys).sortedDescending()
+            allDays.map { epochDay ->
+                val journalContent = journalsByDay[epochDay]?.content.orEmpty()
+                JournalDaySummary(
+                    epochDay = epochDay,
+                    routineNames = workoutsByDay[epochDay].orEmpty(),
+                    hasJournal = journalContent.isNotBlank(),
+                    journalPreview = journalPreviewSnippet(journalContent),
+                )
+            }
         }
 }

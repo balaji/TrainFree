@@ -1,5 +1,8 @@
 package dev.balaji.moonrose.trainfree.db
 
+import androidx.room.immediateTransaction
+import androidx.room.useWriterConnection
+import dev.balaji.moonrose.trainfree.calendar.WeekMath
 import dev.balaji.moonrose.trainfree.model.Exercise
 import dev.balaji.moonrose.trainfree.model.ExerciseType
 import dev.balaji.moonrose.trainfree.model.SetField
@@ -20,6 +23,9 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import kotlinx.datetime.LocalDate
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.atStartOfDayIn
 
 data class DraftSessionSet(
     // Snapshots shown as placeholder to the user (never mutated by the UI).
@@ -135,19 +141,40 @@ data class RestTimerTarget(
 const val REST_TIMER_DURATION_SECONDS = 120L
 const val REST_TIMER_DURATION_MS = REST_TIMER_DURATION_SECONDS * 1000L
 
+sealed interface WorkoutSessionMode {
+    data class Live(val sessionId: Long) : WorkoutSessionMode
+    data class LogCompleted(val epochDay: Long) : WorkoutSessionMode
+    data class EditCompleted(val sessionId: Long) : WorkoutSessionMode
+}
+
 data class WorkoutSessionUiState(
     val loading: Boolean = true,
     val exercises: List<DraftSessionExercise> = emptyList(),
     val saving: Boolean = false,
     val finished: Boolean = false,
     val discarded: Boolean = false,
-    // Epoch millis the session was started; 0 while still loading.
+    val deleted: Boolean = false,
+    // Epoch millis the session was started; 0 while still loading or in timerless log/edit mode.
     val startedAt: Long = 0L,
     val restTimer: RestTimerTarget? = null,
+    val isLiveSession: Boolean = true,
+    val isEditingExisting: Boolean = false,
+    val hasUnsavedChanges: Boolean = false,
+    val sessionTitle: String? = null,
 ) {
-    /** Finishing is only allowed once at least one working set is checked off. */
+    /** Finishing a live session is only allowed once at least one working set is checked off. */
     val hasCompletedSets: Boolean
         get() = exercises.any { ex -> ex.sets.any { it.completed && it.setType != SetType.WARMUP } }
+
+    /**
+     * Saving a timerless completed workout (log or edit) requires at least one
+     * working set that holds every field its exercise type requires.
+     */
+    val hasValidSetsToSave: Boolean
+        get() = exercises.any { ex -> ex.sets.any { it.setType != SetType.WARMUP && it.meetsRequirements(ex.type) } }
+
+    val canSaveCompleted: Boolean
+        get() = !isLiveSession && !loading && !saving && hasValidSetsToSave && hasUnsavedChanges
 
     /** Whether the rest timer is currently attached to [exerciseId]'s [setIndex]. */
     fun isRestTimerOn(exerciseId: Long, setIndex: Int): Boolean =
@@ -260,13 +287,34 @@ data class WorkoutSessionUiState(
     )
 }
 
-class WorkoutSessionFormState(internal val sessionId: Long) {
-    private val _uiState = MutableStateFlow(WorkoutSessionUiState())
+class WorkoutSessionFormState internal constructor(
+    private val mode: WorkoutSessionMode,
+) {
+    constructor(sessionId: Long) : this(WorkoutSessionMode.Live(sessionId))
+
+    internal val sessionId: Long
+        get() = when (mode) {
+            is WorkoutSessionMode.Live -> mode.sessionId
+            is WorkoutSessionMode.EditCompleted -> mode.sessionId
+            is WorkoutSessionMode.LogCompleted -> 0L
+        }
+
+    private val isLiveSession: Boolean get() = mode is WorkoutSessionMode.Live
+    private val isEditingExisting: Boolean get() = mode is WorkoutSessionMode.EditCompleted
+
+    private val _uiState = MutableStateFlow(
+        WorkoutSessionUiState(
+            isLiveSession = isLiveSession,
+            isEditingExisting = isEditingExisting,
+        ),
+    )
     val uiState: StateFlow<WorkoutSessionUiState> = _uiState.asStateFlow()
     private var nextId = 0L
     private val scope = CoroutineScope(Dispatchers.Main)
     private var restTimerDurationSeconds: Long = REST_TIMER_DURATION_SECONDS
     private var currentWeightUnit: WeightUnit = WeightUnit.METRIC
+    private var selectedRoutineId: Long? = null
+    private var initialSnapshot: FormSnapshot? = null
 
     // Serializes persist() runs so a debounced autosave and an explicit
     // save/finish can never interleave their delete+insert rewrites.
@@ -294,73 +342,116 @@ class WorkoutSessionFormState(internal val sessionId: Long) {
         }
         scope.launch {
             currentWeightUnit = UserSettingsRepository.settings.first().weightUnit
-            val session = AppDb.db.workoutSessionDao().findById(sessionId)
-            val details = AppDb.db.workoutSessionDetailDao().getForSession(sessionId)
-            // Details arrive in flat position order with sets of the same
-            // exercise adjacent (invariant maintained by the creator + saver).
-            val grouped = mutableListOf<DraftSessionExercise>()
-            var currentExerciseId = -1L
-            var currentSets = mutableListOf<DraftSessionSet>()
-            var currentExercise: Exercise? = null
-            fun flush() {
-                val ex = currentExercise ?: return
-                grouped.add(
-                    DraftSessionExercise(
-                        id = nextId++,
-                        exercise = ex,
-                        sets = currentSets.toList().ifEmpty {
-                            listOf(DraftSessionSet(targetUnit = currentWeightUnit, actualUnit = currentWeightUnit))
-                        },
-                    ),
-                )
-            }
-            for (detail in details) {
-                if (detail.exerciseId != currentExerciseId) {
-                    flush()
-                    currentExercise = ExerciseRepository.findById(detail.exerciseId)
-                    currentExerciseId = detail.exerciseId
-                    currentSets = mutableListOf()
+            when (mode) {
+                is WorkoutSessionMode.LogCompleted -> {
+                    initialSnapshot = FormSnapshot(routineId = null, exercises = emptyList())
+                    if (!closed) {
+                        updateState(
+                            _uiState.value.copy(
+                                loading = false,
+                                exercises = emptyList(),
+                                startedAt = 0L,
+                                isLiveSession = false,
+                                isEditingExisting = false,
+                            ),
+                        )
+                    }
                 }
-                currentSets.add(
-                    DraftSessionSet(
-                        targetReps = detail.targetReps?.toString().orEmpty(),
-                        targetDuration = formatDurationText(detail.targetDuration),
-                        actualReps = detail.actualReps?.toString().orEmpty(),
-                        actualDuration = formatDurationText(detail.actualDuration),
-                        setType = detail.setType,
-                        completed = detail.completed,
-                        rawTargetWeight = detail.targetWeight,
-                        rawTargetDistance = detail.targetDistance,
-                        targetUnit = detail.weightUnit,
-                        rawActualWeight = detail.actualWeight,
-                        rawActualDistance = detail.actualDistance,
-                        actualUnit = detail.weightUnit,
-                    ),
-                )
-            }
-            flush()
-            val withPrevious = grouped.map { draft ->
-                val rows = loadPreviousSetRows(draft.exercise)
-                draft.copy(
-                    previousSetRows = rows,
-                    previousSets = formatPreviousSets(rows, draft.exercise, currentWeightUnit),
-                )
-            }
-            if (!closed) {
-                updateState(
-                    _uiState.value.copy(
+                is WorkoutSessionMode.Live,
+                is WorkoutSessionMode.EditCompleted,
+                -> {
+                    val targetId = sessionId
+                    val session = AppDb.db.workoutSessionDao().findById(targetId)
+                    val details = AppDb.db.workoutSessionDetailDao().getForSession(targetId)
+                    selectedRoutineId = session?.routineId
+                    val routineName = session?.routineId?.let { AppDb.db.routineDao().findById(it)?.name }
+                    val grouped = groupSessionDetails(details)
+                    val withPrevious = grouped.map { draft ->
+                        val rows = loadPreviousSetRows(draft.exercise)
+                        draft.copy(
+                            previousSetRows = rows,
+                            previousSets = formatPreviousSets(rows, draft.exercise, currentWeightUnit),
+                        )
+                    }
+                    val formatted = _uiState.value.copy(
                         loading = false,
                         exercises = withPrevious,
-                        startedAt = session?.performedAt ?: 0L,
-                    ).withDisplayUnit(currentWeightUnit),
-                )
+                        startedAt = if (isLiveSession) (session?.performedAt ?: 0L) else 0L,
+                        isLiveSession = isLiveSession,
+                        isEditingExisting = isEditingExisting,
+                        sessionTitle = routineName,
+                    ).withDisplayUnit(currentWeightUnit)
+                    if (!isLiveSession) {
+                        initialSnapshot = snapshotOf(formatted.exercises, selectedRoutineId)
+                    }
+                    if (!closed) {
+                        updateState(formatted)
+                    }
+                }
             }
         }
     }
 
+    private suspend fun groupSessionDetails(
+        details: List<WorkoutSessionDetailEntity>,
+    ): List<DraftSessionExercise> {
+        // Details arrive in flat position order with sets of the same
+        // exercise adjacent (invariant maintained by the creator + saver).
+        val grouped = mutableListOf<DraftSessionExercise>()
+        var currentExerciseId = -1L
+        var currentSets = mutableListOf<DraftSessionSet>()
+        var currentExercise: Exercise? = null
+        fun flush() {
+            val ex = currentExercise ?: return
+            grouped.add(
+                DraftSessionExercise(
+                    id = nextId++,
+                    exercise = ex,
+                    sets = currentSets.toList().ifEmpty {
+                        listOf(DraftSessionSet(targetUnit = currentWeightUnit, actualUnit = currentWeightUnit))
+                    },
+                ),
+            )
+        }
+        for (detail in details) {
+            if (detail.exerciseId != currentExerciseId) {
+                flush()
+                currentExercise = ExerciseRepository.findById(detail.exerciseId)
+                currentExerciseId = detail.exerciseId
+                currentSets = mutableListOf()
+            }
+            currentSets.add(
+                DraftSessionSet(
+                    targetReps = detail.targetReps?.toString().orEmpty(),
+                    targetDuration = formatDurationText(detail.targetDuration),
+                    actualReps = detail.actualReps?.toString().orEmpty(),
+                    actualDuration = formatDurationText(detail.actualDuration),
+                    setType = detail.setType,
+                    completed = detail.completed,
+                    rawTargetWeight = detail.targetWeight,
+                    rawTargetDistance = detail.targetDistance,
+                    targetUnit = detail.weightUnit,
+                    rawActualWeight = detail.actualWeight,
+                    rawActualDistance = detail.actualDistance,
+                    actualUnit = detail.weightUnit,
+                ),
+            )
+        }
+        flush()
+        return grouped
+    }
+
     private fun updateState(newState: WorkoutSessionUiState) {
-        _uiState.value = newState
-        WorkoutSessionRepository.updateActiveRestTimer(newState.restTimer)
+        val stamped = if (isLiveSession) {
+            newState
+        } else {
+            val dirty = initialSnapshot?.let { snapshotOf(newState.exercises, selectedRoutineId) != it } ?: false
+            newState.copy(restTimer = null, hasUnsavedChanges = dirty)
+        }
+        _uiState.value = stamped
+        if (isLiveSession) {
+            WorkoutSessionRepository.updateActiveRestTimer(stamped.restTimer)
+        }
     }
 
     internal fun closeQuietly() {
@@ -508,6 +599,7 @@ class WorkoutSessionFormState(internal val sessionId: Long) {
     }
 
     fun toggleCompleted(exerciseIndex: Int, setIndex: Int) {
+        if (!isLiveSession) return
         updateState(
             _uiState.value.toggleCompletedAt(
                 exerciseIndex = exerciseIndex,
@@ -523,6 +615,60 @@ class WorkoutSessionFormState(internal val sessionId: Long) {
         val current = _uiState.value
         if (current.restTimer == null) return
         updateState(current.copy(restTimer = null))
+    }
+
+    /**
+     * Populates exercises and target placeholders from [routineId] when
+     * logging a completed workout without starting a live session.
+     */
+    fun loadRoutine(routineId: Long) {
+        if (isLiveSession || closed) return
+        scope.launch {
+            val routine = AppDb.db.routineDao().findById(routineId) ?: return@launch
+            val workSets = AppDb.db.workSetDao().getForRoutine(routineId)
+            val unit = currentWeightUnit
+            val added = mutableListOf<DraftSessionExercise>()
+            for (ws in workSets) {
+                val exercise = ExerciseRepository.findById(ws.exerciseId) ?: continue
+                val details = AppDb.db.workSetDetailDao().getForWorkSet(ws.id)
+                val sets = if (details.isEmpty()) {
+                    listOf(DraftSessionSet(targetUnit = unit, actualUnit = unit))
+                } else {
+                    details.map { detail ->
+                        DraftSessionSet(
+                            targetReps = detail.targetReps?.toString().orEmpty(),
+                            targetDuration = formatDurationText(detail.targetDuration),
+                            setType = detail.setType,
+                            rawTargetWeight = detail.targetWeight,
+                            rawTargetDistance = detail.targetDistance,
+                            targetUnit = detail.weightUnit,
+                            actualUnit = unit,
+                        ).formattedFor(unit)
+                    }
+                }
+                val rows = loadPreviousSetRows(exercise)
+                added.add(
+                    DraftSessionExercise(
+                        id = nextId++,
+                        exercise = exercise,
+                        sets = sets,
+                        previousSetRows = rows,
+                        previousSets = formatPreviousSets(rows, exercise, unit),
+                    ),
+                )
+            }
+            if (closed || added.isEmpty()) return@launch
+            val current = _uiState.value
+            if (selectedRoutineId == null && current.exercises.isEmpty()) {
+                selectedRoutineId = routineId
+            }
+            updateState(
+                current.copy(
+                    exercises = current.exercises + added,
+                    sessionTitle = current.sessionTitle ?: routine.name,
+                ),
+            )
+        }
     }
 
     /** Rewrite-on-save mirroring RoutineFormState — simpler than diffing. */
@@ -568,6 +714,55 @@ class WorkoutSessionFormState(internal val sessionId: Long) {
     }
 
     /**
+     * Explicit save for timerless completed workouts (Log or Edit mode).
+     * Drops sets missing required fields and marks all saved sets completed.
+     */
+    fun saveCompleted(onDone: () -> Unit = {}) {
+        val state = _uiState.value
+        if (isLiveSession || !state.canSaveCompleted) return
+        _uiState.value = state.copy(saving = true)
+        closed = true
+        settingsJob?.cancel()
+        scope.launch {
+            persistMutex.withLock {
+                AppDb.db.saveCompletedWorkout(
+                    mode = mode,
+                    routineId = selectedRoutineId,
+                    exercises = state.exercises,
+                    now = nowMillis(),
+                )
+            }
+            _uiState.value = _uiState.value.copy(
+                saving = false,
+                finished = true,
+                hasUnsavedChanges = false,
+            )
+            onDone()
+        }
+    }
+
+    /** Deletes an existing completed workout (Edit mode). */
+    fun deleteCompletedSession(onDone: () -> Unit = {}) {
+        val editMode = mode as? WorkoutSessionMode.EditCompleted ?: return
+        val state = _uiState.value
+        if (state.loading || state.saving) return
+        _uiState.value = state.copy(saving = true)
+        closed = true
+        settingsJob?.cancel()
+        scope.launch {
+            persistMutex.withLock {
+                WorkoutSessionRepository.deleteCompletedSession(editMode.sessionId)
+            }
+            _uiState.value = _uiState.value.copy(
+                saving = false,
+                deleted = true,
+                hasUnsavedChanges = false,
+            )
+            onDone()
+        }
+    }
+
+    /**
      * Edits are flushed to the database shortly after every mutation so they
      * survive navigating away (the screen's remembered state is lost once it
      * leaves composition) and so the mini bar's finish action operates on
@@ -576,7 +771,7 @@ class WorkoutSessionFormState(internal val sessionId: Long) {
      * an older one during the delay, never mid-rewrite.
      */
     private fun scheduleAutosave() {
-        if (closed || _uiState.value.loading) return
+        if (!isLiveSession || closed || _uiState.value.loading) return
         autosaveJob?.cancel()
         autosaveJob = scope.launch {
             delay(AUTOSAVE_DEBOUNCE_MS)
@@ -596,33 +791,14 @@ class WorkoutSessionFormState(internal val sessionId: Long) {
         state.exercises.forEach { draft ->
             val sets = if (draft.sets.isEmpty()) listOf(DraftSessionSet()) else draft.sets
             sets.forEach { set ->
-                val actualWeight = set.rawActualWeight ?: set.actualWeight.toDoubleOrNull()
-                val actualDistance = set.rawActualDistance ?: set.actualDistance.toDoubleOrNull()
-                val rawTargetWeight = set.rawTargetWeight ?: set.targetWeight.toDoubleOrNull()
-                val rawTargetDistance = set.rawTargetDistance ?: set.targetDistance.toDoubleOrNull()
-                val hasActualMeasurement = actualWeight != null || actualDistance != null
-                val rowUnit = if (hasActualMeasurement) set.actualUnit else set.targetUnit
-                val targetWeight = rawTargetWeight?.let { set.targetUnit.convertWeight(it, rowUnit) }
-                val targetDistance = rawTargetDistance?.let { set.targetUnit.convertDistance(it, rowUnit) }
                 AppDb.db.workoutSessionDetailDao().insert(
-                    WorkoutSessionDetailEntity(
-                        workoutSessionId = sessionId,
-                        workSetDetailId = null,
+                    buildSessionDetailEntity(
+                        sessionId = sessionId,
                         exerciseId = draft.exercise.id,
                         position = position++,
-                        targetWeight = targetWeight,
-                        targetReps = set.targetReps.toIntOrNull(),
-                        targetDuration = parseDurationSeconds(set.targetDuration),
-                        targetDistance = targetDistance,
-                        actualWeight = actualWeight,
-                        actualReps = set.actualReps.toIntOrNull(),
-                        actualDuration = parseDurationSeconds(set.actualDuration),
-                        actualDistance = actualDistance,
-                        setType = set.setType,
-                        weightUnit = rowUnit,
+                        set = set,
                         completed = set.completed,
-                        createdAt = now,
-                        updatedAt = now,
+                        now = now,
                     ),
                 )
             }
@@ -650,6 +826,148 @@ class WorkoutSessionFormState(internal val sessionId: Long) {
     ) {
         updateExercise(exerciseIndex) { ex ->
             ex.copy(sets = ex.sets.mapIndexed { i, s -> if (i == setIndex) transform(s, ex.type) else s })
+        }
+    }
+}
+
+private data class SetSnapshot(
+    val setType: SetType,
+    val actualWeight: String,
+    val actualReps: String,
+    val actualDuration: String,
+    val actualDistance: String,
+)
+
+private data class ExerciseSnapshot(
+    val exerciseId: Long,
+    val sets: List<SetSnapshot>,
+)
+
+private data class FormSnapshot(
+    val routineId: Long?,
+    val exercises: List<ExerciseSnapshot>,
+)
+
+private fun snapshotOf(exercises: List<DraftSessionExercise>, routineId: Long?): FormSnapshot =
+    FormSnapshot(
+        routineId = routineId,
+        exercises = exercises.map { ex ->
+            ExerciseSnapshot(
+                exerciseId = ex.exercise.id,
+                sets = ex.sets.map { s ->
+                    SetSnapshot(
+                        setType = s.setType,
+                        actualWeight = s.actualWeight,
+                        actualReps = s.actualReps,
+                        actualDuration = s.actualDuration,
+                        actualDistance = s.actualDistance,
+                    )
+                },
+            )
+        },
+    )
+
+private fun buildSessionDetailEntity(
+    sessionId: Long,
+    exerciseId: Long,
+    position: Int,
+    set: DraftSessionSet,
+    completed: Boolean,
+    now: Long,
+): WorkoutSessionDetailEntity {
+    val actualWeight = set.rawActualWeight ?: set.actualWeight.toDoubleOrNull()
+    val actualDistance = set.rawActualDistance ?: set.actualDistance.toDoubleOrNull()
+    val rawTargetWeight = set.rawTargetWeight ?: set.targetWeight.toDoubleOrNull()
+    val rawTargetDistance = set.rawTargetDistance ?: set.targetDistance.toDoubleOrNull()
+    val hasActualMeasurement = actualWeight != null || actualDistance != null
+    val rowUnit = if (hasActualMeasurement) set.actualUnit else set.targetUnit
+    val targetWeight = rawTargetWeight?.let { set.targetUnit.convertWeight(it, rowUnit) }
+    val targetDistance = rawTargetDistance?.let { set.targetUnit.convertDistance(it, rowUnit) }
+    return WorkoutSessionDetailEntity(
+        workoutSessionId = sessionId,
+        workSetDetailId = null,
+        exerciseId = exerciseId,
+        position = position,
+        targetWeight = targetWeight,
+        targetReps = set.targetReps.toIntOrNull(),
+        targetDuration = parseDurationSeconds(set.targetDuration),
+        targetDistance = targetDistance,
+        actualWeight = actualWeight,
+        actualReps = set.actualReps.toIntOrNull(),
+        actualDuration = parseDurationSeconds(set.actualDuration),
+        actualDistance = actualDistance,
+        setType = set.setType,
+        weightUnit = rowUnit,
+        completed = completed,
+        createdAt = now,
+        updatedAt = now,
+    )
+}
+
+internal suspend fun AppDatabase.saveCompletedWorkout(
+    mode: WorkoutSessionMode,
+    routineId: Long?,
+    exercises: List<DraftSessionExercise>,
+    now: Long,
+    zone: TimeZone = TimeZone.currentSystemDefault(),
+    todayEpochDay: Long = WeekMath.todayEpochDay(),
+): Long {
+    val filtered = exercises.mapNotNull { draft ->
+        val validSets = draft.sets.filter { set ->
+            set.meetsRequirements(draft.type)
+        }
+        if (validSets.isEmpty()) null else draft to validSets
+    }
+    require(filtered.any { (draft, sets) -> sets.any { it.setType != SetType.WARMUP } }) {
+        "Cannot save a completed workout without at least one valid working set"
+    }
+
+    return useWriterConnection { transactor ->
+        transactor.immediateTransaction {
+            val targetSessionId = when (mode) {
+                is WorkoutSessionMode.LogCompleted -> {
+                    val performedAt = if (mode.epochDay == todayEpochDay) {
+                        now
+                    } else {
+                        LocalDate.fromEpochDays(mode.epochDay)
+                            .atStartOfDayIn(zone)
+                            .toEpochMilliseconds() + 12 * 3_600_000L
+                    }
+                    workoutSessionDao().insert(
+                        WorkoutSessionEntity(
+                            profileId = PROFILE_ID,
+                            routineId = routineId,
+                            performedAt = performedAt,
+                            completedAt = performedAt,
+                            createdAt = now,
+                            updatedAt = now,
+                        ),
+                    )
+                }
+                is WorkoutSessionMode.EditCompleted -> {
+                    workoutSessionDao().updateRoutineAndTimestamp(mode.sessionId, routineId, now)
+                    workoutSessionDetailDao().deleteForSession(mode.sessionId)
+                    mode.sessionId
+                }
+                is WorkoutSessionMode.Live -> error("saveCompletedWorkout does not support Live mode")
+            }
+
+            var position = 1
+            filtered.forEach { (draft, sets) ->
+                sets.forEach { set ->
+                    workoutSessionDetailDao().insert(
+                        buildSessionDetailEntity(
+                            sessionId = targetSessionId,
+                            exerciseId = draft.exercise.id,
+                            position = position++,
+                            set = set,
+                            completed = true,
+                            now = now,
+                        ),
+                    )
+                }
+            }
+            targetSessionId
         }
     }
 }

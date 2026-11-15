@@ -1,16 +1,29 @@
 import SwiftUI
 import SharedUI
 
-/// Read-only summary of the completed workout session(s) performed on a given
-/// calendar day, bound to the shared `DayDetailState` via SKIE's Swift
-/// `Flow` bridge. The flow is cold and collected in `.task`, so the page
-/// observes the database while visible and refreshes when it reappears —
-/// e.g. after a session is finished from the mini bar on another tab.
+private struct IdentifiableSessionId: Identifiable {
+    let id: Int64
+}
+
+/// Summary of the completed workout session(s) and optional journal entry for a
+/// calendar day, bound to the shared `DayDetailState` via SKIE's Swift `Flow`
+/// bridge.
 struct DayDetailView: View {
     @Environment(ChatCoordinator.self) private var chatCoordinator
     let epochDay: Int64
     @State private var state: DayDetailState
-    @State private var uiState = DayDetailUiState(loading: true, sessions: [], weightUnit: .metric)
+    @State private var uiState = DayDetailUiState(
+        loading: true,
+        sessions: [],
+        journalContent: nil,
+        isFuture: false,
+        weightUnit: .metric
+    )
+    @State private var showLogWorkout = false
+    @State private var editingSession: IdentifiableSessionId?
+    @State private var showJournalEditor = false
+    @State private var sessionPendingDelete: DaySession?
+    @State private var showDeleteConfirm = false
 
     init(epochDay: Int64) {
         self.epochDay = epochDay
@@ -21,11 +34,9 @@ struct DayDetailView: View {
         Group {
             if uiState.loading {
                 ProgressView()
-            } else if uiState.sessions.isEmpty {
-                ContentUnavailableView(L10n.noCompletedWorkouts, systemImage: "calendar")
             } else {
                 List {
-                    if chatCoordinator.isEntryVisible {
+                    if chatCoordinator.isEntryVisible && !uiState.sessions.isEmpty {
                         Section {
                             Button {
                                 chatCoordinator.openForDay(epochDay: epochDay)
@@ -35,11 +46,80 @@ struct DayDetailView: View {
                         }
                     }
 
-                    ForEach(uiState.sessions, id: \.id) { session in
-                        Section(session.routineName ?? L10n.workout) {
-                            ForEach(Array(session.exercises.enumerated()), id: \.offset) { _, exercise in
-                                ExerciseSummaryRow(exercise: exercise, weightUnit: uiState.weightUnit)
+                    if uiState.sessions.isEmpty {
+                        Section {
+                            Text(L10n.noWorkoutsThisDay)
+                                .foregroundStyle(.secondary)
+                            if !uiState.isFuture {
+                                Button {
+                                    showLogWorkout = true
+                                } label: {
+                                    Label(L10n.logCompletedWorkout, systemImage: "plus")
+                                }
                             }
+                        }
+                    } else {
+                        ForEach(uiState.sessions, id: \.id) { session in
+                            Section {
+                                ForEach(Array(session.exercises.enumerated()), id: \.offset) { _, exercise in
+                                    ExerciseSummaryRow(exercise: exercise, weightUnit: uiState.weightUnit)
+                                }
+                            } header: {
+                                HStack {
+                                    Text(session.routineName ?? L10n.workout)
+                                        .font(.headline)
+                                        .foregroundStyle(Color.accentColor)
+                                        .textCase(nil)
+                                    Spacer()
+                                    Button {
+                                        editingSession = IdentifiableSessionId(id: session.id)
+                                    } label: {
+                                        Image(systemName: "pencil")
+                                    }
+                                    .accessibilityLabel(L10n.editWorkoutTitle)
+
+                                    Button(role: .destructive) {
+                                        sessionPendingDelete = session
+                                        showDeleteConfirm = true
+                                    } label: {
+                                        Image(systemName: "trash")
+                                    }
+                                    .tint(.red)
+                                    .accessibilityLabel(L10n.deleteWorkout)
+                                }
+                            }
+                        }
+
+                        if !uiState.isFuture {
+                            Section {
+                                Button {
+                                    showLogWorkout = true
+                                } label: {
+                                    Label(L10n.logCompletedWorkout, systemImage: "plus")
+                                }
+                            }
+                        }
+                    }
+
+                    Section {
+                        if let journal = uiState.journalContent, !journal.isEmpty {
+                            MarkdownTextView(markdown: journal)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .padding(.vertical, 4)
+                        }
+                    } header: {
+                        HStack {
+                            Circle()
+                                .fill(Color.purple)
+                                .frame(width: 8, height: 8)
+                            Text(L10n.journal)
+                                .font(.headline)
+                                .textCase(nil)
+                            Spacer()
+                            Button(uiState.journalContent != nil ? L10n.editJournal : L10n.writeJournal) {
+                                showJournalEditor = true
+                            }
+                            .textCase(nil)
                         }
                     }
                 }
@@ -48,6 +128,33 @@ struct DayDetailView: View {
         }
         .navigationTitle(dayTitle)
         .toolbarTitleDisplayMode(.inline)
+        .sheet(isPresented: $showLogWorkout) {
+            NavigationStack {
+                WorkoutSessionView(
+                    mode: .logCompleted(epochDay: epochDay, title: L10n.logWorkoutTitle)
+                )
+            }
+        }
+        .sheet(item: $editingSession) { target in
+            NavigationStack {
+                WorkoutSessionView(
+                    mode: .editCompleted(sessionId: target.id, title: L10n.editWorkoutTitle)
+                )
+            }
+        }
+        .sheet(isPresented: $showJournalEditor) {
+            JournalEditorView(epochDay: epochDay)
+        }
+        .alert(L10n.deleteWorkoutTitle, isPresented: $showDeleteConfirm, presenting: sessionPendingDelete) { target in
+            Button(L10n.delete, role: .destructive) {
+                Task {
+                    try? await state.deleteSession(sessionId: target.id)
+                }
+            }
+            Button(L10n.cancel, role: .cancel) {}
+        } message: { _ in
+            Text(L10n.deleteWorkoutMessage)
+        }
         .task {
             for await value in state.uiState {
                 uiState = value
@@ -102,12 +209,16 @@ private struct ExerciseSummaryRow: View {
         let distance = set.actualDistance.isEmpty ? set.targetDistance : set.actualDistance
         var parts: [String] = []
         if !weight.isEmpty {
-            parts.append(weightUnit == .metric ? L10n.weightKgValue(weight) : L10n.weightLbValue(weight))
+            parts.append(weightUnit == .imperial ? L10n.weightLbValue(weight) : L10n.weightKgValue(weight))
         }
-        if !reps.isEmpty { parts.append(L10n.repsValue(reps)) }
-        if !duration.isEmpty { parts.append(L10n.durationValue(duration)) }
+        if !reps.isEmpty {
+            parts.append(L10n.repsValue(reps))
+        }
+        if !duration.isEmpty {
+            parts.append(L10n.durationValue(duration))
+        }
         if !distance.isEmpty {
-            parts.append(weightUnit == .metric ? L10n.distanceKmValue(distance) : L10n.distanceMiValue(distance))
+            parts.append(weightUnit == .imperial ? L10n.distanceMiValue(distance) : L10n.distanceKmValue(distance))
         }
         return parts.isEmpty ? "—" : parts.joined(separator: " · ")
     }

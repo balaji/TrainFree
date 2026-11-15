@@ -1,5 +1,6 @@
 package dev.balaji.moonrose.trainfree.db
 
+import dev.balaji.moonrose.trainfree.calendar.WeekMath
 import dev.balaji.moonrose.trainfree.model.SetType
 import dev.balaji.moonrose.trainfree.model.WeightUnit
 import kotlin.time.ExperimentalTime
@@ -37,14 +38,16 @@ data class DaySession(
 data class DayDetailUiState(
     val loading: Boolean = true,
     val sessions: List<DaySession> = emptyList(),
+    val journalContent: String? = null,
+    val isFuture: Boolean = false,
     val weightUnit: WeightUnit = WeightUnit.METRIC,
 )
 
 class DayDetailState(private val epochDay: Long) {
     /**
      * Cold: each collector observes the database while it is collecting, so
-     * the page stays current when a session finishes while it is open (e.g.
-     * from the mini bar) and picks up changes again when it reappears.
+     * the page stays current when a session finishes, is edited/deleted, or a
+     * journal entry is saved.
      */
     @OptIn(ExperimentalTime::class)
     val uiState: Flow<DayDetailUiState> = run {
@@ -53,14 +56,21 @@ class DayDetailState(private val epochDay: Long) {
         val endMillis = LocalDate.fromEpochDays(epochDay + 1).atStartOfDayIn(zone).toEpochMilliseconds()
         combine(
             AppDb.db.workoutSessionDao().observeCompletedInRange(PROFILE_ID, startMillis, endMillis),
+            AppDb.db.journalEntryDao().observeForDay(PROFILE_ID, epochDay),
             UserSettingsRepository.settings,
-        ) { sessions, settings ->
+        ) { sessions, journal, settings ->
             DayDetailUiState(
                 loading = false,
                 sessions = sessions.map { toDaySession(it, settings.weightUnit) },
+                journalContent = journal?.content?.takeIf { it.isNotBlank() },
+                isFuture = epochDay > WeekMath.todayEpochDay(),
                 weightUnit = settings.weightUnit,
             )
         }
+    }
+
+    suspend fun deleteSession(sessionId: Long) {
+        WorkoutSessionRepository.deleteCompletedSession(sessionId)
     }
 
     private suspend fun toDaySession(

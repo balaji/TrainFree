@@ -48,6 +48,14 @@ object WorkoutSessionRepository {
         return WorkoutSessionFormState(sessionId).also { cachedFormState = it }
     }
 
+    /** Fresh in-memory form state for logging a completed workout on [epochDay] without timers. */
+    fun newCompletedLogFormState(epochDay: Long): WorkoutSessionFormState =
+        WorkoutSessionFormState(WorkoutSessionMode.LogCompleted(epochDay))
+
+    /** Fresh in-memory form state for editing an existing completed [sessionId] without timers. */
+    fun editCompletedFormState(sessionId: Long): WorkoutSessionFormState =
+        WorkoutSessionFormState(WorkoutSessionMode.EditCompleted(sessionId))
+
     internal fun updateActiveRestTimer(timer: RestTimerTarget?) {
         _activeRestTimer.value = timer
     }
@@ -249,6 +257,11 @@ object WorkoutSessionRepository {
             cached.closeQuietly()
             cachedFormState = null
         }
+        AppDb.db.workoutSessionDao().delete(sessionId)
+    }
+
+    /** Deletes a completed historical workout without disturbing any active live session/timer. */
+    suspend fun deleteCompletedSession(sessionId: Long) {
         AppDb.db.workoutSessionDao().delete(sessionId)
     }
 }

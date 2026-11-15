@@ -324,19 +324,19 @@
         }
       }
     },
-    "tab_history": {
+    "tab_journal": {
       "extractionState": "manual",
       "localizations": {
         "sv": {
           "stringUnit": {
             "state": "translated",
-            "value": "Historik"
+            "value": "Dagbok"
           }
         },
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "History"
+            "value": "Journal"
           }
         }
       }
@@ -2642,13 +2642,13 @@
         "sv": {
           "stringUnit": {
             "state": "translated",
-            "value": "Visa träningshistorik"
+            "value": "Visa dagbokslista"
           }
         },
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Show workout history"
+            "value": "Show journal list"
           }
         }
       }
@@ -4776,6 +4776,209 @@
             "value": "Scroll to bottom"
           }
         }
+      }
+    },
+    "no_journal_or_workouts": {
+      "extractionState": "manual",
+      "localizations": {
+        "sv": { "stringUnit": { "state": "translated", "value": "Inga pass eller dagboksanteckningar än" } },
+        "en": { "stringUnit": { "state": "translated", "value": "No workouts or journal entries yet" } }
+      }
+    },
+    "log_completed_workout": {
+      "extractionState": "manual",
+      "localizations": {
+        "sv": { "stringUnit": { "state": "translated", "value": "Logga slutfört pass" } },
+        "en": { "stringUnit": { "state": "translated", "value": "Log completed workout" } }
+      }
+    },
+    "edit_existing_workout": {
+      "extractionState": "manual",
+      "localizations": {
+        "sv": { "stringUnit": { "state": "translated", "value": "Redigera befintligt pass" } },
+        "en": { "stringUnit": { "state": "translated", "value": "Edit existing workout" } }
+      }
+    },
+    "write_journal": {
+      "extractionState": "manual",
+      "localizations": {
+        "sv": { "stringUnit": { "state": "translated", "value": "Skriv dagbok" } },
+        "en": { "stringUnit": { "state": "translated", "value": "Write journal" } }
+      }
+    },
+    "journal_entry_badge": {
+      "extractionState": "manual",
+      "localizations": {
+        "sv": { "stringUnit": { "state": "translated", "value": "Dagbok" } },
+        "en": { "stringUnit": { "state": "translated", "value": "Journal" } }
+      }
+    },
+    "no_workouts_this_day": {
+      "extractionState": "manual",
+      "localizations": {
+        "sv": { "stringUnit": { "state": "translated", "value": "Inga slutförda pass den här dagen" } },
+        "en": { "stringUnit": { "state": "translated", "value": "No completed workouts on this day" } }
+      }
+    },
+    "journal": {
+      "extractionState": "manual",
+      "localizations": {
+        "sv": { "stringUnit": { "state": "translated", "value": "Dagbok" } },
+        "en": { "stringUnit": { "state": "translated", "value": "Journal" } }
+      }
+    },
+    "edit_journal": {
+      "extractionState": "manual",
+      "localizations": {
+        "sv": { "stringUnit": { "state": "translated", "value": "Redigera dagbok" } },
+        "en": { "stringUnit": { "state": "translated", "value": "Edit journal" } }
+      }
+    },
+    "log_workout_title": {
+      "extractionState": "manual",
+      "localizations": {
+        "sv": { "stringUnit": { "state": "translated", "value": "Logga pass" } },
+        "en": { "stringUnit": { "state": "translated", "value": "Log workout" } }
+      }
+    },
+    "edit_workout_title": {
+      "extractionState": "manual",
+      "localizations": {
+        "sv": { "stringUnit": { "state": "translated", "value": "Redigera pass" } },
+        "en": { "stringUnit": { "state": "translated", "value": "Edit workout" } }
+      }
+    },
+    "copy_from_routine": {
+      "extractionState": "manual",
+      "localizations": {
+        "sv": { "stringUnit": { "state": "translated", "value": "Kopiera från rutin" } },
+        "en": { "stringUnit": { "state": "translated", "value": "Copy from routine" } }
+      }
+    },
+    "delete_workout": {
+      "extractionState": "manual",
+      "localizations": {
+        "sv": { "stringUnit": { "state": "translated", "value": "Ta bort pass" } },
+        "en": { "stringUnit": { "state": "translated", "value": "Delete workout" } }
+      }
+    },
+    "delete_workout_title": {
+      "extractionState": "manual",
+      "localizations": {
+        "sv": { "stringUnit": { "state": "translated", "value": "Ta bort pass?" } },
+        "en": { "stringUnit": { "state": "translated", "value": "Delete workout?" } }
+      }
+    },
+    "delete_workout_message": {
+      "extractionState": "manual",
+      "localizations": {
+        "sv": { "stringUnit": { "state": "translated", "value": "Det här passet och alla dess loggade set kommer att tas bort." } },
+        "en": { "stringUnit": { "state": "translated", "value": "This workout and all its logged sets will be deleted." } }
+      }
+    },
+    "discard_changes_title": {
+      "extractionState": "manual",
+      "localizations": {
+        "sv": { "stringUnit": { "state": "translated", "value": "Kasta ändringar?" } },
+        "en": { "stringUnit": { "state": "translated", "value": "Discard changes?" } }
+      }
+    },
+    "discard_changes_message": {
+      "extractionState": "manual",
+      "localizations": {
+        "sv": { "stringUnit": { "state": "translated", "value": "Du har osparade ändringar. Lämna utan att spara?" } },
+        "en": { "stringUnit": { "state": "translated", "value": "You have unsaved changes. Leave without saving?" } }
+      }
+    },
+    "keep_editing": {
+      "extractionState": "manual",
+      "localizations": {
+        "sv": { "stringUnit": { "state": "translated", "value": "Fortsätt redigera" } },
+        "en": { "stringUnit": { "state": "translated", "value": "Keep editing" } }
+      }
+    },
+    "journal_editor_placeholder": {
+      "extractionState": "manual",
+      "localizations": {
+        "sv": { "stringUnit": { "state": "translated", "value": "Skriv om ditt pass, din energi, dina tankar eller vad du vill…" } },
+        "en": { "stringUnit": { "state": "translated", "value": "Write about your workout, energy, mindset, or anything on your mind…" } }
+      }
+    },
+    "journal_tab_edit": {
+      "extractionState": "manual",
+      "localizations": {
+        "sv": { "stringUnit": { "state": "translated", "value": "Redigera" } },
+        "en": { "stringUnit": { "state": "translated", "value": "Edit" } }
+      }
+    },
+    "journal_tab_preview": {
+      "extractionState": "manual",
+      "localizations": {
+        "sv": { "stringUnit": { "state": "translated", "value": "Förhandsgranska" } },
+        "en": { "stringUnit": { "state": "translated", "value": "Preview" } }
+      }
+    },
+    "journal_preview_empty": {
+      "extractionState": "manual",
+      "localizations": {
+        "sv": { "stringUnit": { "state": "translated", "value": "Inget att förhandsgranska" } },
+        "en": { "stringUnit": { "state": "translated", "value": "Nothing to preview" } }
+      }
+    },
+    "journal_word_count": {
+      "extractionState": "manual",
+      "localizations": {
+        "sv": { "stringUnit": { "state": "translated", "value": "%lld / %lld ord" } },
+        "en": { "stringUnit": { "state": "translated", "value": "%lld / %lld words" } }
+      }
+    },
+    "journal_format_bold": {
+      "extractionState": "manual",
+      "localizations": {
+        "sv": { "stringUnit": { "state": "translated", "value": "Fetstil" } },
+        "en": { "stringUnit": { "state": "translated", "value": "Bold" } }
+      }
+    },
+    "journal_format_italic": {
+      "extractionState": "manual",
+      "localizations": {
+        "sv": { "stringUnit": { "state": "translated", "value": "Kursiv" } },
+        "en": { "stringUnit": { "state": "translated", "value": "Italic" } }
+      }
+    },
+    "journal_format_heading": {
+      "extractionState": "manual",
+      "localizations": {
+        "sv": { "stringUnit": { "state": "translated", "value": "Rubrik" } },
+        "en": { "stringUnit": { "state": "translated", "value": "Heading" } }
+      }
+    },
+    "journal_format_list": {
+      "extractionState": "manual",
+      "localizations": {
+        "sv": { "stringUnit": { "state": "translated", "value": "Punktlista" } },
+        "en": { "stringUnit": { "state": "translated", "value": "Bullet list" } }
+      }
+    },
+    "delete_journal_title": {
+      "extractionState": "manual",
+      "localizations": {
+        "sv": { "stringUnit": { "state": "translated", "value": "Ta bort dagboksanteckning?" } },
+        "en": { "stringUnit": { "state": "translated", "value": "Delete journal?" } }
+      }
+    },
+    "delete_journal_message": {
+      "extractionState": "manual",
+      "localizations": {
+        "sv": { "stringUnit": { "state": "translated", "value": "Dagens dagboksanteckning kommer att tas bort." } },
+        "en": { "stringUnit": { "state": "translated", "value": "This day's journal entry will be deleted." } }
+      }
+    },
+    "month_year_short": {
+      "extractionState": "manual",
+      "localizations": {
+        "sv": { "stringUnit": { "state": "translated", "value": "%1$@'%2$@" } },
+        "en": { "stringUnit": { "state": "translated", "value": "%1$@'%2$@" } }
       }
     }
   },

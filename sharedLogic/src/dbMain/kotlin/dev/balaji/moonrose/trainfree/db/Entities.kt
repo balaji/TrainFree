@@ -205,6 +205,25 @@ data class AiInsightCacheEntity(
 )
 
 @Entity(
+    tableName = "journal_entries",
+    foreignKeys = [
+        ForeignKey(ProfileEntity::class, ["id"], ["profile_id"], onDelete = ForeignKey.CASCADE),
+    ],
+    indices = [
+        Index("profile_id"),
+        Index(value = ["profile_id", "epoch_day"], unique = true),
+    ],
+)
+data class JournalEntryEntity(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    @ColumnInfo(name = "profile_id") val profileId: Long,
+    @ColumnInfo(name = "epoch_day") val epochDay: Long,
+    val content: String,
+    @ColumnInfo(name = "created_at") val createdAt: Long,
+    @ColumnInfo(name = "updated_at") val updatedAt: Long,
+)
+
+@Entity(
     tableName = "workout_session_details",
     foreignKeys = [
         ForeignKey(WorkoutSessionEntity::class, ["id"], ["workout_session_id"], onDelete = ForeignKey.CASCADE),

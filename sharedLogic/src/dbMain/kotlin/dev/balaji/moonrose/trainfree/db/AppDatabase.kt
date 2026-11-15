@@ -19,8 +19,9 @@ import androidx.room.TypeConverters
         UserSettingEntity::class,
         BodyMetricEntity::class,
         AiInsightCacheEntity::class,
+        JournalEntryEntity::class,
     ],
-    version = 18,
+    version = 19,
     exportSchema = true,
 )
 @TypeConverters(Converters::class)
@@ -37,6 +38,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun userSettingDao(): UserSettingDao
     abstract fun bodyMetricDao(): BodyMetricDao
     abstract fun aiInsightCacheDao(): AiInsightCacheDao
+    abstract fun journalEntryDao(): JournalEntryDao
 }
 
 // Room's KSP processor generates the per-platform actuals.
