@@ -207,7 +207,7 @@ private fun DayActionSheet(
             Spacer(Modifier.height(4.dp))
             if (!day.isFuture) {
                 ListItem(
-                    headlineContent = { Text(stringResource(Res.string.log_completed_workout)) },
+                    headlineContent = { Text(stringResource(Res.string.log_workout_title)) },
                     leadingContent = {
                         Icon(
                             Icons.Filled.FitnessCenter,
@@ -217,20 +217,22 @@ private fun DayActionSheet(
                     },
                     modifier = Modifier.clickable(onClick = onLogWorkout),
                 )
-                ListItem(
-                    headlineContent = { Text(stringResource(Res.string.edit_existing_workout)) },
-                    leadingContent = {
-                        Icon(
-                            Icons.Filled.Edit,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary,
-                        )
-                    },
-                    modifier = Modifier.clickable(onClick = onEditExistingWorkout),
-                )
+                if (day.hasCompletedWorkout) {
+                    ListItem(
+                        headlineContent = { Text(stringResource(Res.string.edit_workout_title)) },
+                        leadingContent = {
+                            Icon(
+                                Icons.Filled.Edit,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                            )
+                        },
+                        modifier = Modifier.clickable(onClick = onEditExistingWorkout),
+                    )
+                }
             }
             ListItem(
-                headlineContent = { Text(stringResource(Res.string.write_journal)) },
+                headlineContent = { Text(stringResource(Res.string.journal)) },
                 leadingContent = {
                     Icon(
                         Icons.AutoMirrored.Filled.Assignment,

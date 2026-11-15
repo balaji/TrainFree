@@ -9,12 +9,22 @@ private struct IdentifiableEpochDay: Identifiable, Hashable {
     let id: Int64
 }
 
+private struct IdentifiableCalendarDay: Identifiable {
+    let day: CalendarDay
+    var id: Int64 { day.epochDay }
+}
+
+private enum PendingDaySheet {
+    case logWorkout(Int64)
+    case writeJournal(Int64)
+}
+
 struct CalendarView: View {
     @State private var model: CalendarModel?
     @State private var settings: UserSettings?
     @State private var showingSessionList = false
-    @State private var actionDay: CalendarDay?
-    @State private var showingDayActions = false
+    @State private var actionDay: IdentifiableCalendarDay?
+    @State private var pendingDaySheet: PendingDaySheet?
     @State private var pushedDayDetail: IdentifiableEpochDay?
     @State private var logWorkoutDay: IdentifiableEpochDay?
     @State private var journalEditorDay: IdentifiableEpochDay?
@@ -48,24 +58,23 @@ struct CalendarView: View {
         .navigationDestination(item: $pushedDayDetail) { target in
             DayDetailView(epochDay: target.id)
         }
-        .confirmationDialog(
-            actionDay.map { Self.dayTitle($0.epochDay) } ?? "",
-            isPresented: $showingDayActions,
-            titleVisibility: .visible,
-            presenting: actionDay
-        ) { day in
-            if !day.isFuture {
-                Button(L10n.logCompletedWorkout) {
-                    logWorkoutDay = IdentifiableEpochDay(id: day.epochDay)
+        .sheet(item: $actionDay, onDismiss: presentPendingSheet) { target in
+            DayActionSheetView(
+                day: target.day,
+                title: Self.dayTitle(target.id),
+                onLogWorkout: {
+                    pendingDaySheet = .logWorkout(target.id)
+                    actionDay = nil
+                },
+                onEditExistingWorkout: {
+                    actionDay = nil
+                    pushedDayDetail = IdentifiableEpochDay(id: target.id)
+                },
+                onWriteJournal: {
+                    pendingDaySheet = .writeJournal(target.id)
+                    actionDay = nil
                 }
-                Button(L10n.editExistingWorkout) {
-                    pushedDayDetail = IdentifiableEpochDay(id: day.epochDay)
-                }
-            }
-            Button(L10n.writeJournal) {
-                journalEditorDay = IdentifiableEpochDay(id: day.epochDay)
-            }
-            Button(L10n.cancel, role: .cancel) {}
+            )
         }
         .sheet(item: $logWorkoutDay) { target in
             NavigationStack {
@@ -98,8 +107,7 @@ struct CalendarView: View {
                     LazyVStack(spacing: 0) {
                         ForEach(model.weeks, id: \.weekStartEpochDay) { week in
                             WeekRowView(week: week) { day in
-                                actionDay = day
-                                showingDayActions = true
+                                actionDay = IdentifiableCalendarDay(day: day)
                             }
                             .id(week.weekStartEpochDay)
                         }
@@ -133,6 +141,17 @@ struct CalendarView: View {
         .foregroundStyle(.secondary)
         .padding(.horizontal, 8)
         .padding(.vertical, 8)
+    }
+
+    private func presentPendingSheet() {
+        guard let pending = pendingDaySheet else { return }
+        pendingDaySheet = nil
+        switch pending {
+        case .logWorkout(let epochDay):
+            logWorkoutDay = IdentifiableEpochDay(id: epochDay)
+        case .writeJournal(let epochDay):
+            journalEditorDay = IdentifiableEpochDay(id: epochDay)
+        }
     }
 
     private static func dayTitle(_ epochDay: Int64) -> String {
@@ -289,6 +308,110 @@ private struct JournalDayRow: View {
         formatter.timeZone = TimeZone(identifier: "UTC")
         return formatter
     }()
+}
+
+private struct DayActionSheetView: View {
+    let day: CalendarDay
+    let title: String
+    let onLogWorkout: () -> Void
+    let onEditExistingWorkout: () -> Void
+    let onWriteJournal: () -> Void
+
+    @State private var sheetHeight: CGFloat
+
+    init(
+        day: CalendarDay,
+        title: String,
+        onLogWorkout: @escaping () -> Void,
+        onEditExistingWorkout: @escaping () -> Void,
+        onWriteJournal: @escaping () -> Void
+    ) {
+        self.day = day
+        self.title = title
+        self.onLogWorkout = onLogWorkout
+        self.onEditExistingWorkout = onEditExistingWorkout
+        self.onWriteJournal = onWriteJournal
+        _sheetHeight = State(initialValue: day.isFuture ? 130 : (day.hasCompletedWorkout ? 235 : 182))
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Text(title)
+                .font(.headline)
+                .padding(.horizontal, 20)
+                .padding(.top, 20)
+                .padding(.bottom, 12)
+            Divider()
+            VStack(spacing: 0) {
+                if !day.isFuture {
+                    DayActionRow(
+                        title: L10n.logWorkoutTitle,
+                        systemImage: "dumbbell.fill",
+                        iconColor: .accentColor,
+                        action: onLogWorkout
+                    )
+                    if day.hasCompletedWorkout {
+                        DayActionRow(
+                            title: L10n.editWorkoutTitle,
+                            systemImage: "pencil",
+                            iconColor: .accentColor,
+                            action: onEditExistingWorkout
+                        )
+                    }
+                }
+                DayActionRow(
+                    title: L10n.journal,
+                    systemImage: "list.clipboard.fill",
+                    iconColor: .purple,
+                    action: onWriteJournal
+                )
+            }
+            .padding(.vertical, 4)
+        }
+        .onGeometryChange(for: CGFloat.self) { proxy in
+            proxy.size.height
+        } action: { newHeight in
+            if newHeight > 0 {
+                sheetHeight = newHeight
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .presentationDetents([.height(sheetHeight)])
+        .presentationDragIndicator(.visible)
+    }
+}
+
+private struct DayActionRow: View {
+    let title: String
+    let systemImage: String
+    let iconColor: Color
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 16) {
+                Image(systemName: systemImage)
+                    .font(.body.weight(.medium))
+                    .foregroundStyle(iconColor)
+                    .frame(width: 24, alignment: .center)
+                Text(title)
+                    .font(.body)
+                    .foregroundStyle(.primary)
+                Spacer()
+            }
+            .padding(.horizontal, 20)
+            .padding(.vertical, 14)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(DayActionRowButtonStyle())
+    }
+}
+
+private struct DayActionRowButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .background(configuration.isPressed ? Color(.tertiarySystemFill) : .clear)
+    }
 }
 
 #Preview {

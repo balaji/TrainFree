@@ -306,7 +306,12 @@ struct PlateWeightField: UIViewRepresentable {
         private func makePlateInputView() -> UIInputView {
             let host = UIHostingController(rootView: PlateKeypadView(keyboard: parent.keyboard))
             hosting = host
-            let width = field?.window?.bounds.width ?? UIScreen.main.bounds.width
+            let width = field?.window?.bounds.width
+                ?? UIApplication.shared.connectedScenes
+                    .compactMap { $0 as? UIWindowScene }
+                    .first?
+                    .screen.bounds.width
+                ?? 320
             let input = UIInputView(
                 frame: CGRect(x: 0, y: 0, width: width, height: Self.keypadHeight),
                 inputViewStyle: .keyboard

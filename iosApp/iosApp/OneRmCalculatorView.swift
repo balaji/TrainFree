@@ -121,7 +121,6 @@ func formulaName(_ formula: OneRmFormula) -> String {
     case .brzycki: return L10n.oneRmFormulaBrzycki
     case .lombardi: return L10n.oneRmFormulaLombardi
     case .oconner: return L10n.oneRmFormulaOconner
-    default: return formula.value.capitalized
     }
 }
 
@@ -132,6 +131,5 @@ private func formulaInfo(_ formula: OneRmFormula) -> String {
     case .brzycki: return L10n.oneRmInfoBrzycki
     case .lombardi: return L10n.oneRmInfoLombardi
     case .oconner: return L10n.oneRmInfoOconner
-    default: return ""
     }
 }

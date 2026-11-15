@@ -38,13 +38,11 @@ struct BmiCalculatorView: View {
                 switch formula {
                 case .standard: return L10n.bmiInfoStandard
                 case .trefethen: return L10n.bmiInfoTrefethen
-                default: return ""
                 }
             case .classification(let classification):
                 switch classification {
                 case .who: return L10n.bmiInfoWho
                 case .asianPacific: return L10n.bmiInfoAsianPacific
-                default: return ""
                 }
             }
         }
@@ -318,7 +316,6 @@ private struct BmiSpectrumView: View {
         case .normal: return Color(rgb: dark ? 0x199E70 : 0x1BAF7A)
         case .overweight: return Color(rgb: dark ? 0xC98500 : 0xEDA100)
         case .obese: return Color(rgb: dark ? 0xE66767 : 0xE34948)
-        default: return .gray
         }
     }
 }
@@ -330,7 +327,6 @@ func bmiCategoryLabel(_ category: BmiCategory) -> String {
     case .normal: return L10n.bmiCategoryNormal
     case .overweight: return L10n.bmiCategoryOverweight
     case .obese: return L10n.bmiCategoryObese
-    default: return ""
     }
 }
 
@@ -339,7 +335,6 @@ func bmiFormulaName(_ formula: BmiFormula) -> String {
     switch formula {
     case .standard: return L10n.bmiFormulaStandard
     case .trefethen: return L10n.bmiFormulaTrefethen
-    default: return formula.value.capitalized
     }
 }
 
@@ -348,7 +343,6 @@ func bmiClassificationName(_ classification: BmiClassification) -> String {
     switch classification {
     case .who: return L10n.bmiClassificationWho
     case .asianPacific: return L10n.bmiClassificationAsianPacific
-    default: return classification.value.capitalized
     }
 }
 
