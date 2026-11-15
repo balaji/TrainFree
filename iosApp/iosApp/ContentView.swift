@@ -426,7 +426,7 @@ struct ContentView: View {
                     .modifier(floatingWorkoutMenu)
                     .modifier(sessionBarInset)
                 }
-                Tab(L10n.tabHistory, systemImage: "calendar",
+                Tab(L10n.tabJournal, systemImage: "calendar",
                     value: AppNavigationCoordinator.AppTab.calendar) {
                     NavigationStack {
                         CalendarView()

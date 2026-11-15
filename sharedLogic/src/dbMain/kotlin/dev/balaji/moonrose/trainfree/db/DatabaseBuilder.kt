@@ -21,12 +21,34 @@ internal val MIGRATION_17_18 = object : Migration(17, 18) {
     }
 }
 
+internal val MIGRATION_18_19 = object : Migration(18, 19) {
+    override fun migrate(connection: SQLiteConnection) {
+        connection.execSQL(
+            "CREATE TABLE IF NOT EXISTS `journal_entries` (" +
+                "`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, " +
+                "`profile_id` INTEGER NOT NULL, " +
+                "`epoch_day` INTEGER NOT NULL, " +
+                "`content` TEXT NOT NULL, " +
+                "`created_at` INTEGER NOT NULL, " +
+                "`updated_at` INTEGER NOT NULL, " +
+                "FOREIGN KEY(`profile_id`) REFERENCES `profile`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        )
+        connection.execSQL(
+            "CREATE INDEX IF NOT EXISTS `index_journal_entries_profile_id` ON `journal_entries` (`profile_id`)",
+        )
+        connection.execSQL(
+            "CREATE UNIQUE INDEX IF NOT EXISTS `index_journal_entries_profile_id_epoch_day` " +
+                "ON `journal_entries` (`profile_id`, `epoch_day`)",
+        )
+    }
+}
+
 fun createDatabase(): AppDatabase =
     databaseBuilder()
         .setDriver(BundledSQLiteDriver())
         .setQueryCoroutineContext(Dispatchers.IO)
         .addCallback(ExerciseSeedCallback)
-        .addMigrations(MIGRATION_17_18)
+        .addMigrations(MIGRATION_17_18, MIGRATION_18_19)
         // Pre-release safety net for schema history older than v17.
         .fallbackToDestructiveMigration(dropAllTables = true)
         .build()

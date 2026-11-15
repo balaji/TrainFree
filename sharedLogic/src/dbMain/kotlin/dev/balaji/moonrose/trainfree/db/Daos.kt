@@ -352,6 +352,9 @@ interface WorkoutSessionDao {
     @Query("UPDATE workout_sessions SET completed_at = :completedAt, updated_at = :now WHERE id = :id")
     suspend fun setCompletedAt(id: Long, completedAt: Long, now: Long)
 
+    @Query("UPDATE workout_sessions SET routine_id = :routineId, updated_at = :now WHERE id = :id")
+    suspend fun updateRoutineAndTimestamp(id: Long, routineId: Long?, now: Long)
+
     @Query("DELETE FROM workout_sessions WHERE id = :id")
     suspend fun delete(id: Long)
 
@@ -516,4 +519,28 @@ interface WorkoutSessionDetailDao {
 
     @Insert
     suspend fun insert(detail: WorkoutSessionDetailEntity): Long
+}
+
+@Dao
+interface JournalEntryDao {
+    @Query("SELECT epoch_day FROM journal_entries WHERE profile_id = :profileId")
+    fun observeAllEpochDays(profileId: Long): Flow<List<Long>>
+
+    @Query("SELECT * FROM journal_entries WHERE profile_id = :profileId ORDER BY epoch_day DESC")
+    fun observeAll(profileId: Long): Flow<List<JournalEntryEntity>>
+
+    @Query("SELECT * FROM journal_entries WHERE profile_id = :profileId AND epoch_day = :epochDay")
+    fun observeForDay(profileId: Long, epochDay: Long): Flow<JournalEntryEntity?>
+
+    @Query("SELECT * FROM journal_entries WHERE profile_id = :profileId AND epoch_day = :epochDay")
+    suspend fun findForDay(profileId: Long, epochDay: Long): JournalEntryEntity?
+
+    @Insert
+    suspend fun insert(entry: JournalEntryEntity): Long
+
+    @Query("UPDATE journal_entries SET content = :content, updated_at = :updatedAt WHERE id = :id")
+    suspend fun updateContent(id: Long, content: String, updatedAt: Long)
+
+    @Query("DELETE FROM journal_entries WHERE profile_id = :profileId AND epoch_day = :epochDay")
+    suspend fun deleteForDay(profileId: Long, epochDay: Long)
 }

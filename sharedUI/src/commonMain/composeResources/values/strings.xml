@@ -24,7 +24,7 @@
     <!-- Tabs -->
     <string name="tab_exercises">Exercises</string>
     <string name="tab_workouts">Workouts</string>
-    <string name="tab_history">History</string>
+    <string name="tab_journal">Journal</string>
     <string name="tab_progress">Progress</string>
 
     <!-- Active session / workout dialogs -->
@@ -224,15 +224,42 @@
     <string name="trend_down">Trending down</string>
     <string name="trend_flat">Flat</string>
 
-    <!-- Calendar / history -->
+    <!-- Calendar / journal -->
     <string name="show_calendar">Show calendar</string>
-    <string name="show_workout_history">Show workout history</string>
+    <string name="show_workout_history">Show journal list</string>
     <string name="week_number_abbrev">Wk</string>
     <string name="no_completed_workouts">No completed workouts</string>
+    <string name="no_journal_or_workouts">No workouts or journal entries yet</string>
+    <string name="log_completed_workout">Log completed workout</string>
+    <string name="edit_existing_workout">Edit existing workout</string>
+    <string name="write_journal">Write journal</string>
+    <string name="journal_entry_badge">Journal</string>
 
-    <!-- Day detail -->
+    <!-- Day detail & journal -->
     <string name="no_workouts_this_day">No completed workouts on this day</string>
     <string name="workout">Workout</string>
+    <string name="journal">Journal</string>
+    <string name="edit_journal">Edit journal</string>
+    <string name="log_workout_title">Log workout</string>
+    <string name="edit_workout_title">Edit workout</string>
+    <string name="copy_from_routine">Copy from routine</string>
+    <string name="delete_workout">Delete workout</string>
+    <string name="delete_workout_title">Delete workout?</string>
+    <string name="delete_workout_message">This workout and all its logged sets will be deleted.</string>
+    <string name="discard_changes_title">Discard changes?</string>
+    <string name="discard_changes_message">You have unsaved changes. Leave without saving?</string>
+    <string name="keep_editing">Keep editing</string>
+    <string name="journal_editor_placeholder">Write about your workout, energy, mindset, or anything on your mind…</string>
+    <string name="journal_tab_edit">Edit</string>
+    <string name="journal_tab_preview">Preview</string>
+    <string name="journal_preview_empty">Nothing to preview</string>
+    <string name="journal_word_count">%1$d / %2$d words</string>
+    <string name="journal_format_bold">Bold</string>
+    <string name="journal_format_italic">Italic</string>
+    <string name="journal_format_heading">Heading</string>
+    <string name="journal_format_list">Bullet list</string>
+    <string name="delete_journal_title">Delete journal?</string>
+    <string name="delete_journal_message">This day's journal entry will be deleted.</string>
     <string name="warm_up">Warm-up</string>
     <string name="drop_set">Drop set</string>
     <string name="set_number">Set %1$d</string>
@@ -264,6 +291,8 @@
     <string name="month_oct_short">Oct</string>
     <string name="month_nov_short">Nov</string>
     <string name="month_dec_short">Dec</string>
+    <!-- e.g. "Nov'26": month abbreviation, 2-digit year -->
+    <string name="month_year_short">%1$s'%2$s</string>
     <!-- e.g. "Jul 7, 2026": month abbreviation, day, year -->
     <string name="day_title">%1$s %2$s, %3$s</string>
 

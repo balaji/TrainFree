@@ -196,6 +196,16 @@ internal fun monthAbbreviation(monthOfYear: Int): String = stringResource(
     },
 )
 
+@Composable
+internal fun monthYearAbbreviation(monthOfYear: Int, year: Int): String {
+    val shortYear = ((year % 100) + 100) % 100
+    return stringResource(
+        Res.string.month_year_short,
+        monthAbbreviation(monthOfYear),
+        shortYear.toString().padStart(2, '0'),
+    )
+}
+
 /** e.g. "Jul 7, 2026". */
 @Composable
 internal fun formatDayTitle(epochDay: Long): String {

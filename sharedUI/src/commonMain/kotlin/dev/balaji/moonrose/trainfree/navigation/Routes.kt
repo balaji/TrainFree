@@ -22,7 +22,7 @@ data object WorkoutsRoute : Route {
 }
 
 data object CalendarRoute : TopLevelRoute {
-    override val title get() = "History"
+    override val title get() = "Journal"
 }
 
 data object ProgressRoute : TopLevelRoute {
@@ -56,4 +56,19 @@ data class WorkoutSessionRoute(
 data class DayDetailRoute(
     val epochDay: Long,
     override val title: String = "Workout",
+) : Route
+
+data class WorkoutLogRoute(
+    val epochDay: Long,
+    override val title: String = "Log workout",
+) : Route
+
+data class WorkoutEditRoute(
+    val sessionId: Long,
+    override val title: String = "Edit workout",
+) : Route
+
+data class JournalEditorRoute(
+    val epochDay: Long,
+    override val title: String = "Journal",
 ) : Route

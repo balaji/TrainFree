@@ -30,12 +30,14 @@ enum class WeekStart(val value: String) {
  */
 data class CalendarDay(
     val epochDay: Long,
+    val year: Int,
     val dayOfMonth: Int,
     /** Month (1-12) of this day's date; UIs label the 1st of each month with its localized abbreviation. */
     val monthOfYear: Int,
     val isToday: Boolean,
     val isFuture: Boolean,
     val hasCompletedWorkout: Boolean,
+    val hasJournal: Boolean = false,
     /** Saturday or Sunday, regardless of the configured week start. */
     val isWeekend: Boolean,
 )
@@ -80,6 +82,7 @@ object WeekMath {
         completedDays: Set<Long>,
         todayEpochDay: Long,
         weekStart: WeekStart = WeekStart.SUNDAY,
+        journalDays: Set<Long> = emptySet(),
     ): List<CalendarWeek> {
         val weeks = mutableListOf<CalendarWeek>()
         var weekStartDay = weekStartOnOrBefore(startEpochDay, weekStart)
@@ -89,11 +92,13 @@ object WeekMath {
                 val date = LocalDate.fromEpochDays(epochDay)
                 CalendarDay(
                     epochDay = epochDay,
+                    year = date.year,
                     dayOfMonth = date.day,
                     monthOfYear = date.month.number,
                     isToday = epochDay == todayEpochDay,
                     isFuture = epochDay > todayEpochDay,
                     hasCompletedWorkout = epochDay in completedDays,
+                    hasJournal = epochDay in journalDays,
                     isWeekend = date.dayOfWeek == DayOfWeek.SATURDAY || date.dayOfWeek == DayOfWeek.SUNDAY,
                 )
             }

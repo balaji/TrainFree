@@ -18,6 +18,7 @@ import androidx.compose.foundation.gestures.animateTo
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.PressInteraction
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -45,6 +46,7 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
@@ -63,8 +65,10 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -109,6 +113,7 @@ import androidx.compose.ui.focus.onFocusChanged
 import dev.balaji.moonrose.trainfree.db.BarbellKeyboardState
 import dev.balaji.moonrose.trainfree.db.DraftSessionExercise
 import dev.balaji.moonrose.trainfree.db.DraftSessionSet
+import dev.balaji.moonrose.trainfree.db.ProgramRepository
 import dev.balaji.moonrose.trainfree.db.REST_TIMER_DURATION_SECONDS
 import dev.balaji.moonrose.trainfree.db.UserSettingsRepository
 import dev.balaji.moonrose.trainfree.db.WorkoutSessionFormState
@@ -120,6 +125,9 @@ import dev.balaji.moonrose.trainfree.model.UserSettings
 import dev.balaji.moonrose.trainfree.model.WeightUnit
 import dev.balaji.moonrose.trainfree.model.displaySetFields
 import dev.balaji.moonrose.trainfree.navigation.LocalUseNativeNavigation
+import dev.balaji.moonrose.trainfree.navigation.PlatformBackHandler
+import dev.balaji.moonrose.trainfree.navigation.WorkoutEditRoute
+import dev.balaji.moonrose.trainfree.navigation.WorkoutLogRoute
 import dev.balaji.moonrose.trainfree.navigation.WorkoutSessionRoute
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -229,6 +237,117 @@ fun WorkoutSessionScreen(route: WorkoutSessionRoute, onGoBack: () -> Unit) {
     }
 }
 
+@Composable
+fun WorkoutLogScreen(route: WorkoutLogRoute, onGoBack: () -> Unit) {
+    val formState = remember(route.epochDay) {
+        WorkoutSessionRepository.newCompletedLogFormState(route.epochDay)
+    }
+    CompletedWorkoutSessionScreen(
+        defaultTitle = stringResource(Res.string.log_workout_title),
+        formState = formState,
+        allowRoutineTemplate = true,
+        onGoBack = onGoBack,
+    )
+}
+
+@Composable
+fun WorkoutEditScreen(route: WorkoutEditRoute, onGoBack: () -> Unit) {
+    val formState = remember(route.sessionId) {
+        WorkoutSessionRepository.editCompletedFormState(route.sessionId)
+    }
+    CompletedWorkoutSessionScreen(
+        defaultTitle = stringResource(Res.string.edit_workout_title),
+        formState = formState,
+        allowRoutineTemplate = false,
+        onGoBack = onGoBack,
+    )
+}
+
+@Composable
+private fun CompletedWorkoutSessionScreen(
+    defaultTitle: String,
+    formState: WorkoutSessionFormState,
+    allowRoutineTemplate: Boolean,
+    onGoBack: () -> Unit,
+) {
+    val uiState by formState.uiState.collectAsState()
+    if (uiState.finished || uiState.discarded || uiState.deleted) {
+        LaunchedEffect(Unit) { onGoBack() }
+        return
+    }
+
+    var showDiscardChanges by remember { mutableStateOf(false) }
+    var showDeleteConfirm by remember { mutableStateOf(false) }
+    val attemptBack = {
+        if (uiState.hasUnsavedChanges) showDiscardChanges = true else onGoBack()
+    }
+    PlatformBackHandler(enabled = !uiState.saving && !uiState.deleted && !uiState.finished) {
+        attemptBack()
+    }
+
+    WorkoutSessionShell(
+        title = uiState.sessionTitle?.takeIf { it.isNotBlank() } ?: defaultTitle,
+        elapsedSeconds = null,
+        onGoBack = attemptBack,
+        onDelete = if (uiState.isEditingExisting) ({ showDeleteConfirm = true }) else null,
+        onFinish = { formState.saveCompleted() },
+        finishEnabled = uiState.canSaveCompleted,
+        finishContentDescription = stringResource(Res.string.save),
+    ) { padding ->
+        WorkoutSessionBody(
+            formState = formState,
+            uiState = uiState,
+            allowRoutineTemplate = allowRoutineTemplate,
+            modifier = Modifier
+                .padding(padding)
+                .consumeWindowInsets(padding)
+                .imePadding(),
+        )
+    }
+
+    if (showDiscardChanges) {
+        AlertDialog(
+            onDismissRequest = { showDiscardChanges = false },
+            title = { Text(stringResource(Res.string.discard_changes_title)) },
+            text = { Text(stringResource(Res.string.discard_changes_message)) },
+            confirmButton = {
+                TextButton(onClick = {
+                    showDiscardChanges = false
+                    onGoBack()
+                }) {
+                    Text(stringResource(Res.string.discard), color = MaterialTheme.colorScheme.error)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDiscardChanges = false }) {
+                    Text(stringResource(Res.string.keep_editing))
+                }
+            },
+        )
+    }
+
+    if (showDeleteConfirm) {
+        AlertDialog(
+            onDismissRequest = { showDeleteConfirm = false },
+            title = { Text(stringResource(Res.string.delete_workout_title)) },
+            text = { Text(stringResource(Res.string.delete_workout_message)) },
+            confirmButton = {
+                TextButton(onClick = {
+                    showDeleteConfirm = false
+                    formState.deleteCompletedSession()
+                }) {
+                    Text(stringResource(Res.string.delete), color = MaterialTheme.colorScheme.error)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDeleteConfirm = false }) {
+                    Text(stringResource(Res.string.cancel))
+                }
+            },
+        )
+    }
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun WorkoutSessionShell(
@@ -236,8 +355,10 @@ private fun WorkoutSessionShell(
     elapsedSeconds: Long? = null,
     onGoBack: () -> Unit,
     onDiscard: (() -> Unit)? = null,
+    onDelete: (() -> Unit)? = null,
     onFinish: (() -> Unit)? = null,
     finishEnabled: Boolean = false,
+    finishContentDescription: String? = null,
     content: @Composable (PaddingValues) -> Unit,
 ) {
     if (LocalUseNativeNavigation.current) {
@@ -273,12 +394,25 @@ private fun WorkoutSessionShell(
                                 )
                             }
                         }
+                        if (onDelete != null) {
+                            IconButton(onClick = onDelete) {
+                                Icon(
+                                    Icons.Default.Delete,
+                                    contentDescription = stringResource(Res.string.delete_workout),
+                                    tint = MaterialTheme.colorScheme.error,
+                                )
+                            }
+                        }
                         if (onFinish != null) {
                             IconButton(onClick = onFinish, enabled = finishEnabled) {
                                 Icon(
                                     Icons.Default.Check,
-                                    contentDescription = stringResource(Res.string.finish_workout),
-                                    tint = MaterialTheme.colorScheme.primary,
+                                    contentDescription = finishContentDescription ?: stringResource(Res.string.finish_workout),
+                                    tint = if (finishEnabled) {
+                                        MaterialTheme.colorScheme.primary
+                                    } else {
+                                        MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
+                                    },
                                 )
                             }
                         }
@@ -294,11 +428,14 @@ private fun WorkoutSessionShell(
 private fun WorkoutSessionBody(
     formState: WorkoutSessionFormState,
     uiState: WorkoutSessionUiState,
+    allowRoutineTemplate: Boolean = false,
     modifier: Modifier = Modifier,
 ) {
     val scope = rememberCoroutineScope()
     var showPicker by remember { mutableStateOf(false) }
+    var showRoutinePicker by remember { mutableStateOf(false) }
     val pickerSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val routineSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val reorder = remember { SessionReorderState() }
     val rowHeight = 56.dp
     val rowHeightPx = with(LocalDensity.current) { rowHeight.toPx() }
@@ -309,7 +446,7 @@ private fun WorkoutSessionBody(
     val plateState by plateKeyboard.uiState.collectAsState()
     val settings by UserSettingsRepository.settings.collectAsState(initial = UserSettings())
     var listHeightPx by remember { mutableIntStateOf(0) }
-    val restTimer = uiState.restTimer
+    val restTimer = uiState.restTimer.takeIf { uiState.isLiveSession }
     var restRemainingSeconds by remember(restTimer) {
         mutableLongStateOf(restTimer?.let { remainingSecondsUntil(it.endsAtMillis) } ?: 0L)
     }
@@ -349,6 +486,7 @@ private fun WorkoutSessionBody(
                             exercise = exercise,
                             exIndex = exIndex,
                             weightUnit = settings.weightUnit,
+                            isLiveSession = uiState.isLiveSession,
                             listHeightPx = listHeightPx,
                             // Which of this card's sets the plate keypad is
                             // editing, or null when it targets another card.
@@ -411,20 +549,40 @@ private fun WorkoutSessionBody(
                     }
 
                     item {
-                        TextButton(
-                            onClick = {
-                                focusManager.clearFocus()
-                                keyboardController?.hide()
-                                plateKeyboard.close()
-                                showPicker = true
-                            },
+                        Column(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .padding(horizontal = 16.dp, vertical = 8.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp),
                         ) {
-                            Icon(Icons.Default.Add, contentDescription = null)
-                            Spacer(Modifier.width(4.dp))
-                            Text(stringResource(Res.string.add_exercise_caps))
+                            TextButton(
+                                onClick = {
+                                    focusManager.clearFocus()
+                                    keyboardController?.hide()
+                                    plateKeyboard.close()
+                                    showPicker = true
+                                },
+                                modifier = Modifier.fillMaxWidth(),
+                            ) {
+                                Icon(Icons.Default.Add, contentDescription = null)
+                                Spacer(Modifier.width(4.dp))
+                                Text(stringResource(Res.string.add_exercise_caps))
+                            }
+                            if (allowRoutineTemplate) {
+                                OutlinedButton(
+                                    onClick = {
+                                        focusManager.clearFocus()
+                                        keyboardController?.hide()
+                                        plateKeyboard.close()
+                                        showRoutinePicker = true
+                                    },
+                                    modifier = Modifier.fillMaxWidth(),
+                                ) {
+                                    Icon(Icons.AutoMirrored.Filled.List, contentDescription = null)
+                                    Spacer(Modifier.width(8.dp))
+                                    Text(stringResource(Res.string.copy_from_routine))
+                                }
+                            }
                         }
                     }
                 }
@@ -460,6 +618,70 @@ private fun WorkoutSessionBody(
                     scope.launch { pickerSheetState.hide() }.invokeOnCompletion { showPicker = false }
                 },
             )
+        }
+    }
+
+    if (showRoutinePicker) {
+        ModalBottomSheet(
+            onDismissRequest = { showRoutinePicker = false },
+            sheetState = routineSheetState,
+        ) {
+            RoutineTemplatePickerSheet(
+                onRoutineSelected = { routineId ->
+                    formState.loadRoutine(routineId)
+                    scope.launch { routineSheetState.hide() }.invokeOnCompletion { showRoutinePicker = false }
+                },
+            )
+        }
+    }
+}
+
+@Composable
+private fun RoutineTemplatePickerSheet(
+    onRoutineSelected: (Long) -> Unit,
+) {
+    val programs by ProgramRepository.programs.collectAsState(initial = emptyList())
+    val routines by ProgramRepository.routines.collectAsState(initial = emptyList())
+    val routinesByProgram = remember(routines) { routines.groupBy { it.programId } }
+
+    Column(modifier = Modifier.fillMaxWidth().padding(bottom = 24.dp)) {
+        Text(
+            text = stringResource(Res.string.copy_from_routine),
+            style = MaterialTheme.typography.titleMedium,
+            modifier = Modifier.padding(horizontal = 24.dp, vertical = 12.dp),
+        )
+        HorizontalDivider()
+        if (routines.isEmpty()) {
+            Text(
+                text = stringResource(Res.string.no_programs_yet),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(24.dp),
+            )
+        } else {
+            LazyColumn(modifier = Modifier.fillMaxWidth()) {
+                programs.forEach { program ->
+                    val programRoutines = routinesByProgram[program.id].orEmpty()
+                    if (programRoutines.isNotEmpty()) {
+                        item(key = "program_${program.id}") {
+                            Text(
+                                text = program.name,
+                                style = MaterialTheme.typography.labelLarge,
+                                color = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp),
+                            )
+                        }
+                        programRoutines.forEach { routine ->
+                            item(key = "routine_${routine.id}") {
+                                ListItem(
+                                    headlineContent = { Text(routine.name) },
+                                    modifier = Modifier.clickable { onRoutineSelected(routine.id) },
+                                )
+                            }
+                        }
+                    }
+                }
+            }
         }
     }
 }
@@ -585,6 +807,7 @@ private fun SessionExerciseCard(
     exercise: DraftSessionExercise,
     exIndex: Int,
     weightUnit: WeightUnit,
+    isLiveSession: Boolean,
     listHeightPx: Int,
     plateKeypadSetIndex: Int?,
     restTimerSetIndex: Int?,
@@ -703,7 +926,9 @@ private fun SessionExerciseCard(
                     textAlign = TextAlign.Center,
                 )
             }
-            Spacer(Modifier.width(40.dp))
+            if (isLiveSession) {
+                Spacer(Modifier.width(40.dp))
+            }
         }
 
         exercise.sets.forEachIndexed { setIdx, set ->
@@ -712,6 +937,7 @@ private fun SessionExerciseCard(
                 fields = exercise.type.displaySetFields(),
                 workingSetNumber = exercise.workingSetNumber(setIdx),
                 previous = exercise.previousSet(setIdx),
+                isLiveSession = isLiveSession,
                 canDelete = exercise.sets.size > 1,
                 canComplete = exercise.isSetReadyToComplete(setIdx),
                 usesPlateKeypad = exercise.usesPlateKeyboard,
@@ -727,7 +953,7 @@ private fun SessionExerciseCard(
                 onUpdateDistance = { onUpdateDistance(setIdx, it) },
                 onToggleCompleted = { onToggleCompleted(setIdx) },
             )
-            AnimatedVisibility(visible = restTimerSetIndex == setIdx) {
+            AnimatedVisibility(visible = isLiveSession && restTimerSetIndex == setIdx) {
                 RestTimerCountdownRow(
                     remainingSeconds = restRemainingSeconds,
                     totalSeconds = restTotalSeconds,
@@ -758,6 +984,7 @@ private fun SessionSetRow(
     fields: List<SetField>,
     workingSetNumber: Int,
     previous: String?,
+    isLiveSession: Boolean,
     canDelete: Boolean,
     canComplete: Boolean,
     usesPlateKeypad: Boolean,
@@ -819,7 +1046,7 @@ private fun SessionSetRow(
     val haptics = LocalHapticFeedback.current
     val rowTint by animateColorAsState(
         when {
-            !set.completed -> Color.Transparent
+            !isLiveSession || !set.completed -> Color.Transparent
             set.setType == SetType.WARMUP -> CompletedWarmupPurple.copy(alpha = 0.20f)
             else -> CompletedGreen.copy(alpha = 0.20f)
         },
@@ -967,16 +1194,18 @@ private fun SessionSetRow(
                     )
                 }
             }
-            Checkbox(
-                checked = set.completed,
-                onCheckedChange = { onToggleCompleted() },
-                // A set needs every field its exercise type requires before
-                // it can be completed; completed stays enabled so stale rows
-                // can still be unchecked.
-                enabled = set.completed || canComplete,
-                colors = CheckboxDefaults.colors(checkedColor = CompletedGreen),
-                modifier = Modifier.size(40.dp),
-            )
+            if (isLiveSession) {
+                Checkbox(
+                    checked = set.completed,
+                    onCheckedChange = { onToggleCompleted() },
+                    // A set needs every field its exercise type requires before
+                    // it can be completed; completed stays enabled so stale rows
+                    // can still be unchecked.
+                    enabled = set.completed || canComplete,
+                    colors = CheckboxDefaults.colors(checkedColor = CompletedGreen),
+                    modifier = Modifier.size(40.dp),
+                )
+            }
         }
     }
 }

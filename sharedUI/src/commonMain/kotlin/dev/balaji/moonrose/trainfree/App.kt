@@ -66,6 +66,7 @@ import dev.balaji.moonrose.trainfree.navigation.CalendarRoute
 import dev.balaji.moonrose.trainfree.navigation.DayDetailRoute
 import dev.balaji.moonrose.trainfree.navigation.ExerciseDetailRoute
 import dev.balaji.moonrose.trainfree.navigation.ExercisesRoute
+import dev.balaji.moonrose.trainfree.navigation.JournalEditorRoute
 import dev.balaji.moonrose.trainfree.navigation.LocalBottomFabPadding
 import dev.balaji.moonrose.trainfree.navigation.NavStack
 import dev.balaji.moonrose.trainfree.navigation.PlatformBackHandler
@@ -73,6 +74,8 @@ import dev.balaji.moonrose.trainfree.navigation.ProfileRoute
 import dev.balaji.moonrose.trainfree.navigation.ProgressRoute
 import dev.balaji.moonrose.trainfree.navigation.ScreenContent
 import dev.balaji.moonrose.trainfree.navigation.TopLevelRoute
+import dev.balaji.moonrose.trainfree.navigation.WorkoutEditRoute
+import dev.balaji.moonrose.trainfree.navigation.WorkoutLogRoute
 import dev.balaji.moonrose.trainfree.navigation.WorkoutSessionRoute
 import dev.balaji.moonrose.trainfree.navigation.WorkoutsRoute
 import dev.balaji.moonrose.trainfree.notifications.rememberRestTimerNotifier
@@ -147,6 +150,9 @@ private fun MainTabs() {
     var showWorkouts by remember { mutableStateOf(false) }
     val workoutsStack = remember { NavStack(WorkoutsRoute) }
     val sessionScreenVisible = stack.current is WorkoutSessionRoute ||
+        stack.current is WorkoutLogRoute ||
+        stack.current is WorkoutEditRoute ||
+        stack.current is JournalEditorRoute ||
         directWorkoutSession != null ||
         (showWorkouts && workoutsStack.current is WorkoutSessionRoute)
 
@@ -668,7 +674,7 @@ private fun WorkoutFloatingMenu(
 private fun topLevelTabTitle(route: TopLevelRoute): String = stringResource(
     when (route) {
         ExercisesRoute -> Res.string.tab_exercises
-        CalendarRoute -> Res.string.tab_history
+        CalendarRoute -> Res.string.tab_journal
         ProgressRoute -> Res.string.tab_progress
         ProfileRoute -> Res.string.profile
     },

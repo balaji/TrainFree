@@ -43,7 +43,7 @@ enum L10n {
     // MARK: - Tabs
     static let tabExercises = String(localized: "tab_exercises", defaultValue: "Exercises")
     static let tabWorkouts = String(localized: "tab_workouts", defaultValue: "Workouts")
-    static let tabHistory = String(localized: "tab_history", defaultValue: "History")
+    static let tabJournal = String(localized: "tab_journal", defaultValue: "Journal")
     static let tabProgress = String(localized: "tab_progress", defaultValue: "Progress")
 
     // MARK: - Active session / workout dialogs
@@ -300,14 +300,44 @@ enum L10n {
     static let notLoggedYet = String(localized: "not_logged_yet", defaultValue: "Not logged yet")
     static let logWeight = String(localized: "log_weight", defaultValue: "Log weight")
 
-    // MARK: - Calendar / history
+    // MARK: - Calendar / journal
     static let showCalendar = String(localized: "show_calendar", defaultValue: "Show calendar")
-    static let showWorkoutHistory = String(localized: "show_workout_history", defaultValue: "Show workout history")
+    static let showWorkoutHistory = String(localized: "show_workout_history", defaultValue: "Show journal list")
     static let weekNumberAbbrev = String(localized: "week_number_abbrev", defaultValue: "Wk")
     static let noCompletedWorkouts = String(localized: "no_completed_workouts", defaultValue: "No completed workouts")
+    static let noJournalOrWorkouts = String(localized: "no_journal_or_workouts", defaultValue: "No workouts or journal entries yet")
+    static let logCompletedWorkout = String(localized: "log_completed_workout", defaultValue: "Log completed workout")
+    static let editExistingWorkout = String(localized: "edit_existing_workout", defaultValue: "Edit existing workout")
+    static let writeJournal = String(localized: "write_journal", defaultValue: "Write journal")
+    static let journalEntryBadge = String(localized: "journal_entry_badge", defaultValue: "Journal")
 
-    // MARK: - Day detail
+    // MARK: - Day detail & journal
+    static let noWorkoutsThisDay = String(localized: "no_workouts_this_day", defaultValue: "No completed workouts on this day")
     static let workout = String(localized: "workout", defaultValue: "Workout")
+    static let journal = String(localized: "journal", defaultValue: "Journal")
+    static let editJournal = String(localized: "edit_journal", defaultValue: "Edit journal")
+    static let logWorkoutTitle = String(localized: "log_workout_title", defaultValue: "Log workout")
+    static let editWorkoutTitle = String(localized: "edit_workout_title", defaultValue: "Edit workout")
+    static let copyFromRoutine = String(localized: "copy_from_routine", defaultValue: "Copy from routine")
+    static let deleteWorkout = String(localized: "delete_workout", defaultValue: "Delete workout")
+    static let deleteWorkoutTitle = String(localized: "delete_workout_title", defaultValue: "Delete workout?")
+    static let deleteWorkoutMessage = String(localized: "delete_workout_message", defaultValue: "This workout and all its logged sets will be deleted.")
+    static let discardChangesTitle = String(localized: "discard_changes_title", defaultValue: "Discard changes?")
+    static let discardChangesMessage = String(localized: "discard_changes_message", defaultValue: "You have unsaved changes. Leave without saving?")
+    static let keepEditing = String(localized: "keep_editing", defaultValue: "Keep editing")
+    static let journalEditorPlaceholder = String(localized: "journal_editor_placeholder", defaultValue: "Write about your workout, energy, mindset, or anything on your mind…")
+    static let journalTabEdit = String(localized: "journal_tab_edit", defaultValue: "Edit")
+    static let journalTabPreview = String(localized: "journal_tab_preview", defaultValue: "Preview")
+    static let journalPreviewEmpty = String(localized: "journal_preview_empty", defaultValue: "Nothing to preview")
+    static func journalWordCount(_ count: Int, _ max: Int) -> String {
+        String(localized: "journal_word_count", defaultValue: "\(count) / \(max) words")
+    }
+    static let journalFormatBold = String(localized: "journal_format_bold", defaultValue: "Bold")
+    static let journalFormatItalic = String(localized: "journal_format_italic", defaultValue: "Italic")
+    static let journalFormatHeading = String(localized: "journal_format_heading", defaultValue: "Heading")
+    static let journalFormatList = String(localized: "journal_format_list", defaultValue: "Bullet list")
+    static let deleteJournalTitle = String(localized: "delete_journal_title", defaultValue: "Delete journal?")
+    static let deleteJournalMessage = String(localized: "delete_journal_message", defaultValue: "This day's journal entry will be deleted.")
     static func setNumber(_ number: Int) -> String {
         String(localized: "set_number", defaultValue: "Set \(number)")
     }
@@ -352,6 +382,9 @@ enum L10n {
     /// 1-based month, mirroring LogicLabels.monthAbbreviation.
     static func monthAbbreviation(_ monthOfYear: Int) -> String {
         monthsShort[max(1, min(12, monthOfYear)) - 1]
+    }
+    static func monthYearShort(_ month: String, _ year: String) -> String {
+        String(localized: "month_year_short", defaultValue: "\(month)'\(year)")
     }
     static func dayTitle(_ month: String, _ day: String, _ year: String) -> String {
         String(localized: "day_title", defaultValue: "\(month) \(day), \(year)")
