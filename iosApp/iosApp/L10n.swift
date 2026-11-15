@@ -338,7 +338,6 @@ enum L10n {
     static let journalFormatList = String(localized: "journal_format_list", defaultValue: "Bullet list")
     static let deleteJournalTitle = String(localized: "delete_journal_title", defaultValue: "Delete journal?")
     static let deleteJournalMessage = String(localized: "delete_journal_message", defaultValue: "This day's journal entry will be deleted.")
-    static let noProgramsYet = String(localized: "no_programs_yet", defaultValue: "No programs yet. Tap + to create one.")
     static func setNumber(_ number: Int) -> String {
         String(localized: "set_number", defaultValue: "Set \(number)")
     }

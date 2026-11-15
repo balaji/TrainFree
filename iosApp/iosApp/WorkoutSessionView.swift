@@ -286,7 +286,7 @@ struct WorkoutSessionView: View {
                     return
                 }
             case .logCompleted(let epochDay, _):
-                let state = WorkoutSessionRepository.shared.newCompletedLogFormState(epochDay: epochDay)
+                let state = WorkoutSessionRepository.shared.doNewCompletedLogFormState(epochDay: epochDay)
                 formState = state
                 uiState = state.uiState.value
                 plateKeyboard = BarbellKeyboardState(formState: state)
