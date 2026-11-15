@@ -16,6 +16,7 @@ import dev.balaji.moonrose.trainfree.model.AppFontSize
 import dev.balaji.moonrose.trainfree.model.DEFAULT_REST_TIMER_SECONDS
 import dev.balaji.moonrose.trainfree.model.Exercise
 import dev.balaji.moonrose.trainfree.model.RestTimerSound
+import dev.balaji.moonrose.trainfree.model.SetType
 import dev.balaji.moonrose.trainfree.model.clampRestTimerSeconds
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -28,7 +29,6 @@ class SharedLogicAndroidHostTest {
     private val bench = Exercise(
         id = 1L,
         name = "Bench Press",
-        description = null,
         exerciseType = "strength",
         bodyPart = "chest",
         equipment = "barbell",
@@ -38,7 +38,6 @@ class SharedLogicAndroidHostTest {
     private val squat = Exercise(
         id = 2L,
         name = "Squat",
-        description = null,
         exerciseType = "strength",
         bodyPart = "legs",
         equipment = "barbell",
@@ -236,5 +235,112 @@ class SharedLogicAndroidHostTest {
             UserSettingEntity(SETTING_APP_FONT_SIZE, "largest", 0L, 0L),
         ).toUserSettings()
         assertEquals(AppFontSize.LARGEST, largest.appFontSize)
+    }
+
+    @Test
+    fun warmupSetAlwaysHasNullPreviousAndNormalSetsIndexByWorkingSetNumber() {
+        val exercise = DraftSessionExercise(
+            id = 10L,
+            exercise = bench,
+            sets = listOf(
+                DraftSessionSet(setType = SetType.WARMUP),
+                DraftSessionSet(setType = SetType.NORMAL),
+                DraftSessionSet(setType = SetType.NORMAL),
+            ),
+            previousSets = listOf("67.5kg x 5", "70kg x 5", "72.5kg x 5"),
+        )
+
+        assertNull(exercise.previousSet(0))
+        assertEquals(1, exercise.workingSetNumber(1))
+        assertEquals("67.5kg x 5", exercise.previousSet(1))
+        assertEquals(2, exercise.workingSetNumber(2))
+        assertEquals("70kg x 5", exercise.previousSet(2))
+    }
+
+    @Test
+    fun switchingWarmupSetToNormalPopulatesPreviousForThatSetNumber() {
+        val initial = DraftSessionExercise(
+            id = 10L,
+            exercise = bench,
+            sets = listOf(
+                DraftSessionSet(setType = SetType.WARMUP),
+                DraftSessionSet(setType = SetType.NORMAL),
+                DraftSessionSet(setType = SetType.NORMAL),
+            ),
+            previousSets = listOf("67.5kg x 5", "70kg x 5", "72.5kg x 5"),
+        )
+
+        val setZeroNormal = initial.copy(
+            sets = initial.sets.mapIndexed { idx, s -> if (idx == 0) s.copy(setType = SetType.NORMAL) else s },
+        )
+        assertEquals(1, setZeroNormal.workingSetNumber(0))
+        assertEquals("67.5kg x 5", setZeroNormal.previousSet(0))
+        assertEquals(2, setZeroNormal.workingSetNumber(1))
+        assertEquals("70kg x 5", setZeroNormal.previousSet(1))
+        assertEquals(3, setZeroNormal.workingSetNumber(2))
+        assertEquals("72.5kg x 5", setZeroNormal.previousSet(2))
+
+        val setOneWarmup = setZeroNormal.copy(
+            sets = setZeroNormal.sets.mapIndexed { idx, s -> if (idx == 1) s.copy(setType = SetType.WARMUP) else s },
+        )
+        assertEquals(1, setOneWarmup.workingSetNumber(0))
+        assertEquals("67.5kg x 5", setOneWarmup.previousSet(0))
+        assertNull(setOneWarmup.previousSet(1))
+        assertEquals(2, setOneWarmup.workingSetNumber(2))
+        assertEquals("70kg x 5", setOneWarmup.previousSet(2))
+    }
+
+    @Test
+    fun hasCompletedSetsExcludesWarmupSets() {
+        val warmupOnly = WorkoutSessionUiState(
+            loading = false,
+            exercises = listOf(
+                DraftSessionExercise(
+                    id = 10L,
+                    exercise = bench,
+                    sets = listOf(
+                        DraftSessionSet(actualWeight = "20", actualReps = "5", setType = SetType.WARMUP, completed = true),
+                    ),
+                ),
+            ),
+        )
+        assertFalse(warmupOnly.hasCompletedSets)
+
+        val withNormal = warmupOnly.copy(
+            exercises = listOf(
+                warmupOnly.exercises[0].copy(
+                    sets = warmupOnly.exercises[0].sets + DraftSessionSet(
+                        actualWeight = "60",
+                        actualReps = "5",
+                        setType = SetType.NORMAL,
+                        completed = true,
+                    ),
+                ),
+            ),
+        )
+        assertTrue(withNormal.hasCompletedSets)
+
+        val withDrop = warmupOnly.copy(
+            exercises = listOf(
+                warmupOnly.exercises[0].copy(
+                    sets = warmupOnly.exercises[0].sets + DraftSessionSet(
+                        actualWeight = "40",
+                        actualReps = "8",
+                        setType = SetType.DROP,
+                        completed = true,
+                    ),
+                ),
+            ),
+        )
+        assertTrue(withDrop.hasCompletedSets)
+
+        val normalSwitchedToWarmup = withNormal.copy(
+            exercises = listOf(
+                withNormal.exercises[0].copy(
+                    sets = withNormal.exercises[0].sets.map { it.copy(setType = SetType.WARMUP) },
+                ),
+            ),
+        )
+        assertFalse(normalSwitchedToWarmup.hasCompletedSets)
     }
 }

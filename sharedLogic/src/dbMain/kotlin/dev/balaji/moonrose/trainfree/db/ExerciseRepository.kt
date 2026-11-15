@@ -38,7 +38,6 @@ object ExerciseRepository {
 
     suspend fun create(
         name: String,
-        description: String?,
         exerciseType: String?,
         bodyPart: String?,
         equipment: String?,
@@ -48,7 +47,6 @@ object ExerciseRepository {
             AppDb.db.exerciseDao().insert(
                 ExerciseEntity(
                     name = name,
-                    description = description,
                     exerciseType = exerciseType,
                     bodyPart = bodyPart,
                     otherBodyParts = null,
@@ -70,7 +68,6 @@ object ExerciseRepository {
     suspend fun update(
         id: Long,
         name: String,
-        description: String?,
         exerciseType: String?,
         bodyPart: String?,
         equipment: String?,
@@ -80,7 +77,6 @@ object ExerciseRepository {
             AppDb.db.exerciseDao().update(
                 id = id,
                 name = name,
-                description = description,
                 exerciseType = exerciseType,
                 bodyPart = bodyPart,
                 equipment = equipment,
@@ -114,7 +110,6 @@ object ExerciseRepository {
 private fun ExerciseEntity.toDomain() = Exercise(
     id = id,
     name = name,
-    description = description,
     exerciseType = exerciseType,
     bodyPart = bodyPart,
     equipment = equipment,

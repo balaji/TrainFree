@@ -23,7 +23,6 @@ import dev.balaji.moonrose.trainfree.model.UserSettings
 import dev.balaji.moonrose.trainfree.model.WeightUnit
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.TimeZone
@@ -33,7 +32,6 @@ class ChatToolboxTest {
     private val bench = Exercise(
         id = 1L,
         name = "Barbell Bench Press",
-        description = "Lower the barbell to mid-chest and press up cleanly.",
         exerciseType = "strength",
         bodyPart = "chest",
         equipment = "barbell",
@@ -44,7 +42,6 @@ class ChatToolboxTest {
     private val run = Exercise(
         id = 2L,
         name = "Treadmill Run",
-        description = null,
         exerciseType = "distance_duration",
         bodyPart = "full body",
         equipment = "machine",
@@ -194,14 +191,10 @@ class ChatToolboxTest {
     }
 
     @Test
-    fun `exercise search includes descriptions only when requested`() {
-        val withoutDesc = ChatToolbox.exerciseSearchFrom(listOf(bench), mapOf(1L to 12), includeDescription = false)
-        assertTrue(withoutDesc.summary.contains("secondary: triceps, shoulders"))
-        assertTrue(withoutDesc.summary.contains("12 logged sets"))
-        assertFalse(withoutDesc.summary.contains("Form:"))
-
-        val withDesc = ChatToolbox.exerciseSearchFrom(listOf(bench), emptyMap(), includeDescription = true)
-        assertTrue(withDesc.summary.contains("Form: Lower the barbell to mid-chest"))
+    fun `exercise search formats metadata and logged set count`() {
+        val out = ChatToolbox.exerciseSearchFrom(listOf(bench), mapOf(1L to 12))
+        assertTrue(out.summary.contains("secondary: triceps, shoulders"))
+        assertTrue(out.summary.contains("12 logged sets"))
     }
 
     @Test

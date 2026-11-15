@@ -200,7 +200,6 @@ struct SearchExercisesTool: Tool {
                 query: arguments.query,
                 bodyPart: arguments.bodyPart,
                 equipment: arguments.equipment,
-                includeDescription: false,
                 limit: Int32(arguments.limit ?? 8)
             )
         }

@@ -160,7 +160,6 @@ internal object GeminiNanoToolCodec {
                 query = args.stringArg("query"),
                 bodyPart = args.stringArg("body_part"),
                 equipment = args.stringArg("equipment"),
-                includeDescription = false,
                 limit = args.intArg("limit") ?: 8,
             )
             TOOL_BODY_METRICS -> toolbox.getBodyMetricsAndProfile(

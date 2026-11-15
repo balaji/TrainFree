@@ -168,14 +168,13 @@ interface ExerciseDao {
     suspend fun insert(exercise: ExerciseEntity): Long
 
     @Query(
-        "UPDATE exercises SET name = :name, description = :description, " +
+        "UPDATE exercises SET name = :name, " +
             "exercise_type = :exerciseType, body_part = :bodyPart, equipment = :equipment, " +
             "updated_at = :now WHERE id = :id",
     )
     suspend fun update(
         id: Long,
         name: String,
-        description: String?,
         exerciseType: String?,
         bodyPart: String?,
         equipment: String?,
@@ -272,14 +271,18 @@ interface WorkoutSessionDao {
     suspend fun findInProgress(profileId: Long): WorkoutSessionEntity?
 
     @Query(
-        "SELECT performed_at FROM workout_sessions " +
-            "WHERE profile_id = :profileId AND completed_at IS NOT NULL",
+        "SELECT s.performed_at FROM workout_sessions s " +
+            "WHERE s.profile_id = :profileId AND s.completed_at IS NOT NULL " +
+            "AND EXISTS(SELECT 1 FROM workout_session_details d " +
+            "WHERE d.workout_session_id = s.id AND d.completed != 0 AND d.set_type != 'warmup')",
     )
     fun observeCompletedPerformedAt(profileId: Long): Flow<List<Long>>
 
     @Query(
-        "SELECT performed_at FROM workout_sessions " +
-            "WHERE profile_id = :profileId AND completed_at IS NOT NULL",
+        "SELECT s.performed_at FROM workout_sessions s " +
+            "WHERE s.profile_id = :profileId AND s.completed_at IS NOT NULL " +
+            "AND EXISTS(SELECT 1 FROM workout_session_details d " +
+            "WHERE d.workout_session_id = s.id AND d.completed != 0 AND d.set_type != 'warmup')",
     )
     suspend fun getCompletedPerformedAt(profileId: Long): List<Long>
 
@@ -376,7 +379,7 @@ interface WorkoutSessionDetailDao {
 
     @Query(
         "SELECT EXISTS(SELECT 1 FROM workout_session_details " +
-            "WHERE workout_session_id = :sessionId AND completed != 0)",
+            "WHERE workout_session_id = :sessionId AND completed != 0 AND set_type != 'warmup')",
     )
     suspend fun hasCompletedSets(sessionId: Long): Boolean
 
@@ -500,11 +503,12 @@ interface WorkoutSessionDetailDao {
             "d.weight_unit AS weight_unit " +
             "FROM workout_session_details d " +
             "JOIN workout_sessions s ON s.id = d.workout_session_id " +
-            "WHERE d.exercise_id = :exerciseId AND s.id = (" +
+            "WHERE d.exercise_id = :exerciseId AND d.completed != 0 AND d.set_type != 'warmup' " +
+            "AND s.id = (" +
             "SELECT s2.id FROM workout_sessions s2 " +
             "JOIN workout_session_details d2 ON d2.workout_session_id = s2.id " +
             "WHERE s2.profile_id = :profileId AND s2.completed_at IS NOT NULL " +
-            "AND d2.exercise_id = :exerciseId " +
+            "AND d2.exercise_id = :exerciseId AND d2.completed != 0 AND d2.set_type != 'warmup' " +
             "ORDER BY s2.performed_at DESC LIMIT 1) " +
             "ORDER BY d.position",
     )

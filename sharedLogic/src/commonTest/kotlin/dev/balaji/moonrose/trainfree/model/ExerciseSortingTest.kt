@@ -7,7 +7,6 @@ class ExerciseSortingTest {
     private fun exercise(id: Long, name: String) = Exercise(
         id = id,
         name = name,
-        description = null,
         exerciseType = "strength",
         bodyPart = "chest",
         equipment = "barbell",

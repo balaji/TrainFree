@@ -706,16 +706,12 @@ private fun SessionExerciseCard(
             Spacer(Modifier.width(40.dp))
         }
 
-        // Only normal sets take a working-set number; warm-up and drop sets show
-        // a marker, and the cell opens the set-type menu.
-        var workingSetNumber = 0
         exercise.sets.forEachIndexed { setIdx, set ->
-            if (set.setType == SetType.NORMAL) workingSetNumber++
             SessionSetRow(
                 set = set,
                 fields = exercise.type.displaySetFields(),
-                workingSetNumber = workingSetNumber,
-                previous = exercise.previousSets.getOrNull(setIdx)?.takeIf { it.isNotBlank() },
+                workingSetNumber = exercise.workingSetNumber(setIdx),
+                previous = exercise.previousSet(setIdx),
                 canDelete = exercise.sets.size > 1,
                 canComplete = exercise.isSetReadyToComplete(setIdx),
                 usesPlateKeypad = exercise.usesPlateKeyboard,
@@ -822,7 +818,11 @@ private fun SessionSetRow(
 
     val haptics = LocalHapticFeedback.current
     val rowTint by animateColorAsState(
-        if (set.completed) CompletedGreen.copy(alpha = 0.20f) else Color.Transparent,
+        when {
+            !set.completed -> Color.Transparent
+            set.setType == SetType.WARMUP -> CompletedWarmupPurple.copy(alpha = 0.20f)
+            else -> CompletedGreen.copy(alpha = 0.20f)
+        },
     )
     // Brief scale pop when the row transitions to completed, as a visual cue.
     val popScale = remember { Animatable(1f) }
@@ -983,6 +983,9 @@ private fun SessionSetRow(
 
 /** Green shared by the completed-row tint and the checked checkbox. */
 private val CompletedGreen = Color(0xFF43A047)
+
+/** Purple tint used for a completed warm-up set row background. */
+private val CompletedWarmupPurple = Color(0xFF8E24AA)
 
 /**
  * Returns a callback that starts [WorkoutSessionRoute] immediately when idle,

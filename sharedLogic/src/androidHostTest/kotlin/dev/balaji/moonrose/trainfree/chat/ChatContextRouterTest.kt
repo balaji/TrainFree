@@ -45,10 +45,9 @@ private class RecordingToolbox : ChatToolboxPort {
         query: String?,
         bodyPart: String?,
         equipment: String?,
-        includeDescription: Boolean,
         limit: Int,
     ): ToolOutput {
-        calls += "search:q=${query.orEmpty()},bp=${bodyPart.orEmpty()},eq=${equipment.orEmpty()},desc=$includeDescription"
+        calls += "search:q=${query.orEmpty()},bp=${bodyPart.orEmpty()},eq=${equipment.orEmpty()}"
         return ToolOutput("Exercise search block")
     }
 
@@ -59,9 +58,9 @@ private class RecordingToolbox : ChatToolboxPort {
 }
 
 class ChatContextRouterTest {
-    private val bench = Exercise(1L, "Barbell Bench Press", "Press bar.", "strength", "chest", "barbell", true)
-    private val dbBench = Exercise(2L, "Dumbbell Bench Press", "Press DBs.", "strength", "chest", "dumbbell", true)
-    private val ohp = Exercise(3L, "Barbell Overhead Press", "Press overhead.", "strength", "shoulders", "barbell", true)
+    private val bench = Exercise(1L, "Barbell Bench Press", "strength", "chest", "barbell", true)
+    private val dbBench = Exercise(2L, "Dumbbell Bench Press", "strength", "chest", "dumbbell", true)
+    private val ohp = Exercise(3L, "Barbell Overhead Press", "strength", "shoulders", "barbell", true)
     private val catalog = listOf(bench, dbBench, ohp)
     private val trained = mapOf(1L to 30, 3L to 12)
 
@@ -84,7 +83,7 @@ class ChatContextRouterTest {
     fun `routes dumbbell substitute question for bench press`() = runBlocking {
         val tb = RecordingToolbox()
         router(tb).route("What dumbbell substitute can I use instead of bench press?")
-        assertTrue(tb.calls.any { it == "search:q=,bp=chest,eq=dumbbell,desc=false" })
+        assertTrue(tb.calls.any { it == "search:q=,bp=chest,eq=dumbbell" })
     }
 
     @Test
@@ -115,14 +114,14 @@ class ChatContextRouterTest {
             "How do I perform this with good form?",
             ChatSeedContext(kind = "exercise", exerciseId = 1L, exerciseName = "Barbell Bench Press"),
         )
-        assertEquals(listOf("search:q=Barbell Bench Press,bp=,eq=,desc=false"), tbExercise.calls)
+        assertEquals(listOf("search:q=Barbell Bench Press,bp=,eq="), tbExercise.calls)
 
         val tbExplain = RecordingToolbox()
         router(tbExplain).route(
             "What is Barbell Bench Press?",
             ChatSeedContext(kind = "exercise", exerciseId = 1L, exerciseName = "Barbell Bench Press"),
         )
-        assertEquals(listOf("search:q=Barbell Bench Press,bp=,eq=,desc=false"), tbExplain.calls)
+        assertEquals(listOf("search:q=Barbell Bench Press,bp=,eq="), tbExplain.calls)
 
         val tbUnknownForm = RecordingToolbox()
         val unknownOut = router(tbUnknownForm).route("How do I perform a Jefferson Curl?")

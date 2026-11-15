@@ -17,7 +17,6 @@ class ExerciseMatcherTest {
     ) = Exercise(
         id = id,
         name = name,
-        description = "How to perform $name.",
         exerciseType = exerciseType,
         bodyPart = bodyPart,
         equipment = equipment,

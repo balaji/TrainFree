@@ -36,6 +36,9 @@ data class DraftWorkSet(
 ) {
     /** Which measured fields this exercise's sets take; unrecognized types fall back to strength (reps). */
     val type: ExerciseType get() = ExerciseType.fromValue(exercise.exerciseType) ?: ExerciseType.STRENGTH
+
+    /** Count of non-warmup sets, used by read-only routine summaries ("3 x Bench Press"). */
+    val workingSetCount: Int get() = sets.count { it.setType != SetType.WARMUP }
 }
 
 data class RoutineDetailUiState(

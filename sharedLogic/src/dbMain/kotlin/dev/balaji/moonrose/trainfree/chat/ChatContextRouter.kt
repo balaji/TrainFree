@@ -18,7 +18,6 @@ internal interface ChatToolboxPort {
         query: String? = null,
         bodyPart: String? = null,
         equipment: String? = null,
-        includeDescription: Boolean = false,
         limit: Int = 8,
     ): ToolOutput
     suspend fun getBodyMetricsAndProfile(days: Int = 90): ToolOutput
@@ -39,9 +38,8 @@ internal object LiveChatToolboxPort : ChatToolboxPort {
         query: String?,
         bodyPart: String?,
         equipment: String?,
-        includeDescription: Boolean,
         limit: Int,
-    ) = ChatToolbox.searchExercises(query, bodyPart, equipment, includeDescription, limit)
+    ) = ChatToolbox.searchExercises(query, bodyPart, equipment, limit)
     override suspend fun getBodyMetricsAndProfile(days: Int) =
         ChatToolbox.getBodyMetricsAndProfile(days)
 }
@@ -103,7 +101,7 @@ internal class ChatContextRouter(
                 outputs += toolbox.getExerciseProgression(exerciseQuery = ex, weeks = 12)
             }
             if (plan.wantsForm || (seedContext.kind == "exercise" && !plan.wantsSubstitutes)) {
-                outputs += toolbox.searchExercises(query = ex, includeDescription = false, limit = 1)
+                outputs += toolbox.searchExercises(query = ex, limit = 1)
             }
             if (plan.wantsSubstitutes) {
                 val resolved = (ExerciseMatcher.resolve(ex, exercises) as? ExerciseMatchResult.Matched)?.exercise
@@ -111,7 +109,6 @@ internal class ChatContextRouter(
                 outputs += toolbox.searchExercises(
                     bodyPart = subBodyPart,
                     equipment = plan.equipment,
-                    includeDescription = false,
                     limit = 6,
                 )
             }
@@ -121,7 +118,6 @@ internal class ChatContextRouter(
                 outputs += toolbox.searchExercises(
                     bodyPart = plan.bodyPart,
                     equipment = plan.equipment,
-                    includeDescription = false,
                     limit = 6,
                 )
             }

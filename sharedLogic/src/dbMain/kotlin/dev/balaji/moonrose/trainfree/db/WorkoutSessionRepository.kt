@@ -235,7 +235,7 @@ object WorkoutSessionRepository {
         }
         val emptyIds = details.filter { d ->
             val type = typeByExercise.getValue(d.exerciseId)
-            !type.isSetComplete(d.actualReps, d.actualDuration, d.actualDistance)
+            !d.completed || !type.isSetComplete(d.actualReps, d.actualDuration, d.actualDistance)
         }.map { it.id }
         if (emptyIds.isNotEmpty()) AppDb.db.workoutSessionDetailDao().deleteByIds(emptyIds)
         AppDb.db.workoutSessionDao().setCompletedAt(sessionId, now, now)

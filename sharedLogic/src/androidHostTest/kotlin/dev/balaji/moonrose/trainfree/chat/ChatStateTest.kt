@@ -62,7 +62,7 @@ private class FakeChatProvider(
 
 class ChatStateTest {
     private val scope = CoroutineScope(Dispatchers.Unconfined)
-    private val bench = Exercise(1L, "Barbell Bench Press", "Press.", "strength", "chest", "barbell", true)
+    private val bench = Exercise(1L, "Barbell Bench Press", "strength", "chest", "barbell", true)
 
     private val router = ChatContextRouter(
         toolbox = object : ChatToolboxPort {
@@ -77,7 +77,7 @@ class ChatStateTest {
             override suspend fun getWorkoutsForDay(epochDay: Long) =
                 ToolOutput("Day $epochDay workout", listOf(ChatSourceRef("day", "Nov 10", epochDay = epochDay)))
             override suspend fun getProgramsAndRoutines(routineQuery: String?) = ToolOutput("PPL")
-            override suspend fun searchExercises(query: String?, bodyPart: String?, equipment: String?, includeDescription: Boolean, limit: Int) =
+            override suspend fun searchExercises(query: String?, bodyPart: String?, equipment: String?, limit: Int) =
                 ToolOutput("Search")
             override suspend fun getBodyMetricsAndProfile(days: Int) = ToolOutput("Body")
         },
