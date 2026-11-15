@@ -1,7 +1,5 @@
 package dev.balaji.moonrose.trainfree.db
 
-import kotlin.experimental.ExperimentalObjCName
-import kotlin.native.ObjCName
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -9,14 +7,9 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
-@OptIn(ExperimentalObjCName::class)
 data class ExerciseFormUiState(
     val loading: Boolean = true,
     val name: String = "",
-    // "description" collides with NSObject's auto-generated `description` (toString())
-    // on the Swift side, so it silently resolved to the wrong value there.
-    @ObjCName("descriptionText")
-    val description: String = "",
     val exerciseType: String? = null,
     val bodyPart: String? = null,
     val equipment: String? = null,
@@ -47,7 +40,6 @@ class ExerciseFormState private constructor(private val exerciseId: Long?) {
                 _uiState.value = _uiState.value.copy(
                     loading = false,
                     name = exercise?.name ?: "",
-                    description = exercise?.description ?: "",
                     exerciseType = exercise?.exerciseType,
                     bodyPart = exercise?.bodyPart,
                     equipment = exercise?.equipment,
@@ -59,10 +51,6 @@ class ExerciseFormState private constructor(private val exerciseId: Long?) {
 
     fun updateName(value: String) {
         _uiState.value = _uiState.value.copy(name = value, nameError = false, duplicateNameError = false)
-    }
-
-    fun updateDescription(value: String) {
-        _uiState.value = _uiState.value.copy(description = value)
     }
 
     fun updateExerciseType(value: String) {
@@ -88,7 +76,6 @@ class ExerciseFormState private constructor(private val exerciseId: Long?) {
             val error = if (exerciseId == null) {
                 ExerciseRepository.create(
                     name = state.name.trim(),
-                    description = state.description.trim().ifBlank { null },
                     exerciseType = state.exerciseType,
                     bodyPart = state.bodyPart,
                     equipment = state.equipment,
@@ -97,7 +84,6 @@ class ExerciseFormState private constructor(private val exerciseId: Long?) {
                 ExerciseRepository.update(
                     id = exerciseId,
                     name = state.name.trim(),
-                    description = state.description.trim().ifBlank { null },
                     exerciseType = state.exerciseType,
                     bodyPart = state.bodyPart,
                     equipment = state.equipment,

@@ -2,15 +2,22 @@ package dev.balaji.moonrose.trainfree.db
 
 import androidx.sqlite.SQLiteConnection
 import androidx.sqlite.SQLiteStatement
+import dev.balaji.moonrose.trainfree.model.ExerciseType
+import dev.balaji.moonrose.trainfree.model.SamplePrograms
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class ExerciseSeedTest {
 
     private data class ExerciseRow(
         val name: String,
+        val type: String,
+        val bodyPart: String,
+        val otherBodyParts: List<String>,
+        val equipment: String,
         val builtin: Long,
     )
 
@@ -52,9 +59,9 @@ class ExerciseSeedTest {
                 if (rowsByName.values.any { it.builtin != 0L }) 1L else 0L
             }
 
-            sql.startsWith("INSERT OR IGNORE INTO exercises") -> InsertStatement { name, builtin ->
+            sql.startsWith("INSERT OR IGNORE INTO exercises") -> InsertStatement { row ->
                 insertAttempts++
-                rowsByName.putIfAbsent(name, ExerciseRow(name = name, builtin = builtin))
+                rowsByName.putIfAbsent(row.name, row)
             }
 
             else -> error("Unexpected SQL in ExerciseSeedTest: $sql")
@@ -105,7 +112,7 @@ class ExerciseSeedTest {
     }
 
     private class InsertStatement(
-        private val onInsert: (name: String, builtin: Long) -> Unit,
+        private val onInsert: (ExerciseRow) -> Unit,
     ) : BaseStatement() {
         private val textArgs = mutableMapOf<Int, String>()
         private val longArgs = mutableMapOf<Int, Long>()
@@ -119,9 +126,17 @@ class ExerciseSeedTest {
         }
 
         override fun step(): Boolean {
+            val otherRaw = requireNotNull(textArgs[4]) { "Missing other_body_parts parameter" }
+            val otherList = if (otherRaw.isEmpty()) emptyList() else otherRaw.split(",")
             onInsert(
-                requireNotNull(textArgs[1]) { "Missing name parameter" },
-                requireNotNull(longArgs[7]) { "Missing builtin parameter" },
+                ExerciseRow(
+                    name = requireNotNull(textArgs[1]) { "Missing name parameter" },
+                    type = requireNotNull(textArgs[2]) { "Missing exercise_type parameter" },
+                    bodyPart = requireNotNull(textArgs[3]) { "Missing body_part parameter" },
+                    otherBodyParts = otherList,
+                    equipment = requireNotNull(textArgs[5]) { "Missing equipment parameter" },
+                    builtin = requireNotNull(longArgs[6]) { "Missing builtin parameter" },
+                ),
             )
             return false
         }
@@ -163,5 +178,67 @@ class ExerciseSeedTest {
         assertEquals(0, connection.beginCount)
         assertEquals(0, connection.endCount)
         assertEquals(attemptsAfterCreate, connection.insertAttempts)
+    }
+
+    @Test
+    fun seedCatalogMetadataIsValidAndMatchesSamplePrograms() {
+        val canonicalBodyParts = setOf(
+            "back", "biceps", "calves", "chest", "core", "forearms",
+            "full body", "glutes", "hamstrings", "shoulders", "thighs", "triceps",
+        )
+        val canonicalEquipment = setOf(
+            "machine", "body weight", "cable", "barbell", "smith machine",
+            "dumbbell", "kettlebell", "other", "band",
+        )
+
+        val connection = FakeSQLiteConnection()
+        ExerciseSeedCallback.onCreate(connection)
+
+        assertEquals(
+            connection.insertAttempts,
+            connection.rowsByName.size,
+            "Duplicate exercise name found in SEED_EXERCISES",
+        )
+
+        for (row in connection.rowsByName.values) {
+            assertTrue(row.name.isNotBlank(), "Exercise name must not be blank")
+            assertNotNull(
+                ExerciseType.fromValue(row.type),
+                "Invalid exercise type '${row.type}' for ${row.name}",
+            )
+            assertTrue(
+                row.bodyPart in canonicalBodyParts,
+                "Invalid primary bodyPart '${row.bodyPart}' for ${row.name}",
+            )
+            assertTrue(
+                row.equipment in canonicalEquipment,
+                "Invalid equipment '${row.equipment}' for ${row.name}",
+            )
+            assertTrue(
+                row.otherBodyParts.all { it in canonicalBodyParts && it != "full body" },
+                "Non-canonical entry in otherBodyParts for ${row.name}: ${row.otherBodyParts}",
+            )
+            assertFalse(
+                row.bodyPart in row.otherBodyParts,
+                "otherBodyParts contains primary bodyPart '${row.bodyPart}' for ${row.name}",
+            )
+            assertEquals(
+                row.otherBodyParts.distinct().size,
+                row.otherBodyParts.size,
+                "Duplicate entries in otherBodyParts for ${row.name}: ${row.otherBodyParts}",
+            )
+        }
+
+        val sampleExercises = SamplePrograms.all
+            .flatMap { it.routines }
+            .flatMap { it.workSets }
+            .map { it.exerciseName }
+            .distinct()
+        for (name in sampleExercises) {
+            assertTrue(
+                name in connection.rowsByName,
+                "SampleProgram references unknown seed exercise '$name'",
+            )
+        }
     }
 }

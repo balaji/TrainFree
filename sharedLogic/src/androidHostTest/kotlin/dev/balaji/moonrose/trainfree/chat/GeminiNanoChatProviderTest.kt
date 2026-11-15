@@ -69,10 +69,9 @@ private class RecordingChatToolboxPort : ChatToolboxPort {
         query: String?,
         bodyPart: String?,
         equipment: String?,
-        includeDescription: Boolean,
         limit: Int,
     ): ToolOutput {
-        calls += "search:${query.orEmpty()}:${bodyPart.orEmpty()}:${equipment.orEmpty()}:$includeDescription:$limit"
+        calls += "search:${query.orEmpty()}:${bodyPart.orEmpty()}:${equipment.orEmpty()}:$limit"
         return ToolOutput("Incline Dumbbell Press, Chest Dip")
     }
 
@@ -349,7 +348,7 @@ class GeminiNanoChatProviderTest {
                 "recent:3:Pull:14",
                 "day:20400",
                 "programs:Upper",
-                "search:row:back:dumbbell:false:4",
+                "search:row:back:dumbbell:4",
                 "metrics:30",
             ),
             toolbox.calls,

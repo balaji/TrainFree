@@ -48,7 +48,6 @@ data class UserSettingEntity(
 data class ExerciseEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
     val name: String,
-    val description: String?,
     @ColumnInfo(name = "exercise_type") val exerciseType: String?,
     @ColumnInfo(name = "body_part") val bodyPart: String?,
     @ColumnInfo(name = "other_body_parts") val otherBodyParts: List<String>?,

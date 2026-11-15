@@ -64,9 +64,9 @@ data class DraftSessionExercise(
     val exercise: Exercise,
     val sets: List<DraftSessionSet> = listOf(DraftSessionSet()),
     /**
-     * What the user logged the last time they did this exercise, formatted
-     * ("50kg x 5") and in set order. Row N of the current session shows entry
-     * N; rows beyond the list show a placeholder.
+     * What the user logged the last time they did this exercise (completed
+     * working sets only, warm-ups excluded), formatted ("50kg x 5") in order.
+     * Use [previousSet] to look up the label for a row by index.
      */
     val previousSets: List<String> = emptyList(),
     internal val previousSetRows: List<PreviousSetRow> = emptyList(),
@@ -87,6 +87,33 @@ data class DraftSessionExercise(
      */
     fun isSetReadyToComplete(setIndex: Int): Boolean =
         sets.getOrNull(setIndex)?.meetsRequirements(type) ?: false
+
+    /**
+     * 1-based working-set number for the set at [setIndex] (counting normal sets
+     * up to and including [setIndex]). Warm-up and drop sets display a letter
+     * marker instead of this number.
+     */
+    fun workingSetNumber(setIndex: Int): Int {
+        if (setIndex !in sets.indices) return 0
+        return sets.take(setIndex + 1).count { it.setType == SetType.NORMAL }
+    }
+
+    /**
+     * Formatted previous-session performance for the set at [setIndex], or null
+     * when the placeholder ("—") should be shown. Warm-up sets never show a
+     * previous value; normal sets index into [previousSets] by their 1-based
+     * working-set number so switching a set between warm-up and normal populates
+     * or shifts the previous value for that specific set number's count.
+     */
+    fun previousSet(setIndex: Int): String? {
+        val set = sets.getOrNull(setIndex) ?: return null
+        val previousIndex = when (set.setType) {
+            SetType.WARMUP -> return null
+            SetType.NORMAL -> workingSetNumber(setIndex) - 1
+            SetType.DROP -> sets.take(setIndex + 1).count { it.setType != SetType.WARMUP } - 1
+        }
+        return previousSets.getOrNull(previousIndex)?.takeIf { it.isNotBlank() }
+    }
 }
 
 /**
@@ -118,9 +145,9 @@ data class WorkoutSessionUiState(
     val startedAt: Long = 0L,
     val restTimer: RestTimerTarget? = null,
 ) {
-    /** Finishing is only allowed once at least one set is checked off. */
+    /** Finishing is only allowed once at least one working set is checked off. */
     val hasCompletedSets: Boolean
-        get() = exercises.any { ex -> ex.sets.any { it.completed } }
+        get() = exercises.any { ex -> ex.sets.any { it.completed && it.setType != SetType.WARMUP } }
 
     /** Whether the rest timer is currently attached to [exerciseId]'s [setIndex]. */
     fun isRestTimerOn(exerciseId: Long, setIndex: Int): Boolean =

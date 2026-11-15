@@ -373,13 +373,11 @@ private struct SessionExerciseSection: View {
 
     /// Only normal sets take a number; warm-up and drop sets show a marker.
     private func workingSetNumber(_ setIdx: Int) -> Int {
-        exercise.sets.prefix(setIdx + 1).filter { $0.setType == .normal }.count
+        Int(exercise.workingSetNumber(setIndex: Int32(setIdx)))
     }
 
     private func previousLabel(_ setIdx: Int) -> String? {
-        guard setIdx < exercise.previousSets.count else { return nil }
-        let value = exercise.previousSets[setIdx]
-        return value.isEmpty ? nil : value
+        exercise.previousSet(setIndex: Int32(setIdx))
     }
 
     private var fields: [SetField] { SetFieldColumns.fields(for: exercise.type) }
@@ -586,7 +584,11 @@ private struct SessionSetRow: View {
             .frame(width: 28)
         }
         .scaleEffect(pop ? 1.04 : 1)
-        .listRowBackground(set.completed ? Color.green.opacity(0.15) : nil)
+        .listRowBackground(
+            set.completed
+                ? (set.setType == .warmup ? Color.purple.opacity(0.15) : Color.green.opacity(0.15))
+                : nil
+        )
         .onChange(of: focusedColumn) { _, newValue in
             if newValue != nil {
                 onFieldFocused()

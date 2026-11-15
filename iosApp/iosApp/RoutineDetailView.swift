@@ -131,7 +131,7 @@ struct RoutineDetailView: View {
                         .foregroundStyle(.secondary)
                 } else {
                     ForEach(Array(uiState.workSets.enumerated()), id: \.element.id) { _, workSet in
-                        Text(L10n.setsByExercise(workSet.sets.count, workSet.exercise.name))
+                        Text(L10n.setsByExercise(Int(workSet.workingSetCount), workSet.exercise.name))
                     }
                 }
             }

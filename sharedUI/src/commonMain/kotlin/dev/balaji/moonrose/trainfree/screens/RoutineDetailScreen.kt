@@ -324,7 +324,7 @@ private fun RoutineReadOnlyBody(
                 uiState.workSets.forEach { workSet ->
                     item(key = workSet.id) {
                         Text(
-                            text = stringResource(Res.string.sets_by_exercise, workSet.sets.size, workSet.exercise.name),
+                            text = stringResource(Res.string.sets_by_exercise, workSet.workingSetCount, workSet.exercise.name),
                             style = MaterialTheme.typography.bodyLarge,
                             modifier = Modifier
                                 .fillMaxWidth()

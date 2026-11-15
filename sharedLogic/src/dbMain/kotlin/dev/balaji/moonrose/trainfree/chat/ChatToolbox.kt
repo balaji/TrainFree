@@ -244,13 +244,11 @@ object ChatToolbox {
     /**
      * Searches the exercise catalog by name/abbreviation, body part (including
      * secondary muscles and group aliases like "legs" or "arms"), and equipment.
-     * Set [includeDescription] = true when form instructions are needed.
      */
     suspend fun searchExercises(
         query: String? = null,
         bodyPart: String? = null,
         equipment: String? = null,
-        includeDescription: Boolean = false,
         limit: Int = 8,
     ): ToolOutput {
         val exercises = ExerciseRepository.getAll()
@@ -263,7 +261,7 @@ object ChatToolbox {
             trainedSetCounts = counts,
             limit = limit,
         )
-        return exerciseSearchFrom(matches, counts, includeDescription)
+        return exerciseSearchFrom(matches, counts)
     }
 
     /** Body-weight trend, profile measurements, and BMI (computed via configured formula). */
@@ -608,7 +606,6 @@ object ChatToolbox {
     internal fun exerciseSearchFrom(
         matches: List<Exercise>,
         trainedSetCounts: Map<Long, Int>,
-        includeDescription: Boolean,
     ): ToolOutput {
         if (matches.isEmpty()) {
             return ToolOutput("No matching exercises found in the catalog.")
@@ -624,12 +621,6 @@ object ChatToolbox {
                 trainedSetCounts[ex.id]?.takeIf { it > 0 }?.let { "$it logged sets" },
             ).joinToString(" | ")
             lines += "- ${ex.name} ($meta)"
-            if (includeDescription && !ex.description.isNullOrBlank()) {
-                val snippet = ex.description.trim().let {
-                    if (it.length > 260) it.take(257).trimEnd() + "..." else it
-                }
-                lines += "  Form: $snippet"
-            }
             sources += ChatSourceRef(kind = "exercise", label = ex.name, exerciseId = ex.id)
         }
         return ToolOutput(summary = lines.joinToString("\n"), sources = sources)
