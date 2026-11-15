@@ -7,37 +7,50 @@ import UIKit
 /// clear a previously-set override on a *presented* sheet (a known
 /// SwiftUI/UIKit bug) — call sites resolve "system" to this concrete value
 /// themselves instead of passing `nil`.
-private struct SystemColorSchemeReader: UIViewControllerRepresentable {
+private struct SystemColorSchemeReader: UIViewRepresentable {
     let onChange: (ColorScheme) -> Void
 
-    func makeUIViewController(context: Context) -> Controller {
-        let controller = Controller()
-        controller.onChange = onChange
-        return controller
+    func makeUIView(context: Context) -> ObserverView {
+        let view = ObserverView()
+        view.isUserInteractionEnabled = false
+        view.onChange = onChange
+        return view
     }
 
-    func updateUIViewController(_ uiViewController: Controller, context: Context) {
-        uiViewController.onChange = onChange
+    func updateUIView(_ uiView: ObserverView, context: Context) {
+        uiView.onChange = onChange
     }
 
-    final class Controller: UIViewController {
+    final class ObserverView: UIView {
         var onChange: ((ColorScheme) -> Void)?
+        private weak var observedScene: UIWindowScene?
+        private var traitRegistration: (any UITraitChangeRegistration)?
 
-        override func viewDidLoad() {
-            super.viewDidLoad()
-            report()
+        override func didMoveToWindow() {
+            super.didMoveToWindow()
+            let scene = window?.windowScene
+            if scene !== observedScene {
+                if let registration = traitRegistration {
+                    observedScene?.unregisterForTraitChanges(registration)
+                    traitRegistration = nil
+                }
+                observedScene = scene
+                if let scene {
+                    traitRegistration = scene.registerForTraitChanges([UITraitUserInterfaceStyle.self]) { [weak self] (scene: UIWindowScene, _) in
+                        self?.report(scene: scene)
+                    }
+                }
+            }
+            if let scene {
+                report(scene: scene)
+            }
         }
 
-        override func traitCollectionDidChange(_ previousTraitCollection: UITraitCollection?) {
-            super.traitCollectionDidChange(previousTraitCollection)
-            report()
-        }
-
-        // UIScreen's trait collection tracks the physical device setting and
-        // isn't affected by any app-level overrideUserInterfaceStyle, unlike
-        // `self.traitCollection`.
-        private func report() {
-            onChange?(UIScreen.main.traitCollection.userInterfaceStyle == .dark ? .dark : .light)
+        // The scene's screen trait collection tracks the physical device
+        // setting and isn't affected by any app-level overrideUserInterfaceStyle,
+        // unlike `self.traitCollection`.
+        private func report(scene: UIWindowScene) {
+            onChange?(scene.screen.traitCollection.userInterfaceStyle == .dark ? .dark : .light)
         }
     }
 }

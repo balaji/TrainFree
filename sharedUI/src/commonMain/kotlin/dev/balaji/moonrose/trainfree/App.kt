@@ -110,10 +110,15 @@ fun App() {
             ProfileRepository.profile.collect { value = it != null }
         }
 
-        when (hasProfile) {
-            null -> Box(Modifier.fillMaxSize()) // first emission arrives near-instantly
-            false -> ProfileSetupFlow()
-            true -> MainTabs()
+        Surface(
+            modifier = Modifier.fillMaxSize(),
+            color = MaterialTheme.colorScheme.background,
+        ) {
+            when (hasProfile) {
+                null -> Box(Modifier.fillMaxSize()) // first emission arrives near-instantly
+                false -> ProfileSetupFlow()
+                true -> MainTabs()
+            }
         }
     }
 }
