@@ -498,6 +498,7 @@ private fun WorkoutSessionBody(
                             },
                             restRemainingSeconds = restRemainingSeconds,
                             restTotalSeconds = restTimer?.durationSeconds ?: REST_TIMER_DURATION_SECONDS,
+                            restTimerDurationSeconds = settings.restTimerDurationSeconds,
                             onOpenPlateKeypad = { setIdx, currentValue ->
                                 // Dismiss the system IME and drop text-field focus
                                 // so the two keyboards never overlap and refocusing
@@ -813,6 +814,7 @@ private fun SessionExerciseCard(
     restTimerSetIndex: Int?,
     restRemainingSeconds: Long,
     restTotalSeconds: Long,
+    restTimerDurationSeconds: Int,
     onOpenPlateKeypad: (Int, String) -> Unit,
     onFieldFocused: () -> Unit,
     onAddSet: () -> Unit,
@@ -953,11 +955,15 @@ private fun SessionExerciseCard(
                 onUpdateDistance = { onUpdateDistance(setIdx, it) },
                 onToggleCompleted = { onToggleCompleted(setIdx) },
             )
-            AnimatedVisibility(visible = isLiveSession && restTimerSetIndex == setIdx) {
-                RestTimerCountdownRow(
-                    remainingSeconds = restRemainingSeconds,
-                    totalSeconds = restTotalSeconds,
-                )
+            if (isLiveSession) {
+                if (restTimerSetIndex == setIdx) {
+                    RestTimerCountdownRow(
+                        remainingSeconds = restRemainingSeconds,
+                        totalSeconds = restTotalSeconds,
+                    )
+                } else {
+                    RestTimerIndicatorRow(durationSeconds = restTimerDurationSeconds)
+                }
             }
         }
 
@@ -1318,6 +1324,39 @@ private fun RestTimerCountdownRow(remainingSeconds: Long, totalSeconds: Long) {
             modifier = Modifier.fillMaxWidth().height(3.dp),
             color = MaterialTheme.colorScheme.primary,
             trackColor = MaterialTheme.colorScheme.surfaceVariant,
+        )
+    }
+}
+
+/**
+ * Thin non-interactive divider row shown below a set to indicate the
+ * configured rest timer duration (e.g. `---------- Rest timer: 2:00 ----------`).
+ */
+@Composable
+internal fun RestTimerIndicatorRow(durationSeconds: Int) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 2.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        HorizontalDivider(
+            modifier = Modifier.weight(1f),
+            color = MaterialTheme.colorScheme.outlineVariant,
+        )
+        Text(
+            text = stringResource(
+                Res.string.rest_timer_indicator,
+                formatCountdown(durationSeconds.toLong()),
+            ),
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 1,
+            modifier = Modifier.padding(horizontal = 8.dp),
+        )
+        HorizontalDivider(
+            modifier = Modifier.weight(1f),
+            color = MaterialTheme.colorScheme.outlineVariant,
         )
     }
 }

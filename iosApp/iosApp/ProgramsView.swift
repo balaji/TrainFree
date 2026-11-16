@@ -319,18 +319,43 @@ struct ProgramsView: View {
 
     @ViewBuilder
     private func programRows(_ program: Program) -> some View {
-        Button {
-            toggle(program)
-        } label: {
-            HStack {
-                Text(program.name)
-                    .foregroundStyle(Color.primary)
-                Spacer()
-                Image(systemName: "chevron.right")
-                    .foregroundStyle(.secondary)
-                    .rotationEffect(.degrees(expandedProgramId == program.id ? 90 : 0))
+        HStack {
+            Button {
+                toggle(program)
+            } label: {
+                HStack {
+                    Text(program.name)
+                        .foregroundStyle(Color.primary)
+                    Spacer()
+                }
+                .contentShape(Rectangle())
             }
-            .contentShape(Rectangle())
+            .buttonStyle(.plain)
+
+            Button {
+                promptText = program.name
+                prompt = .renameProgram(program)
+            } label: {
+                Image(systemName: "pencil")
+                    .foregroundStyle(.secondary)
+            }
+            .buttonStyle(.borderless)
+            .accessibilityLabel(L10n.renameProgram)
+
+            Image(systemName: "chevron.right")
+                .foregroundStyle(.secondary)
+                .rotationEffect(.degrees(expandedProgramId == program.id ? 90 : 0))
+        }
+        .contextMenu {
+            Button {
+                promptText = program.name
+                prompt = .renameProgram(program)
+            } label: {
+                Label(L10n.rename, systemImage: "pencil")
+            }
+            Button(role: .destructive) { deleteTarget = .program(program) } label: {
+                Label(L10n.delete, systemImage: "trash")
+            }
         }
         .swipeActions(edge: .trailing) {
             Button(role: .destructive) { deleteTarget = .program(program) } label: {

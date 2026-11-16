@@ -71,6 +71,8 @@ private sealed interface ProgramDialog {
     data class ViewSampleRoutine(val routine: SampleRoutine) : ProgramDialog
 }
 
+private var lastExpandedProgramId: Long? = null
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ProgramsScreen(onNavigate: (Route) -> Unit, onGoBack: () -> Unit = {}) {
@@ -80,7 +82,7 @@ fun ProgramsScreen(onNavigate: (Route) -> Unit, onGoBack: () -> Unit = {}) {
     }.collectAsState(initial = emptyMap())
     var actionError by remember { mutableStateOf<String?>(null) }
     var dialog by remember { mutableStateOf<ProgramDialog?>(null) }
-    var expandedProgramId by remember { mutableStateOf<Long?>(null) }
+    var expandedProgramId by remember { mutableStateOf(lastExpandedProgramId) }
     var expandedSampleId by remember { mutableStateOf<String?>(null) }
     var myProgramsExpanded by remember { mutableStateOf(true) }
     var sampleProgramsExpanded by remember { mutableStateOf(true) }
@@ -89,7 +91,9 @@ fun ProgramsScreen(onNavigate: (Route) -> Unit, onGoBack: () -> Unit = {}) {
     val emptyWorkoutTitle = stringResource(Res.string.empty_workout_title)
 
     fun toggleExpanded(program: Program) {
-        expandedProgramId = if (expandedProgramId == program.id) null else program.id
+        val next = if (expandedProgramId == program.id) null else program.id
+        expandedProgramId = next
+        lastExpandedProgramId = next
     }
 
     fun toggleSampleExpanded(sample: SampleProgram) {
@@ -425,11 +429,20 @@ private fun ProgramRow(
         ),
         onClick = { onToggle(program) },
         trailingContent = {
-            Icon(
-                Icons.AutoMirrored.Filled.KeyboardArrowRight,
-                contentDescription = if (expanded) stringResource(Res.string.collapse) else stringResource(Res.string.expand),
-                modifier = Modifier.rotate(chevronRotation),
-            )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                IconButton(onClick = { onRename(program) }) {
+                    Icon(
+                        Icons.Filled.Edit,
+                        contentDescription = stringResource(Res.string.edit_program),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                Icon(
+                    Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                    contentDescription = if (expanded) stringResource(Res.string.collapse) else stringResource(Res.string.expand),
+                    modifier = Modifier.rotate(chevronRotation),
+                )
+            }
         },
     ) {
         Text(program.name)

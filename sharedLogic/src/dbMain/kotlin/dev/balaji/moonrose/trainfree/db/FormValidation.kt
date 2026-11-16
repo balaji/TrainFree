@@ -3,12 +3,13 @@ package dev.balaji.moonrose.trainfree.db
 const val MAX_PROGRAM_NAME_LENGTH = 50
 
 /**
- * Input filter for program and routine names: letters, digits and spaces
- * only, capped at [MAX_PROGRAM_NAME_LENGTH] characters. Public so the native
- * SwiftUI name prompts can apply the same filtering as the Compose dialogs.
+ * Input filter for program and routine names: single-line printable characters
+ * (no control characters like newlines or tabs), capped at
+ * [MAX_PROGRAM_NAME_LENGTH] characters. Public so the native SwiftUI name
+ * prompts can apply the same filtering as the Compose dialogs.
  */
 fun filterProgramName(value: String): String =
-    value.filter { it.isLetterOrDigit() || it == ' ' }.take(MAX_PROGRAM_NAME_LENGTH)
+    value.filter { !it.isISOControl() }.take(MAX_PROGRAM_NAME_LENGTH)
 
 /**
  * Save-time backstop for program and routine names, applied in
@@ -22,8 +23,8 @@ internal fun requireValidProgramName(name: String): String {
     require(trimmed.length <= MAX_PROGRAM_NAME_LENGTH) {
         "Name must be at most $MAX_PROGRAM_NAME_LENGTH characters"
     }
-    require(trimmed.all { it.isLetterOrDigit() || it == ' ' }) {
-        "Name can contain only letters and numbers"
+    require(trimmed.none { it.isISOControl() }) {
+        "Name cannot contain control characters"
     }
     return trimmed
 }

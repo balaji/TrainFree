@@ -48,6 +48,7 @@ import androidx.compose.material.icons.filled.FitnessCenter
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -200,6 +201,20 @@ private fun MainTabs() {
         } else {
             directWorkoutLaunchId += 1
             directWorkoutSession = target
+        }
+    }
+
+    // Re-open the workout tracking screen if the activity was recreated while
+    // it was visible (e.g. process death or configuration change in background).
+    var restoreActiveSessionOnRecreate by rememberSaveable { mutableStateOf(false) }
+    var pendingSessionRestore by remember { mutableStateOf(restoreActiveSessionOnRecreate) }
+    SideEffect { restoreActiveSessionOnRecreate = sessionScreenVisible }
+    LaunchedEffect(activeSession, pendingSessionRestore) {
+        if (pendingSessionRestore && activeSession != null) {
+            pendingSessionRestore = false
+            if (!sessionScreenVisible) {
+                openActiveSession()
+            }
         }
     }
 
