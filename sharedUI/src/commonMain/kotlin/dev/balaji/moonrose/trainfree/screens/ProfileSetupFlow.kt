@@ -12,6 +12,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -19,6 +20,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import dev.balaji.moonrose.trainfree.db.BackupTransferState
 import org.jetbrains.compose.resources.stringResource
 import dev.balaji.moonrose.trainfree.sharedui.resources.*
 
@@ -31,6 +33,12 @@ import dev.balaji.moonrose.trainfree.sharedui.resources.*
 @Composable
 fun ProfileSetupFlow() {
     var showForm by remember { mutableStateOf(false) }
+    val backupState = remember { BackupTransferState() }
+    val backupUiState by backupState.uiState.collectAsState()
+    val launchImport = rememberBackupImporter(
+        onReadSuccess = backupState::inspectImport,
+        onReadError = backupState::onFileReadError,
+    )
 
     Scaffold { padding ->
         if (showForm) {
@@ -63,8 +71,15 @@ fun ProfileSetupFlow() {
                     TextButton(onClick = { showForm = true }) {
                         Text(stringResource(Res.string.create_a_profile))
                     }
+                    TextButton(
+                        enabled = !backupUiState.working,
+                        onClick = launchImport,
+                    ) {
+                        Text(stringResource(Res.string.restore_from_backup))
+                    }
                 }
             }
         }
+        BackupDialogs(state = backupUiState, backupState = backupState)
     }
 }

@@ -436,4 +436,23 @@
     <string name="chat_scroll_to_bottom">Rulla längst ner</string>
     <string name="workout_title">Passets titel</string>
     <string name="rename_workout">Byt namn på pass</string>
+
+    <!-- Backup & restore -->
+    <string name="backup_section">Säkerhetskopia</string>
+    <string name="export_backup">Exportera säkerhetskopia</string>
+    <string name="import_backup">Importera säkerhetskopia</string>
+    <string name="restore_from_backup">Återställ från säkerhetskopia</string>
+    <string name="restore_backup_title">Återställa säkerhetskopia?</string>
+    <string name="restore_backup_message">Detta ersätter din nuvarande data med säkerhetskopian från %1$s (%2$d pass, %3$d program, %4$d dagboksanteckningar).</string>
+    <string name="restore">Återställ</string>
+    <string name="restoring">Återställer…</string>
+    <string name="exporting">Exporterar…</string>
+    <string name="backup_export_succeeded">Säkerhetskopia exporterad.</string>
+    <string name="backup_import_succeeded">Säkerhetskopia återställd.</string>
+    <string name="backup_error_title">Säkerhetskopieringsfel</string>
+    <string name="backup_error_invalid_file">Den valda filen är inte en giltig Train Free-säkerhetskopia.</string>
+    <string name="backup_error_unsupported_version">Den här säkerhetskopian skapades av en nyare version av Train Free. Uppdatera appen för att återställa den.</string>
+    <string name="backup_error_missing_profile">Den här säkerhetskopian innehåller ingen profil.</string>
+    <string name="backup_error_export_failed">Det gick inte att exportera säkerhetskopian.</string>
+    <string name="backup_error_import_failed">Det gick inte att återställa säkerhetskopian. Din befintliga data ändrades inte.</string>
 </resources>

@@ -4,6 +4,8 @@ import androidx.compose.runtime.Composable
 import dev.balaji.moonrose.trainfree.calendar.WeekMath
 import dev.balaji.moonrose.trainfree.chat.ChatMessage
 import dev.balaji.moonrose.trainfree.chat.ChatSuggestedPrompt
+import dev.balaji.moonrose.trainfree.db.BackupError
+import dev.balaji.moonrose.trainfree.db.BackupNotice
 import dev.balaji.moonrose.trainfree.db.MAX_AGE
 import dev.balaji.moonrose.trainfree.db.MIN_AGE
 import dev.balaji.moonrose.trainfree.insights.BmiCategory
@@ -387,3 +389,22 @@ internal fun chatAvailabilityMessage(availability: String): String? = when (avai
     "available" -> null
     else -> stringResource(Res.string.chat_status_unavailable)
 }
+
+@Composable
+internal fun backupErrorLabel(error: BackupError): String = stringResource(
+    when (error) {
+        BackupError.INVALID_FILE -> Res.string.backup_error_invalid_file
+        BackupError.UNSUPPORTED_VERSION -> Res.string.backup_error_unsupported_version
+        BackupError.MISSING_PROFILE -> Res.string.backup_error_missing_profile
+        BackupError.EXPORT_FAILED -> Res.string.backup_error_export_failed
+        BackupError.IMPORT_FAILED -> Res.string.backup_error_import_failed
+    },
+)
+
+@Composable
+internal fun backupNoticeLabel(notice: BackupNotice): String = stringResource(
+    when (notice) {
+        BackupNotice.EXPORT_SUCCEEDED -> Res.string.backup_export_succeeded
+        BackupNotice.IMPORT_SUCCEEDED -> Res.string.backup_import_succeeded
+    },
+)

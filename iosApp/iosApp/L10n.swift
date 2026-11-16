@@ -633,4 +633,45 @@ enum L10n {
             return chatStatusUnavailable
         }
     }
+
+    // MARK: - Backup & restore
+    static let backupSection = String(localized: "backup_section", defaultValue: "Backup")
+    static let exportBackup = String(localized: "export_backup", defaultValue: "Export backup")
+    static let importBackup = String(localized: "import_backup", defaultValue: "Import backup")
+    static let restoreFromBackup = String(localized: "restore_from_backup", defaultValue: "Restore from backup")
+    static let restoreBackupTitle = String(localized: "restore_backup_title", defaultValue: "Restore backup?")
+    static func restoreBackupMessage(_ date: String, _ workouts: Int, _ programs: Int, _ journalEntries: Int) -> String {
+        String(
+            localized: "restore_backup_message",
+            defaultValue: "This replaces your current data with the backup from \(date) (\(workouts) workouts, \(programs) programs, \(journalEntries) journal entries)."
+        )
+    }
+    static let restore = String(localized: "restore", defaultValue: "Restore")
+    static let restoring = String(localized: "restoring", defaultValue: "Restoring…")
+    static let exporting = String(localized: "exporting", defaultValue: "Exporting…")
+    static let backupExportSucceeded = String(localized: "backup_export_succeeded", defaultValue: "Backup exported.")
+    static let backupImportSucceeded = String(localized: "backup_import_succeeded", defaultValue: "Backup restored.")
+    static let backupErrorTitle = String(localized: "backup_error_title", defaultValue: "Backup error")
+    static let backupErrorInvalidFile = String(localized: "backup_error_invalid_file", defaultValue: "The selected file is not a valid Train Free backup.")
+    static let backupErrorUnsupportedVersion = String(localized: "backup_error_unsupported_version", defaultValue: "This backup was created by a newer version of Train Free. Update the app to restore it.")
+    static let backupErrorMissingProfile = String(localized: "backup_error_missing_profile", defaultValue: "This backup does not contain a profile.")
+    static let backupErrorExportFailed = String(localized: "backup_error_export_failed", defaultValue: "Could not export the backup file.")
+    static let backupErrorImportFailed = String(localized: "backup_error_import_failed", defaultValue: "Could not restore the backup. Your existing data was left unchanged.")
+
+    static func backupErrorLabel(_ error: BackupError) -> String {
+        switch error {
+        case .invalidFile: return backupErrorInvalidFile
+        case .unsupportedVersion: return backupErrorUnsupportedVersion
+        case .missingProfile: return backupErrorMissingProfile
+        case .exportFailed: return backupErrorExportFailed
+        case .importFailed: return backupErrorImportFailed
+        }
+    }
+
+    static func backupNoticeLabel(_ notice: BackupNotice) -> String {
+        switch notice {
+        case .exportSucceeded: return backupExportSucceeded
+        case .importSucceeded: return backupImportSucceeded
+        }
+    }
 }

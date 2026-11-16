@@ -8,6 +8,7 @@ import SharedUI
 struct ProfileSetupView: View {
     @State private var showForm = false
     @State private var unit: WeightUnit = .metric
+    @State private var backupController = BackupTransferController()
 
     var body: some View {
         Group {
@@ -29,10 +30,15 @@ struct ProfileSetupView: View {
                         showForm = true
                     }
                     .padding(.top, 8)
+                    Button(L10n.restoreFromBackup) {
+                        backupController.startImport()
+                    }
+                    .disabled(backupController.uiState.working)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
+        .backupTransferSupport(backupController)
         .task {
             for await settings in UserSettingsRepository.shared.settings {
                 unit = settings.weightUnit

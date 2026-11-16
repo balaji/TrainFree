@@ -80,12 +80,18 @@ interface ProfileDao {
     @Query("SELECT * FROM profile WHERE id = 1")
     fun observe(): Flow<ProfileEntity?>
 
+    @Query("SELECT * FROM profile WHERE id = 1")
+    suspend fun get(): ProfileEntity?
+
     @Upsert
     suspend fun upsert(profile: ProfileEntity)
 
     /** No-op when no profile row exists yet. */
     @Query("UPDATE profile SET weight = :weight, updated_at = :now WHERE id = 1")
     suspend fun updateWeight(weight: Double, now: Long)
+
+    @Query("DELETE FROM profile")
+    suspend fun deleteAll()
 }
 
 @Dao
@@ -93,11 +99,17 @@ interface UserSettingDao {
     @Query("SELECT * FROM user_settings")
     fun observeAll(): Flow<List<UserSettingEntity>>
 
+    @Query("SELECT * FROM user_settings ORDER BY `key`")
+    suspend fun getAll(): List<UserSettingEntity>
+
     @Query("SELECT * FROM user_settings WHERE `key` = :key")
     suspend fun find(key: String): UserSettingEntity?
 
     @Upsert
     suspend fun upsert(setting: UserSettingEntity)
+
+    @Query("DELETE FROM user_settings")
+    suspend fun deleteAll()
 }
 
 @Dao
@@ -119,6 +131,9 @@ interface ProgramDao {
 
     @Query("DELETE FROM programs WHERE id = :id")
     suspend fun delete(id: Long)
+
+    @Query("DELETE FROM programs")
+    suspend fun deleteAll()
 }
 
 @Dao
@@ -185,10 +200,16 @@ interface ExerciseDao {
 
     @Query("DELETE FROM exercises WHERE id = :id")
     suspend fun delete(id: Long)
+
+    @Query("DELETE FROM exercises WHERE builtin = 0")
+    suspend fun deleteCustomExercises()
 }
 
 @Dao
 interface WorkSetDao {
+    @Query("SELECT * FROM work_sets ORDER BY routine_id, position")
+    suspend fun getAll(): List<WorkSetEntity>
+
     @Query("SELECT * FROM work_sets WHERE routine_id = :routineId ORDER BY position")
     fun observeForRoutine(routineId: Long): Flow<List<WorkSetEntity>>
 
@@ -204,6 +225,9 @@ interface WorkSetDao {
 
 @Dao
 interface WorkSetDetailDao {
+    @Query("SELECT * FROM work_set_details ORDER BY work_set_id, position")
+    suspend fun getAll(): List<WorkSetDetailEntity>
+
     @Query("SELECT * FROM work_set_details WHERE work_set_id = :workSetId ORDER BY position")
     fun observeForWorkSet(workSetId: Long): Flow<List<WorkSetDetailEntity>>
 
@@ -219,6 +243,9 @@ interface WorkSetDetailDao {
 
 @Dao
 interface BodyMetricDao {
+    @Query("SELECT * FROM body_metrics ORDER BY id")
+    suspend fun getAll(): List<BodyMetricEntity>
+
     @Query("SELECT * FROM body_metrics WHERE profile_id = :profileId ORDER BY logged_at DESC")
     fun observeAll(profileId: Long): Flow<List<BodyMetricEntity>>
 
@@ -239,6 +266,9 @@ interface BodyMetricDao {
 
     @Query("DELETE FROM body_metrics WHERE test_data != 0")
     suspend fun deleteTestData()
+
+    @Query("DELETE FROM body_metrics")
+    suspend fun deleteAll()
 }
 
 @Dao
@@ -248,10 +278,16 @@ interface AiInsightCacheDao {
 
     @Upsert
     suspend fun upsert(entry: AiInsightCacheEntity)
+
+    @Query("DELETE FROM ai_insight_cache")
+    suspend fun clearAll()
 }
 
 @Dao
 interface WorkoutSessionDao {
+    @Query("SELECT * FROM workout_sessions ORDER BY id")
+    suspend fun getAll(): List<WorkoutSessionEntity>
+
     @Query("SELECT * FROM workout_sessions ORDER BY performed_at DESC")
     fun observeAll(): Flow<List<WorkoutSessionEntity>>
 
@@ -372,10 +408,16 @@ interface WorkoutSessionDao {
     /** Cascades to `workout_session_details` via the FK. */
     @Query("DELETE FROM workout_sessions WHERE test_data != 0")
     suspend fun deleteTestData()
+
+    @Query("DELETE FROM workout_sessions")
+    suspend fun deleteAll()
 }
 
 @Dao
 interface WorkoutSessionDetailDao {
+    @Query("SELECT * FROM workout_session_details ORDER BY workout_session_id, position")
+    suspend fun getAll(): List<WorkoutSessionDetailEntity>
+
     @Query("SELECT * FROM workout_session_details WHERE workout_session_id = :sessionId ORDER BY position")
     fun observeForSession(sessionId: Long): Flow<List<WorkoutSessionDetailEntity>>
 
@@ -531,6 +573,9 @@ interface WorkoutSessionDetailDao {
 
 @Dao
 interface JournalEntryDao {
+    @Query("SELECT * FROM journal_entries ORDER BY epoch_day")
+    suspend fun getAll(): List<JournalEntryEntity>
+
     @Query("SELECT epoch_day FROM journal_entries WHERE profile_id = :profileId")
     fun observeAllEpochDays(profileId: Long): Flow<List<Long>>
 
@@ -551,4 +596,7 @@ interface JournalEntryDao {
 
     @Query("DELETE FROM journal_entries WHERE profile_id = :profileId AND epoch_day = :epochDay")
     suspend fun deleteForDay(profileId: Long, epochDay: Long)
+
+    @Query("DELETE FROM journal_entries")
+    suspend fun deleteAll()
 }

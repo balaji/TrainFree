@@ -54,6 +54,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import dev.balaji.moonrose.trainfree.calendar.WeekStart
+import dev.balaji.moonrose.trainfree.db.BackupTransferState
 import dev.balaji.moonrose.trainfree.db.ProfileRepository
 import dev.balaji.moonrose.trainfree.db.TestDataRepository
 import dev.balaji.moonrose.trainfree.db.UserSettingsRepository
@@ -165,6 +166,7 @@ private fun ProfileDetails(profile: Profile, onEdit: () -> Unit) {
         }
         ToolsSection()
         SettingsSection()
+        BackupSection()
         DeveloperSection()
     }
 }
@@ -314,6 +316,50 @@ private fun ToolRow(
             )
         }
     }
+}
+
+@Composable
+private fun BackupSection() {
+    val backupState = remember { BackupTransferState() }
+    val state by backupState.uiState.collectAsState()
+    val launchExport = rememberBackupExporter(onCompleted = backupState::onExportCompleted)
+    val launchImport = rememberBackupImporter(
+        onReadSuccess = backupState::inspectImport,
+        onReadError = backupState::onFileReadError,
+    )
+
+    Text(
+        stringResource(Res.string.backup_section),
+        style = MaterialTheme.typography.titleMedium,
+        color = MaterialTheme.colorScheme.primary,
+        modifier = Modifier.padding(top = 24.dp, bottom = 4.dp),
+    )
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        OutlinedButton(
+            enabled = !state.working,
+            onClick = { backupState.prepareExport(launchExport) },
+            modifier = Modifier.weight(1f),
+        ) {
+            Text(
+                stringResource(
+                    if (state.working && state.pendingImport == null) Res.string.exporting else Res.string.export_backup,
+                ),
+            )
+        }
+        OutlinedButton(
+            enabled = !state.working,
+            onClick = launchImport,
+            modifier = Modifier.weight(1f),
+        ) {
+            Text(stringResource(Res.string.import_backup))
+        }
+    }
+    HorizontalDivider()
+
+    BackupDialogs(state = state, backupState = backupState)
 }
 
 /**

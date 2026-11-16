@@ -17,6 +17,7 @@ struct ProfileView: View {
     @State private var showOneRmCalculator = false
     @State private var showBmiCalculator = false
     @State private var showNotificationsDeniedAlert = false
+    @State private var backupController = BackupTransferController()
 
     var body: some View {
         Group {
@@ -140,6 +141,16 @@ struct ProfileView: View {
                                 }))
                             }
                         }
+                        Section(L10n.backupSection) {
+                            Button(backupController.uiState.working && backupController.uiState.pendingImport == nil ? L10n.exporting : L10n.exportBackup) {
+                                backupController.startExport()
+                            }
+                            .disabled(backupController.uiState.working)
+                            Button(L10n.importBackup) {
+                                backupController.startImport()
+                            }
+                            .disabled(backupController.uiState.working)
+                        }
                         // Test-data tooling for development. Kept in release
                         // builds for now; generated rows carry the test_data
                         // flag so Delete only removes what Generate created.
@@ -151,6 +162,7 @@ struct ProfileView: View {
                         }
                     }
                     .floatingWorkoutMenuClearance()
+                    .backupTransferSupport(backupController)
                     .alert(L10n.notificationsDeniedTitle, isPresented: $showNotificationsDeniedAlert) {
                         Button(L10n.openSettings) {
                             if let url = URL(string: UIApplication.openNotificationSettingsURLString) {
