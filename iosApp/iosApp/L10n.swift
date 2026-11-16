@@ -57,6 +57,9 @@ enum L10n {
     static func restTimerCountdown(_ remaining: String) -> String {
         String(localized: "rest_timer_countdown", defaultValue: "Rest · \(remaining)")
     }
+    static func restTimerIndicator(_ duration: String) -> String {
+        String(localized: "rest_timer_indicator", defaultValue: "Rest timer: \(duration)")
+    }
     static let restOverTitle = String(localized: "rest_over_title", defaultValue: "Rest is over")
     static let restOverMessage = String(localized: "rest_over_message", defaultValue: "Time for your next set.")
 

@@ -37,6 +37,7 @@
     <string name="workout_in_progress_title">Ett träningspass pågår</string>
     <string name="finish_workout">Avsluta träningspass</string>
     <string name="rest_timer_countdown">Vila · %1$s</string>
+    <string name="rest_timer_indicator">Vilotimer: %1$s</string>
     <string name="rest_over_title">Vilan är slut</string>
     <string name="rest_over_message">Dags för nästa set.</string>
     <string name="rest_timer_channel_name">Vilotimer</string>

@@ -13,6 +13,7 @@ struct RoutineDetailView: View {
     @State private var nameBeforeEdit = ""
     @State private var showExercisePicker = false
     @State private var weightUnit: WeightUnit = .metric
+    @State private var restTimerDurationSeconds: Int = Int(WorkoutSessionFormStateKt.REST_TIMER_DURATION_SECONDS)
     @State private var pendingWorkoutTarget: WorkoutSessionTarget?
     @State private var hasActiveSession = WorkoutSessionRepository.shared.activeSession.value != nil
 
@@ -111,6 +112,7 @@ struct RoutineDetailView: View {
         .task {
             for await settings in UserSettingsRepository.shared.settings {
                 weightUnit = settings.weightUnit
+                restTimerDurationSeconds = Int(settings.restTimerDurationSeconds)
                 formState.setDisplayUnit(unit: settings.weightUnit)
             }
         }
@@ -165,12 +167,20 @@ struct RoutineDetailView: View {
 
     private var routineForm: some View {
         List {
+            Section {
+                TextField(L10n.name, text: Binding(
+                    get: { uiState.name },
+                    set: { formState.updateName(value: $0) }
+                ))
+            }
+
             ForEach(Array(uiState.workSets.enumerated()), id: \.element.id) { wsIndex, workSet in
                 ExerciseCardView(
                     wsIndex: wsIndex,
                     workSet: workSet,
                     formState: formState,
                     weightUnit: weightUnit,
+                    restTimerDurationSeconds: restTimerDurationSeconds,
                     onReorderStart: { startY in
                         withAnimation(.easeOut(duration: 0.15)) {
                             reorder.begin(index: wsIndex, fingerY: startY)
@@ -217,6 +227,7 @@ private struct ExerciseCardView: View {
     let workSet: DraftWorkSet
     let formState: RoutineFormState
     let weightUnit: WeightUnit
+    let restTimerDurationSeconds: Int
     var onReorderStart: (CGFloat) -> Void
     var onReorderChanged: (CGFloat) -> Void
     var onReorderEnded: () -> Void
@@ -310,6 +321,8 @@ private struct ExerciseCardView: View {
                     .frame(width: 32)
                 }
                 .padding(.vertical, 4)
+
+                RestTimerIndicatorRow(durationSeconds: restTimerDurationSeconds)
             }
 
             Button {

@@ -68,6 +68,7 @@ struct WorkoutSessionView: View {
     @State private var plateKeyboard: BarbellKeyboardState?
     @State private var plateNumericMode = false
     @State private var weightUnit: WeightUnit = .metric
+    @State private var restTimerDurationSeconds: Int = Int(WorkoutSessionFormStateKt.REST_TIMER_DURATION_SECONDS)
     @State private var restRemainingSeconds = 0
     @State private var activeRowID: SessionSetRowID?
     @State private var focusTrigger = 0
@@ -103,6 +104,7 @@ struct WorkoutSessionView: View {
         .task {
             for await settings in UserSettingsRepository.shared.settings {
                 weightUnit = settings.weightUnit
+                restTimerDurationSeconds = Int(settings.restTimerDurationSeconds)
             }
         }
         .task(id: uiState.restTimer?.startedAtMillis) {
@@ -386,6 +388,7 @@ struct WorkoutSessionView: View {
                                 : nil,
                             restRemainingSeconds: restRemainingSeconds,
                             restTotalSeconds: Int(uiState.restTimer?.durationSeconds ?? WorkoutSessionFormStateKt.REST_TIMER_DURATION_SECONDS),
+                            restTimerDurationSeconds: restTimerDurationSeconds,
                             onActivateRow: { setIdx in
                                 activeRowID = SessionSetRowID(exerciseId: exercise.id, setIndex: setIdx)
                                 focusTrigger += 1
@@ -500,6 +503,7 @@ private struct SessionExerciseSection: View {
     let restTimerSetIndex: Int?
     let restRemainingSeconds: Int
     let restTotalSeconds: Int
+    let restTimerDurationSeconds: Int
     let onActivateRow: (Int) -> Void
     let onClearActiveRow: () -> Void
 
@@ -604,12 +608,18 @@ private struct SessionExerciseSection: View {
                     }
                 }
 
-                if isLiveSession, restTimerSetIndex == setIdx {
-                    RestTimerCountdownRow(
-                        remainingSeconds: restRemainingSeconds,
-                        totalSeconds: restTotalSeconds
-                    )
-                        .listRowSeparator(.hidden)
+                if isLiveSession {
+                    if restTimerSetIndex == setIdx {
+                        RestTimerCountdownRow(
+                            remainingSeconds: restRemainingSeconds,
+                            totalSeconds: restTotalSeconds
+                        )
+                            .listRowSeparator(.hidden)
+                    } else {
+                        RestTimerIndicatorRow(durationSeconds: restTimerDurationSeconds)
+                            .listRowSeparator(.hidden)
+                            .listRowInsets(EdgeInsets(top: 0, leading: 16, bottom: 0, trailing: 16))
+                    }
                 }
             }
 
@@ -831,6 +841,38 @@ private struct RestTimerCountdownRow: View {
         }
         .padding(.vertical, 4)
         .listRowBackground(Color.green.opacity(0.08))
+    }
+}
+
+/// Thin non-interactive divider row shown below a set to indicate the
+/// configured rest timer duration (e.g. `---------- Rest timer: 2:00 ----------`).
+struct RestTimerIndicatorRow: View {
+    let durationSeconds: Int
+
+    private var formattedDuration: String {
+        let clamped = max(0, durationSeconds)
+        let minutes = clamped / 60
+        let seconds = clamped % 60
+        return String(format: "%d:%02d", minutes, seconds)
+    }
+
+    var body: some View {
+        HStack(spacing: 8) {
+            line
+            Text(L10n.restTimerIndicator(formattedDuration))
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+                .monospacedDigit()
+                .lineLimit(1)
+            line
+        }
+        .padding(.vertical, 2)
+    }
+
+    private var line: some View {
+        Rectangle()
+            .fill(Color.secondary.opacity(0.3))
+            .frame(height: 1)
     }
 }
 

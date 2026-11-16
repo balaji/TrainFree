@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<full-backup-content>
+    <!-- Explicit allowlist: only back up TrainFree's Room database and its WAL sidecars,
+         excluding any third-party/MLKit caches or internal files.
+         Note: ai_insight_cache is a small table inside trainfree.db and cannot be excluded
+         at the SQL table level by OS Auto Backup. -->
+    <include domain="database" path="trainfree.db"/>
+    <include domain="database" path="trainfree.db-wal"/>
+    <include domain="database" path="trainfree.db-shm"/>
+</full-backup-content>

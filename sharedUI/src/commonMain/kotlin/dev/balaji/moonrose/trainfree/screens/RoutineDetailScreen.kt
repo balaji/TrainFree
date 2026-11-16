@@ -51,6 +51,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -104,8 +105,9 @@ import dev.balaji.moonrose.trainfree.sharedui.resources.*
 @Composable
 fun RoutineDetailScreen(route: RoutineDetailRoute, onNavigate: (Route) -> Unit, onGoBack: () -> Unit) {
     var isEditing by remember { mutableStateOf(route.isNew) }
+    var currentTitle by remember { mutableStateOf(route.title) }
     var formStateKey by remember { mutableIntStateOf(0) }
-    val formState = remember(formStateKey) { RoutineFormState(route.routineId, route.title) }
+    val formState = remember(formStateKey) { RoutineFormState(route.routineId, currentTitle) }
     val uiState by formState.uiState.collectAsState()
     val settings by UserSettingsRepository.settings.collectAsState(initial = UserSettings())
     LaunchedEffect(formState, settings.weightUnit) {
@@ -132,7 +134,7 @@ fun RoutineDetailScreen(route: RoutineDetailRoute, onNavigate: (Route) -> Unit, 
         Scaffold(
             topBar = {
                 TopAppBar(
-                    title = { Text(uiState.name.ifBlank { route.title }) },
+                    title = { Text(uiState.name.ifBlank { currentTitle }) },
                     navigationIcon = {
                         IconButton(onClick = onGoBack) {
                             Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(Res.string.back))
@@ -142,7 +144,9 @@ fun RoutineDetailScreen(route: RoutineDetailRoute, onNavigate: (Route) -> Unit, 
                         if (isEditing) {
                             IconButton(
                                 onClick = {
+                                    val savedTitle = uiState.name.trim().ifBlank { "Routine" }
                                     formState.save {
+                                        currentTitle = savedTitle
                                         formStateKey++
                                         isEditing = false
                                     }
@@ -224,11 +228,24 @@ private fun RoutineDetailBody(
                 modifier = Modifier.fillMaxSize(),
                 contentPadding = PaddingValues(bottom = 16.dp),
             ) {
+                item(key = "routine_name") {
+                    OutlinedTextField(
+                        value = uiState.name,
+                        onValueChange = formState::updateName,
+                        label = { Text(stringResource(Res.string.name)) },
+                        singleLine = true,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 12.dp),
+                    )
+                }
+
                 itemsIndexed(uiState.workSets, key = { _, ws -> ws.id }) { wsIndex, workSet ->
                     ExerciseCard(
                         workSet = workSet,
                         wsIndex = wsIndex,
                         weightUnit = settings.weightUnit,
+                        restTimerDurationSeconds = settings.restTimerDurationSeconds,
                         onAddSet = { formState.addSet(wsIndex) },
                         onRemoveSet = { setIdx -> formState.removeSet(wsIndex, setIdx) },
                         onUpdateWeight = { setIdx, v -> formState.updateWeight(wsIndex, setIdx, v) },
@@ -479,6 +496,7 @@ private fun ExerciseCard(
     workSet: DraftWorkSet,
     wsIndex: Int,
     weightUnit: WeightUnit,
+    restTimerDurationSeconds: Int,
     onAddSet: () -> Unit,
     onRemoveSet: (Int) -> Unit,
     onUpdateWeight: (Int, String) -> Unit,
@@ -665,6 +683,7 @@ private fun ExerciseCard(
                         )
                     }
                 }
+                RestTimerIndicatorRow(durationSeconds = restTimerDurationSeconds)
             }
 
             // Add set
