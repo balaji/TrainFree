@@ -72,6 +72,12 @@ object WorkoutSessionRepository {
         }
     }
 
+    internal fun clearInMemorySessionState() {
+        cachedFormState?.closeQuietly()
+        cachedFormState = null
+        _activeRestTimer.value = null
+    }
+
     /**
      * Tracks whichever session is currently in progress, so a persistent mini
      * bar (bottom overlay on Android/Desktop, safe-area inset on iOS) can be
