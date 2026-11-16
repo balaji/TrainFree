@@ -434,4 +434,6 @@
     <string name="chat_prompt_exercise_substitutes">Bra alternativ till %1$s</string>
     <string name="chat_prompt_day_summary">Hur stod sig det här passet?</string>
     <string name="chat_scroll_to_bottom">Rulla längst ner</string>
+    <string name="workout_title">Passets titel</string>
+    <string name="rename_workout">Byt namn på pass</string>
 </resources>

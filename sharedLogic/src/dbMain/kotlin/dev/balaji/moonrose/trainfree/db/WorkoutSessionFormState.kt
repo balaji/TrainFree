@@ -314,6 +314,8 @@ class WorkoutSessionFormState internal constructor(
     private var restTimerDurationSeconds: Long = REST_TIMER_DURATION_SECONDS
     private var currentWeightUnit: WeightUnit = WeightUnit.METRIC
     private var selectedRoutineId: Long? = null
+    private var defaultTitle: String = ""
+    private var titleEditedByUser: Boolean = false
     private var initialSnapshot: FormSnapshot? = null
 
     // Serializes persist() runs so a debounced autosave and an explicit
@@ -344,7 +346,12 @@ class WorkoutSessionFormState internal constructor(
             currentWeightUnit = UserSettingsRepository.settings.first().weightUnit
             when (mode) {
                 is WorkoutSessionMode.LogCompleted -> {
-                    initialSnapshot = FormSnapshot(routineId = null, exercises = emptyList())
+                    defaultTitle = defaultWorkoutTitle(mode.epochDay)
+                    initialSnapshot = FormSnapshot(
+                        routineId = null,
+                        title = defaultTitle,
+                        exercises = emptyList(),
+                    )
                     if (!closed) {
                         updateState(
                             _uiState.value.copy(
@@ -353,6 +360,7 @@ class WorkoutSessionFormState internal constructor(
                                 startedAt = 0L,
                                 isLiveSession = false,
                                 isEditingExisting = false,
+                                sessionTitle = defaultTitle,
                             ),
                         )
                     }
@@ -365,6 +373,10 @@ class WorkoutSessionFormState internal constructor(
                     val details = AppDb.db.workoutSessionDetailDao().getForSession(targetId)
                     selectedRoutineId = session?.routineId
                     val routineName = session?.routineId?.let { AppDb.db.routineDao().findById(it)?.name }
+                    val fallbackMillis = session?.performedAt ?: nowMillis()
+                    defaultTitle = routineName?.trim()?.takeIf { it.isNotEmpty() }
+                        ?: defaultWorkoutTitleForMillis(fallbackMillis)
+                    val resolvedTitle = resolveWorkoutTitle(session?.title, routineName, fallbackMillis)
                     val grouped = groupSessionDetails(details)
                     val withPrevious = grouped.map { draft ->
                         val rows = loadPreviousSetRows(draft.exercise)
@@ -379,10 +391,10 @@ class WorkoutSessionFormState internal constructor(
                         startedAt = if (isLiveSession) (session?.performedAt ?: 0L) else 0L,
                         isLiveSession = isLiveSession,
                         isEditingExisting = isEditingExisting,
-                        sessionTitle = routineName,
+                        sessionTitle = resolvedTitle,
                     ).withDisplayUnit(currentWeightUnit)
                     if (!isLiveSession) {
-                        initialSnapshot = snapshotOf(formatted.exercises, selectedRoutineId)
+                        initialSnapshot = snapshotOf(formatted.exercises, selectedRoutineId, resolvedTitle)
                     }
                     if (!closed) {
                         updateState(formatted)
@@ -441,11 +453,20 @@ class WorkoutSessionFormState internal constructor(
         return grouped
     }
 
+    private fun resolvedTitleForSave(rawTitle: String?): String =
+        filterWorkoutTitle(rawTitle.orEmpty()).trim().takeIf { it.isNotEmpty() } ?: defaultTitle
+
     private fun updateState(newState: WorkoutSessionUiState) {
         val stamped = if (isLiveSession) {
             newState
         } else {
-            val dirty = initialSnapshot?.let { snapshotOf(newState.exercises, selectedRoutineId) != it } ?: false
+            val dirty = initialSnapshot?.let {
+                snapshotOf(
+                    newState.exercises,
+                    selectedRoutineId,
+                    resolvedTitleForSave(newState.sessionTitle),
+                ) != it
+            } ?: false
             newState.copy(restTimer = null, hasUnsavedChanges = dirty)
         }
         _uiState.value = stamped
@@ -470,6 +491,16 @@ class WorkoutSessionFormState internal constructor(
         if (!wasLoading) {
             persistMutex.withLock { persist(state) }
         }
+    }
+
+    fun updateTitle(title: String) {
+        val current = _uiState.value
+        if (current.loading || current.saving) return
+        titleEditedByUser = true
+        val filtered = filterWorkoutTitle(title)
+        if (filtered == current.sessionTitle) return
+        updateState(current.copy(sessionTitle = filtered))
+        scheduleAutosave()
     }
 
     fun addExercise(exercise: Exercise) {
@@ -662,10 +693,15 @@ class WorkoutSessionFormState internal constructor(
             if (selectedRoutineId == null && current.exercises.isEmpty()) {
                 selectedRoutineId = routineId
             }
+            val nextTitle = if (!titleEditedByUser) {
+                routine.name
+            } else {
+                current.sessionTitle ?: routine.name
+            }
             updateState(
                 current.copy(
                     exercises = current.exercises + added,
-                    sessionTitle = current.sessionTitle ?: routine.name,
+                    sessionTitle = nextTitle,
                 ),
             )
         }
@@ -728,6 +764,7 @@ class WorkoutSessionFormState internal constructor(
                 AppDb.db.saveCompletedWorkout(
                     mode = mode,
                     routineId = selectedRoutineId,
+                    title = resolvedTitleForSave(state.sessionTitle),
                     exercises = state.exercises,
                     now = nowMillis(),
                 )
@@ -786,6 +823,11 @@ class WorkoutSessionFormState internal constructor(
 
     private suspend fun persist(state: WorkoutSessionUiState) {
         val now = nowMillis()
+        AppDb.db.workoutSessionDao().updateTitle(
+            id = sessionId,
+            title = resolvedTitleForSave(state.sessionTitle),
+            now = now,
+        )
         AppDb.db.workoutSessionDetailDao().deleteForSession(sessionId)
         var position = 1
         state.exercises.forEach { draft ->
@@ -845,12 +887,18 @@ private data class ExerciseSnapshot(
 
 private data class FormSnapshot(
     val routineId: Long?,
+    val title: String,
     val exercises: List<ExerciseSnapshot>,
 )
 
-private fun snapshotOf(exercises: List<DraftSessionExercise>, routineId: Long?): FormSnapshot =
+private fun snapshotOf(
+    exercises: List<DraftSessionExercise>,
+    routineId: Long?,
+    title: String,
+): FormSnapshot =
     FormSnapshot(
         routineId = routineId,
+        title = title,
         exercises = exercises.map { ex ->
             ExerciseSnapshot(
                 exerciseId = ex.exercise.id,
@@ -909,6 +957,7 @@ internal suspend fun AppDatabase.saveCompletedWorkout(
     routineId: Long?,
     exercises: List<DraftSessionExercise>,
     now: Long,
+    title: String = "",
     zone: TimeZone = TimeZone.currentSystemDefault(),
     todayEpochDay: Long = WeekMath.todayEpochDay(),
 ): Long {
@@ -933,19 +982,30 @@ internal suspend fun AppDatabase.saveCompletedWorkout(
                             .atStartOfDayIn(zone)
                             .toEpochMilliseconds() + 12 * 3_600_000L
                     }
+                    val resolvedTitle = title.trim().takeIf { it.isNotEmpty() }
+                        ?: defaultWorkoutTitleForMillis(performedAt, zone)
                     workoutSessionDao().insert(
                         WorkoutSessionEntity(
                             profileId = PROFILE_ID,
                             routineId = routineId,
                             performedAt = performedAt,
                             completedAt = performedAt,
+                            title = resolvedTitle,
                             createdAt = now,
                             updatedAt = now,
                         ),
                     )
                 }
                 is WorkoutSessionMode.EditCompleted -> {
-                    workoutSessionDao().updateRoutineAndTimestamp(mode.sessionId, routineId, now)
+                    val existing = workoutSessionDao().findById(mode.sessionId)
+                    val resolvedTitle = title.trim().takeIf { it.isNotEmpty() }
+                        ?: defaultWorkoutTitleForMillis(existing?.performedAt ?: now, zone)
+                    workoutSessionDao().updateRoutineTitleAndTimestamp(
+                        id = mode.sessionId,
+                        routineId = routineId,
+                        title = resolvedTitle,
+                        now = now,
+                    )
                     workoutSessionDetailDao().deleteForSession(mode.sessionId)
                     mode.sessionId
                 }

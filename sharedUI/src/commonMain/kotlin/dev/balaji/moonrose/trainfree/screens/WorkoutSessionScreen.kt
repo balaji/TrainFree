@@ -69,6 +69,7 @@ import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -106,6 +107,7 @@ import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
@@ -175,7 +177,7 @@ fun WorkoutSessionScreen(route: WorkoutSessionRoute, onGoBack: () -> Unit) {
     val elapsedSeconds = rememberElapsedSeconds(uiState.startedAt)
 
     WorkoutSessionShell(
-        title = route.title,
+        title = uiState.sessionTitle?.takeIf { it.isNotBlank() } ?: route.title,
         elapsedSeconds = elapsedSeconds.takeIf { uiState.startedAt > 0 },
         onGoBack = onGoBack,
         onDiscard = { showDiscardConfirm = true },
@@ -369,7 +371,11 @@ private fun WorkoutSessionShell(
                 TopAppBar(
                     title = {
                         Column {
-                            Text(title)
+                            Text(
+                                title,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
                             if (elapsedSeconds != null) {
                                 Text(
                                     formatElapsed(elapsedSeconds),
@@ -481,6 +487,18 @@ private fun WorkoutSessionBody(
                         .onSizeChanged { listHeightPx = it.height },
                     contentPadding = PaddingValues(bottom = 16.dp),
                 ) {
+                    item(key = "workout_title") {
+                        OutlinedTextField(
+                            value = uiState.sessionTitle.orEmpty(),
+                            onValueChange = { formState.updateTitle(it) },
+                            label = { Text(stringResource(Res.string.workout_title)) },
+                            singleLine = true,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 16.dp, vertical = 12.dp)
+                                .onFocusChanged { if (it.isFocused) plateKeyboard.close() },
+                        )
+                    }
                     itemsIndexed(uiState.exercises, key = { _, ex -> ex.id }) { exIndex, exercise ->
                         SessionExerciseCard(
                             exercise = exercise,

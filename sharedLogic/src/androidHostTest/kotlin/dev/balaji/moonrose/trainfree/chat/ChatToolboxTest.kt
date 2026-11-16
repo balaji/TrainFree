@@ -143,6 +143,35 @@ class ChatToolboxTest {
     }
 
     @Test
+    fun `recent workouts uses custom title or defaults empty workout to Workout on yyyy mm dd`() {
+        val zone = TimeZone.UTC
+        val startMillis = LocalDate(2026, 11, 10).atStartOfDayIn(zone).toEpochMilliseconds()
+        val endMillis = startMillis + 30 * 60_000L
+        val sessions = listOf(
+            RecentCompletedSessionRow(
+                id = 10L,
+                routineId = 5L,
+                routineName = "Push Day",
+                title = "Heavy Bench Focus",
+                performedAt = startMillis,
+                completedAt = endMillis,
+            ),
+            RecentCompletedSessionRow(
+                id = 11L,
+                routineId = null,
+                routineName = null,
+                title = "",
+                performedAt = startMillis,
+                completedAt = endMillis,
+            ),
+        )
+
+        val out = ChatToolbox.recentWorkoutsFrom(sessions, emptyList(), zone, WeightUnit.METRIC)
+        assertTrue(out.summary.contains("Nov 10, 2026 · Heavy Bench Focus (30 min)"))
+        assertTrue(out.summary.contains("Nov 10, 2026 · Workout on 2026/11/10 (30 min)"))
+    }
+
+    @Test
     fun `programs and routines excludes warmups from working set count and shows last done date`() {
         val zone = TimeZone.UTC
         val lastMillis = LocalDate(2026, 11, 8).atStartOfDayIn(zone).toEpochMilliseconds()

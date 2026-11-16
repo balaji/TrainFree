@@ -44,7 +44,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.unit.dp
+import dev.balaji.moonrose.trainfree.calendar.WeekMath
 import dev.balaji.moonrose.trainfree.db.ProgramRepository
+import dev.balaji.moonrose.trainfree.db.defaultWorkoutTitle
 import dev.balaji.moonrose.trainfree.model.Program
 import dev.balaji.moonrose.trainfree.model.Routine
 import dev.balaji.moonrose.trainfree.model.SampleProgram
@@ -88,7 +90,6 @@ fun ProgramsScreen(onNavigate: (Route) -> Unit, onGoBack: () -> Unit = {}) {
     var sampleProgramsExpanded by remember { mutableStateOf(true) }
     val scope = rememberCoroutineScope()
     val couldNotSaveMessage = stringResource(Res.string.could_not_save)
-    val emptyWorkoutTitle = stringResource(Res.string.empty_workout_title)
 
     fun toggleExpanded(program: Program) {
         val next = if (expandedProgramId == program.id) null else program.id
@@ -123,7 +124,12 @@ fun ProgramsScreen(onNavigate: (Route) -> Unit, onGoBack: () -> Unit = {}) {
             routinesByProgram = routinesByProgram,
             contentPadding = contentPadding,
             onStartEmptyWorkout = {
-                startWorkout(WorkoutSessionRoute(routineId = 0L, title = emptyWorkoutTitle))
+                startWorkout(
+                    WorkoutSessionRoute(
+                        routineId = 0L,
+                        title = defaultWorkoutTitle(WeekMath.todayEpochDay()),
+                    ),
+                )
             },
             onToggle = ::toggleExpanded,
             onRename = { dialog = ProgramDialog.Rename(it) },

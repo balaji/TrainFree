@@ -31,7 +31,7 @@ data class DaySessionExercise(
 
 data class DaySession(
     val id: Long,
-    val routineName: String?,
+    val title: String,
     val exercises: List<DaySessionExercise>,
 )
 
@@ -73,6 +73,10 @@ class DayDetailState(private val epochDay: Long) {
         WorkoutSessionRepository.deleteCompletedSession(sessionId)
     }
 
+    suspend fun renameSession(sessionId: Long, title: String) {
+        WorkoutSessionRepository.renameSession(sessionId, title)
+    }
+
     private suspend fun toDaySession(
         session: WorkoutSessionEntity,
         displayUnit: WeightUnit,
@@ -81,7 +85,7 @@ class DayDetailState(private val epochDay: Long) {
         val details = AppDb.db.workoutSessionDetailDao().getForSession(session.id)
         return DaySession(
             id = session.id,
-            routineName = routine?.name,
+            title = resolveWorkoutTitle(session.title, routine?.name, session.performedAt),
             exercises = groupByExercise(details, displayUnit),
         )
     }

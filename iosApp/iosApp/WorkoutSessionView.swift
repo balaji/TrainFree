@@ -373,6 +373,16 @@ struct WorkoutSessionView: View {
     private func sessionBody(formState: WorkoutSessionFormState) -> some View {
         ScrollViewReader { proxy in
             List {
+                Section(L10n.workoutTitle) {
+                    TextField(
+                        L10n.workoutTitle,
+                        text: Binding(
+                            get: { uiState.sessionTitle ?? "" },
+                            set: { formState.updateTitle(title: $0) }
+                        )
+                    )
+                }
+
                 ForEach(Array(uiState.exercises.enumerated()), id: \.element.id) { exIndex, exercise in
                     Section {
                         SessionExerciseSection(

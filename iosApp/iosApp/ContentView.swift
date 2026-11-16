@@ -583,7 +583,10 @@ struct ContentView: View {
             isExpanded: $appCoordinator.workoutMenuExpanded,
             onStartEmptyWorkout: {
                 requestStartWorkout(
-                    WorkoutSessionTarget(routineId: 0, title: L10n.emptyWorkoutTitle),
+                    WorkoutSessionTarget(
+                        routineId: 0,
+                        title: FormValidationKt.defaultWorkoutTitle(epochDay: WeekMath.shared.todayEpochDay())
+                    ),
                     pendingTarget: $pendingWorkoutTarget
                 ) { target in
                     appCoordinator.presentedWorkout = DirectWorkoutTarget(

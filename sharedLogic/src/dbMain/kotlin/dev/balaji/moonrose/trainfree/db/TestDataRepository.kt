@@ -259,6 +259,7 @@ internal suspend fun AppDatabase.insertTestData(plan: TestDataPlan) {
                         routineId = null,
                         performedAt = performedAt,
                         completedAt = performedAt + session.durationMinutes * 60_000L,
+                        title = defaultWorkoutTitle(session.epochDay),
                         testData = true,
                         createdAt = now,
                         updatedAt = now,

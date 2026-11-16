@@ -84,11 +84,12 @@ object WorkoutSessionRepository {
             .map { entity ->
                 entity?.let {
                     val routineId = it.routineId ?: 0L
-                    val title = if (routineId > 0L) {
-                        AppDb.db.routineDao().findById(routineId)?.name ?: "Workout"
+                    val routineName = if (routineId > 0L) {
+                        AppDb.db.routineDao().findById(routineId)?.name
                     } else {
-                        "Empty workout"
+                        null
                     }
+                    val title = resolveWorkoutTitle(it.title, routineName, it.performedAt)
                     ActiveWorkoutSession(
                         sessionId = it.id,
                         routineId = routineId,
@@ -110,12 +111,15 @@ object WorkoutSessionRepository {
         _activeRestTimer.value = null
 
         val now = nowMillis()
+        val routineName = AppDb.db.routineDao().findById(routineId)?.name
+        val title = resolveWorkoutTitle(storedTitle = null, routineName = routineName, performedAtMillis = now)
         val sessionId = AppDb.db.workoutSessionDao().insert(
             WorkoutSessionEntity(
                 profileId = PROFILE_ID,
                 routineId = routineId,
                 performedAt = now,
                 completedAt = null,
+                title = title,
                 createdAt = now,
                 updatedAt = now,
             ),
@@ -190,6 +194,7 @@ object WorkoutSessionRepository {
                 routineId = null,
                 performedAt = now,
                 completedAt = null,
+                title = defaultWorkoutTitleForMillis(now),
                 createdAt = now,
                 updatedAt = now,
             ),
@@ -263,5 +268,17 @@ object WorkoutSessionRepository {
     /** Deletes a completed historical workout without disturbing any active live session/timer. */
     suspend fun deleteCompletedSession(sessionId: Long) {
         AppDb.db.workoutSessionDao().delete(sessionId)
+    }
+
+    /** Renames an existing workout session (used by the Journal day screen). */
+    suspend fun renameSession(sessionId: Long, title: String) {
+        val session = AppDb.db.workoutSessionDao().findById(sessionId) ?: return
+        val routineName = session.routineId?.let { AppDb.db.routineDao().findById(it)?.name }
+        val resolved = resolveWorkoutTitle(
+            storedTitle = filterWorkoutTitle(title),
+            routineName = routineName,
+            performedAtMillis = session.performedAt,
+        )
+        AppDb.db.workoutSessionDao().updateTitle(sessionId, resolved, nowMillis())
     }
 }

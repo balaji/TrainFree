@@ -1,6 +1,7 @@
 package dev.balaji.moonrose.trainfree.screens
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -33,6 +34,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedCard
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -55,6 +57,7 @@ import dev.balaji.moonrose.trainfree.db.DayDetailState
 import dev.balaji.moonrose.trainfree.db.DayDetailUiState
 import dev.balaji.moonrose.trainfree.db.DaySession
 import dev.balaji.moonrose.trainfree.db.DaySessionExercise
+import dev.balaji.moonrose.trainfree.db.filterWorkoutTitle
 import dev.balaji.moonrose.trainfree.model.SetType
 import dev.balaji.moonrose.trainfree.model.WeightUnit
 import dev.balaji.moonrose.trainfree.navigation.DayDetailRoute
@@ -124,6 +127,8 @@ private fun DayDetailContent(
     val uiState by state.uiState.collectAsState(initial = DayDetailUiState())
     val scope = rememberCoroutineScope()
     var sessionPendingDelete by remember { mutableStateOf<DaySession?>(null) }
+    var sessionPendingRename by remember { mutableStateOf<DaySession?>(null) }
+    var renameDraft by remember { mutableStateOf("") }
 
     if (uiState.loading) {
         CenteredMessage(PaddingValues(0.dp)) { CircularProgressIndicator() }
@@ -187,6 +192,10 @@ private fun DayDetailContent(
                 SessionSummaryCard(
                     session = session,
                     weightUnit = uiState.weightUnit,
+                    onRename = {
+                        sessionPendingRename = session
+                        renameDraft = session.title
+                    },
                     onEdit = { onEditSession(session.id) },
                     onDelete = { sessionPendingDelete = session },
                 )
@@ -211,6 +220,40 @@ private fun DayDetailContent(
                 onEditJournal = onEditJournal,
             )
         }
+    }
+
+    sessionPendingRename?.let { target ->
+        AlertDialog(
+            onDismissRequest = { sessionPendingRename = null },
+            title = { Text(stringResource(Res.string.rename_workout)) },
+            text = {
+                OutlinedTextField(
+                    value = renameDraft,
+                    onValueChange = { renameDraft = filterWorkoutTitle(it) },
+                    label = { Text(stringResource(Res.string.workout_title)) },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        val nextTitle = renameDraft
+                        scope.launch {
+                            state.renameSession(target.id, nextTitle)
+                            sessionPendingRename = null
+                        }
+                    },
+                ) {
+                    Text(stringResource(Res.string.save))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { sessionPendingRename = null }) {
+                    Text(stringResource(Res.string.cancel))
+                }
+            },
+        )
     }
 
     sessionPendingDelete?.let { target ->
@@ -288,6 +331,7 @@ private fun JournalSummaryCard(
 private fun SessionSummaryCard(
     session: DaySession,
     weightUnit: WeightUnit,
+    onRename: () -> Unit,
     onEdit: () -> Unit,
     onDelete: () -> Unit,
 ) {
@@ -297,10 +341,13 @@ private fun SessionSummaryCard(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(
-                session.routineName ?: stringResource(Res.string.workout),
+                session.title,
                 style = MaterialTheme.typography.titleMedium,
                 color = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.weight(1f),
+                modifier = Modifier
+                    .weight(1f)
+                    .clickable(onClick = onRename)
+                    .padding(vertical = 4.dp),
             )
             IconButton(onClick = onEdit) {
                 Icon(
