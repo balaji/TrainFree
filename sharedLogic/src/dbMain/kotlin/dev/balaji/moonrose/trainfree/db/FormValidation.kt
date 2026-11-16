@@ -1,6 +1,48 @@
 package dev.balaji.moonrose.trainfree.db
 
+import dev.balaji.moonrose.trainfree.calendar.WeekMath
+import kotlin.time.ExperimentalTime
+import kotlin.time.Instant
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.toLocalDateTime
+
 const val MAX_PROGRAM_NAME_LENGTH = 50
+const val MAX_WORKOUT_TITLE_LENGTH = 80
+
+/**
+ * Input filter for workout titles: single-line text capped at
+ * [MAX_WORKOUT_TITLE_LENGTH] characters.
+ */
+fun filterWorkoutTitle(value: String): String =
+    value.filter { it != '\r' && it != '\n' }.take(MAX_WORKOUT_TITLE_LENGTH)
+
+/** Default title for an empty workout on [epochDay]: `"Workout on yyyy/mm/dd"`. */
+fun defaultWorkoutTitle(epochDay: Long): String {
+    val parts = WeekMath.dayParts(epochDay)
+    val year = parts.year.toString().padStart(4, '0')
+    val month = parts.monthOfYear.toString().padStart(2, '0')
+    val day = parts.dayOfMonth.toString().padStart(2, '0')
+    return "Workout on $year/$month/$day"
+}
+
+/** Default title for an empty workout performed at [epochMillis] in [zone]. */
+@OptIn(ExperimentalTime::class)
+fun defaultWorkoutTitleForMillis(
+    epochMillis: Long,
+    zone: TimeZone = TimeZone.currentSystemDefault(),
+): String {
+    val epochDay = Instant.fromEpochMilliseconds(epochMillis).toLocalDateTime(zone).date.toEpochDays()
+    return defaultWorkoutTitle(epochDay)
+}
+
+internal fun resolveWorkoutTitle(
+    storedTitle: String?,
+    routineName: String?,
+    performedAtMillis: Long,
+): String =
+    storedTitle?.trim()?.takeIf { it.isNotEmpty() }
+        ?: routineName?.trim()?.takeIf { it.isNotEmpty() }
+        ?: defaultWorkoutTitleForMillis(performedAtMillis)
 
 /**
  * Input filter for program and routine names: letters, digits and spaces

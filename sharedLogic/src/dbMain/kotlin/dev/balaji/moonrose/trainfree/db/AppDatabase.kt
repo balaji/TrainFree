@@ -21,7 +21,7 @@ import androidx.room.TypeConverters
         AiInsightCacheEntity::class,
         JournalEntryEntity::class,
     ],
-    version = 19,
+    version = 20,
     exportSchema = true,
 )
 @TypeConverters(Converters::class)

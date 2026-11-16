@@ -54,6 +54,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import dev.balaji.moonrose.trainfree.calendar.WeekMath
 import dev.balaji.moonrose.trainfree.chat.ChatSeedContext
 import dev.balaji.moonrose.trainfree.chat.ChatState
 import dev.balaji.moonrose.trainfree.db.ActiveWorkoutSession
@@ -61,6 +62,7 @@ import dev.balaji.moonrose.trainfree.db.ProfileRepository
 import dev.balaji.moonrose.trainfree.db.REST_TIMER_DURATION_SECONDS
 import dev.balaji.moonrose.trainfree.db.UserSettingsRepository
 import dev.balaji.moonrose.trainfree.db.WorkoutSessionRepository
+import dev.balaji.moonrose.trainfree.db.defaultWorkoutTitle
 import dev.balaji.moonrose.trainfree.model.UserSettings
 import dev.balaji.moonrose.trainfree.navigation.CalendarRoute
 import dev.balaji.moonrose.trainfree.navigation.DayDetailRoute
@@ -146,7 +148,6 @@ private fun MainTabs() {
     var workoutMenuExpanded by remember { mutableStateOf(false) }
     var directWorkoutSession by remember { mutableStateOf<WorkoutSessionRoute?>(null) }
     var directWorkoutLaunchId by remember { mutableIntStateOf(0) }
-    val emptyWorkoutTitle = stringResource(Res.string.empty_workout_title)
 
     PlatformBackHandler(enabled = workoutMenuExpanded) { workoutMenuExpanded = false }
 
@@ -262,7 +263,7 @@ private fun MainTabs() {
                         startDirectWorkout(
                             WorkoutSessionRoute(
                                 routineId = 0L,
-                                title = emptyWorkoutTitle,
+                                title = defaultWorkoutTitle(WeekMath.todayEpochDay()),
                             ),
                         )
                     },

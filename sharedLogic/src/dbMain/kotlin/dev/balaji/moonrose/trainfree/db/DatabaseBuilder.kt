@@ -43,12 +43,30 @@ internal val MIGRATION_18_19 = object : Migration(18, 19) {
     }
 }
 
+internal val MIGRATION_19_20 = object : Migration(19, 20) {
+    override fun migrate(connection: SQLiteConnection) {
+        connection.execSQL(
+            "ALTER TABLE `workout_sessions` ADD COLUMN `title` TEXT NOT NULL DEFAULT ''",
+        )
+        connection.execSQL(
+            "UPDATE `workout_sessions` " +
+                "SET `title` = COALESCE((SELECT `name` FROM `routines` WHERE `routines`.`id` = `workout_sessions`.`routine_id`), '') " +
+                "WHERE `routine_id` IS NOT NULL",
+        )
+        connection.execSQL(
+            "UPDATE `workout_sessions` " +
+                "SET `title` = 'Workout on ' || strftime('%Y/%m/%d', `performed_at` / 1000, 'unixepoch', 'localtime') " +
+                "WHERE `title` = ''",
+        )
+    }
+}
+
 fun createDatabase(): AppDatabase =
     databaseBuilder()
         .setDriver(BundledSQLiteDriver())
         .setQueryCoroutineContext(Dispatchers.IO)
         .addCallback(ExerciseSeedCallback)
-        .addMigrations(MIGRATION_17_18, MIGRATION_18_19)
+        .addMigrations(MIGRATION_17_18, MIGRATION_18_19, MIGRATION_19_20)
         // Pre-release safety net for schema history older than v17.
         .fallbackToDestructiveMigration(dropAllTables = true)
         .build()

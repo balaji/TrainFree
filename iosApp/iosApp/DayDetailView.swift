@@ -24,6 +24,9 @@ struct DayDetailView: View {
     @State private var showJournalEditor = false
     @State private var sessionPendingDelete: DaySession?
     @State private var showDeleteConfirm = false
+    @State private var sessionPendingRename: DaySession?
+    @State private var renameText = ""
+    @State private var showRenameAlert = false
 
     init(epochDay: Int64) {
         self.epochDay = epochDay
@@ -66,10 +69,17 @@ struct DayDetailView: View {
                                 }
                             } header: {
                                 HStack {
-                                    Text(session.routineName ?? L10n.workout)
-                                        .font(.headline)
-                                        .foregroundStyle(Color.accentColor)
-                                        .textCase(nil)
+                                    Button {
+                                        sessionPendingRename = session
+                                        renameText = session.title
+                                        showRenameAlert = true
+                                    } label: {
+                                        Text(session.title)
+                                            .font(.headline)
+                                            .foregroundStyle(Color.accentColor)
+                                            .textCase(nil)
+                                    }
+                                    .buttonStyle(.plain)
                                     Spacer()
                                     Button {
                                         editingSession = IdentifiableSessionId(id: session.id)
@@ -144,6 +154,19 @@ struct DayDetailView: View {
         }
         .sheet(isPresented: $showJournalEditor) {
             JournalEditorView(epochDay: epochDay)
+        }
+        .alert(L10n.renameWorkout, isPresented: $showRenameAlert, presenting: sessionPendingRename) { target in
+            TextField(L10n.workoutTitle, text: Binding(
+                get: { renameText },
+                set: { renameText = FormValidationKt.filterWorkoutTitle(value: $0) }
+            ))
+            Button(L10n.save) {
+                let nextTitle = renameText
+                Task {
+                    try? await state.renameSession(sessionId: target.id, title: nextTitle)
+                }
+            }
+            Button(L10n.cancel, role: .cancel) {}
         }
         .alert(L10n.deleteWorkoutTitle, isPresented: $showDeleteConfirm, presenting: sessionPendingDelete) { target in
             Button(L10n.delete, role: .destructive) {

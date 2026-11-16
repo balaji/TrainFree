@@ -16,7 +16,7 @@ import kotlinx.datetime.toLocalDateTime
  */
 data class JournalDaySummary(
     val epochDay: Long,
-    /** Routine names in session order; "Workout" for sessions without a routine. */
+    /** Workout titles in session order. */
     val routineNames: List<String>,
     val hasJournal: Boolean,
     val journalPreview: String,
@@ -81,7 +81,9 @@ object CalendarRepository {
                     Instant.fromEpochMilliseconds(row.performedAt).toLocalDateTime(zone).date.toEpochDays()
                 }
                 .mapValues { (_, sessions) ->
-                    sessions.asReversed().map { it.routineName ?: "Workout" }
+                    sessions.asReversed().map {
+                        resolveWorkoutTitle(it.title, it.routineName, it.performedAt)
+                    }
                 }
             val journalsByDay = journalRows.associateBy { it.epochDay }
             val allDays = (workoutsByDay.keys + journalsByDay.keys).sortedDescending()

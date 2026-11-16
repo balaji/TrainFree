@@ -4980,6 +4980,20 @@
         "sv": { "stringUnit": { "state": "translated", "value": "%1$@'%2$@" } },
         "en": { "stringUnit": { "state": "translated", "value": "%1$@'%2$@" } }
       }
+    },
+    "workout_title": {
+      "extractionState": "manual",
+      "localizations": {
+        "sv": { "stringUnit": { "state": "translated", "value": "Passets titel" } },
+        "en": { "stringUnit": { "state": "translated", "value": "Workout title" } }
+      }
+    },
+    "rename_workout": {
+      "extractionState": "manual",
+      "localizations": {
+        "sv": { "stringUnit": { "state": "translated", "value": "Byt namn på pass" } },
+        "en": { "stringUnit": { "state": "translated", "value": "Rename workout" } }
+      }
     }
   },
   "version": "1.0"

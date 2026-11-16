@@ -147,7 +147,10 @@ object ChatToolbox {
             .getRecentCompletedWithRoutine(PROFILE_ID, sinceMillis, fetchLimit)
             .let { rows ->
                 if (routineFilter == null) rows
-                else rows.filter { it.routineName?.contains(routineFilter, ignoreCase = true) == true }
+                else rows.filter {
+                    it.title.contains(routineFilter, ignoreCase = true) ||
+                        it.routineName?.contains(routineFilter, ignoreCase = true) == true
+                }
             }
             .take(clampedLimit)
 
@@ -509,7 +512,9 @@ object ChatToolbox {
         for (session in sessions) {
             val epochDay = millisToEpochDay(session.performedAt, zone)
             val dateLabel = shortDate(epochDay)
-            val title = session.routineName ?: "Workout"
+            val title = session.title.trim().takeIf { it.isNotEmpty() }
+                ?: session.routineName?.trim()?.takeIf { it.isNotEmpty() }
+                ?: dev.balaji.moonrose.trainfree.db.defaultWorkoutTitle(epochDay)
             val durationMin = ((session.completedAt - session.performedAt) / 60_000L).coerceAtLeast(0L)
             val durText = if (durationMin > 0L) " (${durationMin} min)" else ""
 

@@ -11,6 +11,7 @@ import kotlinx.coroutines.flow.Flow
 /** Projection for the workout-history list: one row per completed session. */
 data class CompletedSessionRow(
     @ColumnInfo(name = "performed_at") val performedAt: Long,
+    @ColumnInfo(name = "title") val title: String = "",
     /** Null when the session had no routine or the routine was deleted. */
     @ColumnInfo(name = "routine_name") val routineName: String?,
 )
@@ -49,6 +50,7 @@ data class RecentCompletedSessionRow(
     val id: Long,
     @ColumnInfo(name = "routine_id") val routineId: Long?,
     @ColumnInfo(name = "routine_name") val routineName: String?,
+    @ColumnInfo(name = "title") val title: String = "",
     @ColumnInfo(name = "performed_at") val performedAt: Long,
     @ColumnInfo(name = "completed_at") val completedAt: Long,
 )
@@ -287,7 +289,7 @@ interface WorkoutSessionDao {
     suspend fun getCompletedPerformedAt(profileId: Long): List<Long>
 
     @Query(
-        "SELECT s.performed_at AS performed_at, r.name AS routine_name " +
+        "SELECT s.performed_at AS performed_at, s.title AS title, r.name AS routine_name " +
             "FROM workout_sessions s LEFT JOIN routines r ON r.id = s.routine_id " +
             "WHERE s.profile_id = :profileId AND s.completed_at IS NOT NULL " +
             "ORDER BY s.performed_at DESC",
@@ -312,7 +314,7 @@ interface WorkoutSessionDao {
 
     @Query(
         "SELECT s.id AS id, s.routine_id AS routine_id, r.name AS routine_name, " +
-            "s.performed_at AS performed_at, s.completed_at AS completed_at " +
+            "s.title AS title, s.performed_at AS performed_at, s.completed_at AS completed_at " +
             "FROM workout_sessions s LEFT JOIN routines r ON r.id = s.routine_id " +
             "WHERE s.profile_id = :profileId AND s.completed_at IS NOT NULL " +
             "AND s.performed_at >= :sinceMillis " +
@@ -326,7 +328,7 @@ interface WorkoutSessionDao {
 
     @Query(
         "SELECT s.id AS id, s.routine_id AS routine_id, r.name AS routine_name, " +
-            "s.performed_at AS performed_at, s.completed_at AS completed_at " +
+            "s.title AS title, s.performed_at AS performed_at, s.completed_at AS completed_at " +
             "FROM workout_sessions s LEFT JOIN routines r ON r.id = s.routine_id " +
             "WHERE s.profile_id = :profileId AND s.completed_at IS NOT NULL " +
             "AND s.performed_at >= :startMillis AND s.performed_at < :endMillis " +
@@ -351,6 +353,12 @@ interface WorkoutSessionDao {
 
     @Query("UPDATE workout_sessions SET completed_at = :completedAt, updated_at = :now WHERE id = :id")
     suspend fun setCompletedAt(id: Long, completedAt: Long, now: Long)
+
+    @Query("UPDATE workout_sessions SET title = :title, updated_at = :now WHERE id = :id")
+    suspend fun updateTitle(id: Long, title: String, now: Long)
+
+    @Query("UPDATE workout_sessions SET routine_id = :routineId, title = :title, updated_at = :now WHERE id = :id")
+    suspend fun updateRoutineTitleAndTimestamp(id: Long, routineId: Long?, title: String, now: Long)
 
     @Query("UPDATE workout_sessions SET routine_id = :routineId, updated_at = :now WHERE id = :id")
     suspend fun updateRoutineAndTimestamp(id: Long, routineId: Long?, now: Long)

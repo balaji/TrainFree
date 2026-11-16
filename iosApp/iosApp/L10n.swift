@@ -318,6 +318,8 @@ enum L10n {
     static let editJournal = String(localized: "edit_journal", defaultValue: "Edit journal")
     static let logWorkoutTitle = String(localized: "log_workout_title", defaultValue: "Log workout")
     static let editWorkoutTitle = String(localized: "edit_workout_title", defaultValue: "Edit workout")
+    static let workoutTitle = String(localized: "workout_title", defaultValue: "Workout title")
+    static let renameWorkout = String(localized: "rename_workout", defaultValue: "Rename workout")
     static let copyFromRoutine = String(localized: "copy_from_routine", defaultValue: "Copy from routine")
     static let deleteWorkout = String(localized: "delete_workout", defaultValue: "Delete workout")
     static let deleteWorkoutTitle = String(localized: "delete_workout_title", defaultValue: "Delete workout?")

@@ -162,6 +162,7 @@ data class WorkoutSessionEntity(
     @ColumnInfo(name = "performed_at") val performedAt: Long,
     // Null while the session is in progress; set when the user taps Finish.
     @ColumnInfo(name = "completed_at") val completedAt: Long?,
+    @ColumnInfo(defaultValue = "''") val title: String = "",
     // Rows created by the developer test-data generator, so they can be
     // deleted in one statement without touching real history.
     @ColumnInfo(name = "test_data", defaultValue = "0") val testData: Boolean = false,
