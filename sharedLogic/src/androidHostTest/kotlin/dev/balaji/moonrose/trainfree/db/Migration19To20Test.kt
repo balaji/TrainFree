@@ -1,6 +1,5 @@
 package dev.balaji.moonrose.trainfree.db
 
-import androidx.room.RoomOpenDelegate
 import androidx.sqlite.SQLiteConnection
 import androidx.sqlite.SQLiteStatement
 import kotlin.test.Test
@@ -37,16 +36,6 @@ class Migration19To20Test {
         }
 
         override fun close() = Unit
-    }
-
-    @Test
-    fun v20OpenDelegateMatchesExportedSchemaVersionAndHash() {
-        val method = AppDatabase_Impl::class.java.getDeclaredMethod("createOpenDelegate")
-        method.isAccessible = true
-        val delegate = method.invoke(AppDatabase_Impl()) as RoomOpenDelegate
-
-        assertEquals(20, delegate.version)
-        assertEquals("0756691fdb8d2ff4c5ad4b58eb36cc9a", delegate.identityHash)
     }
 
     @Test

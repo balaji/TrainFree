@@ -13,6 +13,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.tooling.preview.Preview
 import dev.balaji.moonrose.trainfree.db.DbContextHolder
 import dev.balaji.moonrose.trainfree.db.DevSeed
+import dev.balaji.moonrose.trainfree.db.HealthSyncManager
+import dev.balaji.moonrose.trainfree.health.AndroidHealthSyncProvider
 import java.util.Locale
 
 class MainActivity : ComponentActivity() {
@@ -21,6 +23,7 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
         DbContextHolder.appContext = applicationContext
+        HealthSyncManager.register(AndroidHealthSyncProvider(applicationContext))
         maybeSeedTestData()
 
         setContent {

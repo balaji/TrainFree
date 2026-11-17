@@ -261,6 +261,15 @@ interface BodyMetricDao {
     @Insert
     suspend fun insert(metric: BodyMetricEntity): Long
 
+    @Query("SELECT * FROM body_metrics WHERE external_id = :externalId LIMIT 1")
+    suspend fun findByExternalId(externalId: String): BodyMetricEntity?
+
+    @Query(
+        "SELECT EXISTS(SELECT 1 FROM body_metrics WHERE profile_id = :profileId " +
+            "AND ABS(logged_at - :loggedAt) <= :windowMillis)",
+    )
+    suspend fun hasNearTimestamp(profileId: Long, loggedAt: Long, windowMillis: Long): Boolean
+
     @Query("DELETE FROM body_metrics WHERE id = :id")
     suspend fun delete(id: Long)
 

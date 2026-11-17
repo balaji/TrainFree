@@ -175,7 +175,10 @@ data class WorkoutSessionEntity(
     foreignKeys = [
         ForeignKey(ProfileEntity::class, ["id"], ["profile_id"], onDelete = ForeignKey.CASCADE),
     ],
-    indices = [Index(value = ["profile_id", "logged_at"])],
+    indices = [
+        Index(value = ["profile_id", "logged_at"]),
+        Index(value = ["external_id"], unique = true),
+    ],
 )
 data class BodyMetricEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
@@ -184,6 +187,8 @@ data class BodyMetricEntity(
     val weight: Double,
     @ColumnInfo(name = "weight_unit", defaultValue = "'metric'") val weightUnit: WeightUnit = WeightUnit.METRIC,
     @ColumnInfo(name = "logged_at") val loggedAt: Long,
+    // Stable external record id when imported from Apple Health / Health Connect.
+    @ColumnInfo(name = "external_id") val externalId: String? = null,
     // See WorkoutSessionEntity.testData.
     @ColumnInfo(name = "test_data", defaultValue = "0") val testData: Boolean = false,
     @ColumnInfo(name = "created_at") val createdAt: Long,

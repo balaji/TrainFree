@@ -497,6 +497,12 @@ private fun rememberRestTimerRemainingSeconds(): Long {
     val notificationsEnabled by rememberUpdatedState(settings.notificationsEnabled)
     val restTimerSound by rememberUpdatedState(settings.restTimerSound)
 
+    LaunchedEffect(settings.healthSyncWeight) {
+        if (settings.healthSyncWeight) {
+            dev.balaji.moonrose.trainfree.db.HealthSyncManager.syncBodyWeightsFromHealth()
+        }
+    }
+
     var remainingSeconds by remember(activeRestTimer) {
         mutableLongStateOf(activeRestTimer?.let { remainingSecondsUntil(it.endsAtMillis) } ?: 0L)
     }

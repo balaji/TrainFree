@@ -189,6 +189,10 @@ data class UserSettings(
      * push notification is sent when the between-set rest timer finishes.
      */
     val notificationsEnabled: Boolean = false,
+    /** Whether live completed workouts are written to Apple Health / Health Connect. */
+    val healthSyncWorkouts: Boolean = false,
+    /** Whether body weight is synced two-way with Apple Health / Health Connect. */
+    val healthSyncWeight: Boolean = false,
     /** Duration in seconds of the between-set rest timer (60..300 in 30s steps). */
     val restTimerDurationSeconds: Int = DEFAULT_REST_TIMER_SECONDS,
     /** Audio tone played when the between-set rest timer reaches zero. */

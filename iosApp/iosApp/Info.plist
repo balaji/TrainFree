@@ -4,5 +4,9 @@
 <dict>
 	<key>CADisableMinimumFrameDurationOnPhone</key>
 	<true/>
+	<key>NSHealthShareUsageDescription</key>
+	<string>TrainFree reads your body weight from Apple Health so smart-scale measurements appear automatically.</string>
+	<key>NSHealthUpdateUsageDescription</key>
+	<string>TrainFree saves your completed strength workouts and logged body weight to Apple Health.</string>
 </dict>
 </plist>

@@ -44,6 +44,12 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -55,9 +61,25 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import dev.balaji.moonrose.trainfree.calendar.WeekStart
 import dev.balaji.moonrose.trainfree.db.BackupTransferState
+import dev.balaji.moonrose.trainfree.db.HealthSyncManager
 import dev.balaji.moonrose.trainfree.db.ProfileRepository
 import dev.balaji.moonrose.trainfree.db.TestDataRepository
 import dev.balaji.moonrose.trainfree.db.UserSettingsRepository
+import dev.balaji.moonrose.trainfree.health.HealthSyncAvailability
+import dev.balaji.moonrose.trainfree.health.rememberHealthSettingsOpener
+import dev.balaji.moonrose.trainfree.health.rememberHealthWeightPermissionRequester
+import dev.balaji.moonrose.trainfree.health.rememberHealthWorkoutPermissionRequester
+import dev.balaji.moonrose.trainfree.sharedui.resources.Res
+import dev.balaji.moonrose.trainfree.sharedui.resources.health_sync_denied_message
+import dev.balaji.moonrose.trainfree.sharedui.resources.health_sync_denied_title
+import dev.balaji.moonrose.trainfree.sharedui.resources.health_sync_not_installed_message
+import dev.balaji.moonrose.trainfree.sharedui.resources.health_sync_section
+import dev.balaji.moonrose.trainfree.sharedui.resources.health_sync_weight
+import dev.balaji.moonrose.trainfree.sharedui.resources.health_sync_weight_imported
+import dev.balaji.moonrose.trainfree.sharedui.resources.health_sync_weight_now
+import dev.balaji.moonrose.trainfree.sharedui.resources.health_sync_weight_syncing
+import dev.balaji.moonrose.trainfree.sharedui.resources.health_sync_weight_up_to_date
+import dev.balaji.moonrose.trainfree.sharedui.resources.health_sync_workouts
 import dev.balaji.moonrose.trainfree.model.AppFont
 import dev.balaji.moonrose.trainfree.model.AppFontSize
 import dev.balaji.moonrose.trainfree.model.Appearance
@@ -166,6 +188,7 @@ private fun ProfileDetails(profile: Profile, onEdit: () -> Unit) {
         }
         ToolsSection()
         SettingsSection()
+        HealthSyncSection()
         BackupSection()
         DeveloperSection()
     }
@@ -248,6 +271,151 @@ private fun SettingsSection() {
             },
             dismissButton = {
                 TextButton(onClick = { showNotificationsDeniedHint = false }) {
+                    Text(stringResource(Res.string.cancel))
+                }
+            },
+        )
+    }
+}
+
+@Composable
+private fun HealthSyncSection() {
+    val availability by produceState(HealthSyncAvailability.UNAVAILABLE) {
+        value = HealthSyncManager.availability()
+    }
+    if (availability == HealthSyncAvailability.UNAVAILABLE) return
+
+    val settings by UserSettingsRepository.settings.collectAsState(initial = null)
+    val current = settings ?: return
+    val scope = rememberCoroutineScope()
+    val openHealthSettings = rememberHealthSettingsOpener()
+    var showDeniedHint by remember { mutableStateOf(false) }
+    var syncingWeight by remember { mutableStateOf(false) }
+    var lastImportedCount by remember { mutableStateOf<Int?>(null) }
+
+    val requestWorkoutPermission = rememberHealthWorkoutPermissionRequester { granted ->
+        scope.launch {
+            UserSettingsRepository.setHealthSyncWorkouts(granted)
+            if (!granted) showDeniedHint = true
+        }
+    }
+    val requestWeightPermission = rememberHealthWeightPermissionRequester { granted ->
+        scope.launch {
+            UserSettingsRepository.setHealthSyncWeight(granted)
+            if (granted) {
+                syncingWeight = true
+                lastImportedCount = HealthSyncManager.syncBodyWeightsFromHealth()
+                syncingWeight = false
+            } else {
+                showDeniedHint = true
+            }
+        }
+    }
+
+    Text(
+        stringResource(Res.string.health_sync_section),
+        style = MaterialTheme.typography.titleMedium,
+        color = MaterialTheme.colorScheme.primary,
+        modifier = Modifier.padding(top = 24.dp, bottom = 4.dp),
+    )
+
+    if (availability == HealthSyncAvailability.NOT_INSTALLED) {
+        Text(
+            stringResource(Res.string.health_sync_not_installed_message),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(vertical = 8.dp),
+        )
+        OutlinedButton(onClick = openHealthSettings) {
+            Text(stringResource(Res.string.open_settings))
+        }
+        return
+    }
+
+    SettingSwitchRow(stringResource(Res.string.health_sync_workouts), current.healthSyncWorkouts) { enabled ->
+        if (enabled) {
+            scope.launch {
+                if (HealthSyncManager.hasWorkoutWritePermission()) {
+                    UserSettingsRepository.setHealthSyncWorkouts(true)
+                } else {
+                    requestWorkoutPermission()
+                }
+            }
+        } else {
+            scope.launch { UserSettingsRepository.setHealthSyncWorkouts(false) }
+        }
+    }
+    HorizontalDivider()
+    SettingSwitchRow(stringResource(Res.string.health_sync_weight), current.healthSyncWeight) { enabled ->
+        if (enabled) {
+            scope.launch {
+                if (HealthSyncManager.hasWeightPermissions()) {
+                    UserSettingsRepository.setHealthSyncWeight(true)
+                    syncingWeight = true
+                    lastImportedCount = HealthSyncManager.syncBodyWeightsFromHealth()
+                    syncingWeight = false
+                } else {
+                    requestWeightPermission()
+                }
+            }
+        } else {
+            lastImportedCount = null
+            scope.launch { UserSettingsRepository.setHealthSyncWeight(false) }
+        }
+    }
+    if (current.healthSyncWeight) {
+        HorizontalDivider()
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 8.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            OutlinedButton(
+                enabled = !syncingWeight,
+                onClick = {
+                    scope.launch {
+                        syncingWeight = true
+                        lastImportedCount = HealthSyncManager.syncBodyWeightsFromHealth()
+                        syncingWeight = false
+                    }
+                },
+            ) {
+                Text(
+                    if (syncingWeight) {
+                        stringResource(Res.string.health_sync_weight_syncing)
+                    } else {
+                        stringResource(Res.string.health_sync_weight_now)
+                    },
+                )
+            }
+            lastImportedCount?.let { count ->
+                Text(
+                    text = if (count > 0) {
+                        stringResource(Res.string.health_sync_weight_imported, count)
+                    } else {
+                        stringResource(Res.string.health_sync_weight_up_to_date)
+                    },
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+    }
+    if (showDeniedHint) {
+        AlertDialog(
+            onDismissRequest = { showDeniedHint = false },
+            title = { Text(stringResource(Res.string.health_sync_denied_title)) },
+            text = { Text(stringResource(Res.string.health_sync_denied_message)) },
+            confirmButton = {
+                TextButton(onClick = {
+                    showDeniedHint = false
+                    openHealthSettings()
+                }) { Text(stringResource(Res.string.open_settings)) }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDeniedHint = false }) {
                     Text(stringResource(Res.string.cancel))
                 }
             },
