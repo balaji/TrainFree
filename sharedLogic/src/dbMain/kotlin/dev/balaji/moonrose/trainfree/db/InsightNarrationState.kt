@@ -1,5 +1,6 @@
 package dev.balaji.moonrose.trainfree.db
 
+import dev.balaji.moonrose.trainfree.insights.ConsistencyQuotes
 import dev.balaji.moonrose.trainfree.insights.InsightCard
 import dev.balaji.moonrose.trainfree.insights.llm.CardNarration
 import dev.balaji.moonrose.trainfree.insights.llm.CardNarrationRequest
@@ -32,7 +33,7 @@ import kotlinx.coroutines.suspendCancellableCoroutine
 class InsightNarrationState internal constructor(
     private val provider: InsightGenerationProvider?,
     private val cards: Flow<List<InsightCard>>,
-    private val buildRequest: suspend (InsightCard) -> CardNarrationRequest?,
+    private val buildRequest: suspend (InsightCard, Int) -> CardNarrationRequest?,
     private val cacheFind: suspend (String) -> AiInsightCacheEntity?,
     private val cachePut: suspend (AiInsightCacheEntity) -> Unit,
     private val scope: CoroutineScope = CoroutineScope(Dispatchers.Main),
@@ -57,39 +58,84 @@ class InsightNarrationState internal constructor(
      * app launch, since this map is in-memory — retry naturally.
      */
     private val enqueued = mutableMapOf<String, String>()
+    private val variants = mutableMapOf<String, Int>()
+    private var latestCards: List<InsightCard> = emptyList()
     private var prewarmed = false
 
     init {
         if (provider?.availability() == "available") {
             scope.launch { worker() }
-            scope.launch { cards.collect { reconcile(it) } }
         }
+        scope.launch { cards.collect { reconcile(it) } }
     }
 
     private class PreparedCard(val request: CardNarrationRequest, val cached: AiInsightCacheEntity?)
 
+    /** Rotates to the next applicable prompt angle or quote for [cardId]. */
+    fun refresh(cardId: String) {
+        val card = latestCards.firstOrNull { it.id == cardId } ?: return
+        if (card.kind == FREQUENCY_KIND) {
+            val currentText = _narrations.value[cardId]?.text
+            val quote = ConsistencyQuotes.random(excluding = currentText)
+            update(cardId, CardNarration(cardId, "ready", quote, canRefresh = true))
+            return
+        }
+        if (provider?.availability() != "available") return
+        val nextVariant = (variants[cardId] ?: 0) + 1
+        variants[cardId] = nextVariant
+        scope.launch {
+            val request = buildRequest(card, nextVariant) ?: return@launch
+            enqueued[cardId] = request.statsHash
+            update(cardId, CardNarration(cardId, "loading", "", request.canRefresh))
+            if (!prewarmed) {
+                prewarmed = true
+                provider.prewarm()
+            }
+            queue.trySend(request)
+        }
+    }
+
     private suspend fun reconcile(cards: List<InsightCard>) {
+        latestCards = cards
+        val next = mutableMapOf<String, CardNarration>()
+        val llmAvailable = provider?.availability() == "available"
         // Suspending fetches happen first; the decide phase below is
         // suspension-free so a completing generation can't interleave with
         // it and get clobbered by stale reads.
-        val prepared = cards.mapNotNull { card ->
-            val request = buildRequest(card) ?: return@mapNotNull null
-            PreparedCard(request, cacheFind(card.id))
+        val prepared = if (llmAvailable) {
+            cards.filter { it.kind != FREQUENCY_KIND }.mapNotNull { card ->
+                val request = buildRequest(card, variants[card.id] ?: 0) ?: return@mapNotNull null
+                PreparedCard(request, cacheFind(card.id))
+            }
+        } else {
+            emptyList()
         }
-        val next = mutableMapOf<String, CardNarration>()
+
+        for (card in cards) {
+            if (card.kind == FREQUENCY_KIND) {
+                val existing = _narrations.value[card.id]
+                next[card.id] = if (existing != null && existing.status == "ready") {
+                    existing
+                } else {
+                    CardNarration(card.id, "ready", ConsistencyQuotes.random(), canRefresh = true)
+                }
+            }
+        }
+
         for (item in prepared) {
             val id = item.request.cardId
+            val canRefresh = item.request.canRefresh
             if (item.cached?.statsHash == item.request.statsHash) {
-                next[id] = CardNarration(id, "ready", item.cached.text)
+                next[id] = CardNarration(id, "ready", item.cached.text, canRefresh)
             } else if (enqueued[id] == item.request.statsHash) {
                 // Already queued or just finished for these exact stats; keep
                 // whatever the worker last reported (loading or ready).
-                next[id] = _narrations.value[id] ?: CardNarration(id, "loading", "")
+                next[id] = _narrations.value[id] ?: CardNarration(id, "loading", "", canRefresh)
             } else if (enqueued[id] == FAILED_PREFIX + item.request.statsHash) {
-                next[id] = CardNarration(id, "failed", "")
+                next[id] = CardNarration(id, "failed", "", canRefresh)
             } else {
                 enqueued[id] = item.request.statsHash
-                next[id] = CardNarration(id, "loading", "")
+                next[id] = CardNarration(id, "loading", "", canRefresh)
                 if (!prewarmed) {
                     prewarmed = true
                     provider?.prewarm()
@@ -112,13 +158,13 @@ class InsightNarrationState internal constructor(
                 if (enqueued[request.cardId] == request.statsHash) {
                     enqueued[request.cardId] = FAILED_PREFIX + request.statsHash
                 }
-                update(request.cardId, CardNarration(request.cardId, "failed", ""))
+                update(request.cardId, CardNarration(request.cardId, "failed", "", request.canRefresh))
                 continue
             }
             cachePut(AiInsightCacheEntity(request.cardId, request.statsHash, text, nowMillis()))
             // Only surface the text if these stats are still the latest.
             if (enqueued[request.cardId] == request.statsHash) {
-                update(request.cardId, CardNarration(request.cardId, "ready", text))
+                update(request.cardId, CardNarration(request.cardId, "ready", text, request.canRefresh))
             }
         }
     }
@@ -142,5 +188,6 @@ class InsightNarrationState internal constructor(
 
     private companion object {
         const val FAILED_PREFIX = "failed:"
+        const val FREQUENCY_KIND = "frequency"
     }
 }

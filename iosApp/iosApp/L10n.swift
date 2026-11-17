@@ -444,6 +444,12 @@ enum L10n {
     static func insightLatestBodyWeight(_ weight: String, _ unit: String) -> String {
         String(localized: "insight_latest_body_weight", defaultValue: "\(weight) \(unit)")
     }
+    static func insightPctVsPriorWeek(_ percent: String) -> String {
+        String(localized: "insight_pct_vs_prior_week", defaultValue: "\(percent)% vs prior week")
+    }
+    static func insightPctVsNWeekAvg(_ percent: String, _ weeks: String) -> String {
+        String(localized: "insight_pct_vs_n_week_avg", defaultValue: "\(percent)% vs \(weeks)-week average")
+    }
     static func insightPctVs4WeekAvg(_ percent: String) -> String {
         String(localized: "insight_pct_vs_4_week_avg", defaultValue: "\(percent)% vs 4-week average")
     }
@@ -474,6 +480,7 @@ enum L10n {
     }
     // iOS-only: shown while the on-device model writes a card narration
     static let insightNarrationLoading = String(localized: "insight_narration_loading", defaultValue: "Reading your training data and writing a note about this trend.")
+    static let insightNarrationRefresh = String(localized: "insight_narration_refresh", defaultValue: "Refresh insight")
 
     // MARK: - 1RM calculator
     static let oneRmCalculator = String(localized: "one_rm_calculator", defaultValue: "1 Rep Max Calculator")

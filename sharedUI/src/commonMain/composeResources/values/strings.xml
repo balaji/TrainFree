@@ -320,6 +320,8 @@
     <string name="insight_plateau_at">Plateau at ~%1$s %2$s</string>
     <string name="insight_est_1rm">Est. 1RM %1$s %2$s</string>
     <string name="insight_latest_body_weight">%1$s %2$s</string>
+    <string name="insight_pct_vs_prior_week">%1$s% vs prior week</string>
+    <string name="insight_pct_vs_n_week_avg">%1$s% vs %2$s-week average</string>
     <string name="insight_pct_vs_4_week_avg">%1$s% vs 4-week average</string>
     <string name="insight_sets_in_sessions">%1$s sets in %2$s sessions</string>
     <string name="insight_workouts_30_days">%1$s workouts in the last 30 days</string>
@@ -334,6 +336,7 @@
     <string name="insight_axis_pct_change">% change</string>
     <string name="insight_series_slope">%1$s %2$s/week</string>
     <string name="insight_narration_loading">Reading your training data and writing a note about this trend.</string>
+    <string name="insight_narration_refresh">Refresh insight</string>
 
     <!-- Profile validation -->
     <string name="profile_age_range">Age must be between %1$s and %2$s</string>
