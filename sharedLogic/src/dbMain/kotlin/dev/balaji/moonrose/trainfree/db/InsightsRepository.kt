@@ -75,6 +75,38 @@ object InsightsRepository {
         return weeklyVolumeFrom(sets, weeks, today)
     }
 
+    internal data class VolumeDriverStats(
+        val topExerciseName: String,
+        val topExercisePct: Int,
+        val topBodyPart: String?,
+    )
+
+    internal suspend fun currentWeekVolumeDrivers(): VolumeDriverStats? {
+        val settings = UserSettingsRepository.settings.first()
+        val today = WeekMath.todayEpochDay()
+        val sets = completedSetsSince(startOfDayMillis(today - 6))
+            .map { it.convertedTo(settings.weightUnit) }
+            .filter { it.weight > 0 && it.reps > 0 }
+        val total = sets.sumOf { it.weight * it.reps }
+        if (total <= 0.0) return null
+        val topExercise = sets
+            .groupBy { it.exerciseName }
+            .maxByOrNull { (_, group) -> group.sumOf { it.weight * it.reps } }
+            ?: return null
+        val topExerciseVol = topExercise.value.sumOf { it.weight * it.reps }
+        val pct = ((topExerciseVol / total) * 100.0).toInt().coerceIn(1, 100)
+        val topBodyPart = sets
+            .filter { it.bodyPart != null }
+            .groupBy { it.bodyPart!! }
+            .maxByOrNull { (_, group) -> group.sumOf { it.weight * it.reps } }
+            ?.key
+        return VolumeDriverStats(
+            topExerciseName = topExercise.key,
+            topExercisePct = pct,
+            topBodyPart = topBodyPart,
+        )
+    }
+
     /** Best sets by estimated 1RM, one per exercise, best first; all-time. */
     suspend fun personalRecords(limit: Int = 5, exerciseName: String? = null): List<ExercisePr> {
         val settings = UserSettingsRepository.settings.first()
@@ -478,16 +510,31 @@ private fun volumeCard(
     todayEpochDay: Long,
 ): InsightCard {
     val weeklies = weeklyVolumeFrom(sets, weeks = 8, todayEpochDay)
-    val thisWeek = weeklies.last()
-    val priorAvg = weeklies.dropLast(1).takeLast(4).map { it.totalVolume }.average()
+    val visibleWeeks = weeklies.dropWhile { it.totalVolume == 0.0 }.ifEmpty { listOf(weeklies.last()) }
+    val thisWeek = visibleWeeks.last()
+    val priorActive = visibleWeeks.dropLast(1).filter { it.totalVolume > 0.0 }
+    val priorAvg = if (priorActive.isEmpty()) 0.0 else priorActive.map { it.totalVolume }.average()
     val detailKey: String
     val detailArgs: List<String>
     val trend: String
     if (priorAvg > 0) {
         val pct = (thisWeek.totalVolume - priorAvg) / priorAvg * 100
         val sign = if (pct >= 0) "+" else ""
-        detailKey = InsightCard.DETAIL_PCT_VS_4_WEEK_AVG
-        detailArgs = listOf("$sign${InsightMath.formatNumber(pct, 0)}")
+        val formattedPct = "$sign${InsightMath.formatNumber(pct, 0)}"
+        when (priorActive.size) {
+            1 -> {
+                detailKey = InsightCard.DETAIL_PCT_VS_PRIOR_WEEK
+                detailArgs = listOf(formattedPct)
+            }
+            4 -> {
+                detailKey = InsightCard.DETAIL_PCT_VS_4_WEEK_AVG
+                detailArgs = listOf(formattedPct)
+            }
+            else -> {
+                detailKey = InsightCard.DETAIL_PCT_VS_N_WEEK_AVG
+                detailArgs = listOf(formattedPct, "${priorActive.size}")
+            }
+        }
         trend = if (pct >= 5) "up" else if (pct <= -5) "down" else "flat"
     } else {
         detailKey = InsightCard.DETAIL_SETS_IN_SESSIONS
@@ -503,7 +550,8 @@ private fun volumeCard(
         detailKey = detailKey,
         detailArgs = detailArgs,
         trend = trend,
-        spark = weeklies.map { SparkPoint(it.weekStartEpochDay, it.totalVolume) },
+        spark = visibleWeeks.map { SparkPoint(it.weekStartEpochDay, it.totalVolume) },
+        referenceValue = if (priorAvg > 0) priorAvg else null,
     )
 }
 

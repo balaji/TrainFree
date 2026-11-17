@@ -114,7 +114,8 @@ struct ProgressTabView: View {
                     InsightCardView(
                         card: card,
                         unit: unitLabel(uiState.weightUnit),
-                        narration: narrations[card.id]
+                        narration: narrations[card.id],
+                        onRefreshNarration: { narrationState.refresh(cardId: card.id) }
                     )
                 }
             }
@@ -147,7 +148,8 @@ struct ProgressTabView: View {
                     InsightCardView(
                         card: card,
                         unit: unitLabel(uiState.weightUnit),
-                        narration: narrations[card.id]
+                        narration: narrations[card.id],
+                        onRefreshNarration: { narrationState.refresh(cardId: card.id) }
                     )
                 }
             }
@@ -306,6 +308,8 @@ private func insightText(_ key: String, _ args: [String], _ unit: String) -> Str
     case "plateau_at": return L10n.insightPlateauAt(args[0], unit)
     case "est_1rm": return L10n.insightEst1Rm(args[0], unit)
     case "latest_body_weight": return L10n.insightLatestBodyWeight(args[0], unit)
+    case "pct_vs_prior_week": return L10n.insightPctVsPriorWeek(args[0])
+    case "pct_vs_n_week_avg": return L10n.insightPctVsNWeekAvg(args[0], args[1])
     case "pct_vs_4_week_avg": return L10n.insightPctVs4WeekAvg(args[0])
     case "sets_in_sessions": return L10n.insightSetsInSessions(args[0], args[1])
     case "workouts_30_days": return L10n.insightWorkouts30Days(args[0])
@@ -346,6 +350,7 @@ private struct TrendIconView: View {
 
 private struct InsightNarrationView: View {
     let narration: CardNarration
+    var onRefresh: (() -> Void)? = nil
     @State private var pulse = false
 
     var body: some View {
@@ -369,6 +374,16 @@ private struct InsightNarrationView: View {
                     .font(.footnote)
                     .foregroundStyle(.secondary)
                     .transition(.opacity)
+                if narration.canRefresh, let onRefresh {
+                    Spacer(minLength: 4)
+                    Button(action: onRefresh) {
+                        Image(systemName: "arrow.clockwise")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel(L10n.insightNarrationRefresh)
+                }
             }
         }
     }
@@ -387,6 +402,7 @@ private struct InsightCardView: View {
     /// Nil when the on-device model is unavailable or this card has no
     /// narration; the card then renders numbers-only.
     let narration: CardNarration?
+    var onRefreshNarration: (() -> Void)? = nil
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
@@ -398,19 +414,22 @@ private struct InsightCardView: View {
                 TrendIconView(trend: card.trend)
             }
             Text(insightText(card.headlineKey, card.headlineArgs, unit))
-                .font(.title3.weight(.semibold))
+                .font(.headline)
             Text(insightText(card.detailKey, card.detailArgs, unit))
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
             if card.kind == "frequency", !card.spark.isEmpty {
                 weeklyVisitBars
                     .padding(.top, 8)
+            } else if card.kind == "volume", !card.spark.isEmpty {
+                weeklyVolumeBars
+                    .padding(.top, 8)
             } else if card.spark.count >= 2 {
                 sparkline
                     .padding(.top, 8)
             }
             if let narration, narration.status != "failed" {
-                InsightNarrationView(narration: narration)
+                InsightNarrationView(narration: narration, onRefresh: onRefreshNarration)
                     .padding(.top, 8)
             }
         }
@@ -456,6 +475,73 @@ private struct InsightCardView: View {
                 WeeklyVisitSegment(weekKey: String(point.epochDay), index: index)
             }
         }
+    }
+
+    private var weeklyVolumeBars: some View {
+        let weekKeys = card.spark.map { String($0.epochDay) }
+        let maxVol = Swift.max(
+            card.spark.map(\.value).max() ?? 0,
+            card.referenceValue?.doubleValue ?? 0,
+            1
+        )
+        return Chart {
+            ForEach(card.spark, id: \.epochDay) { point in
+                BarMark(
+                    x: .value("Week", String(point.epochDay)),
+                    y: .value("Volume", point.value)
+                )
+                .foregroundStyle(Color.accentColor.gradient)
+                .cornerRadius(3)
+            }
+            if let avg = card.referenceValue?.doubleValue, avg > 0 {
+                RuleMark(y: .value("Average", avg))
+                    .foregroundStyle(.secondary.opacity(0.7))
+                    .lineStyle(StrokeStyle(lineWidth: 1, dash: [4, 3]))
+            }
+        }
+        .chartXScale(domain: weekKeys)
+        .chartYScale(domain: 0...(maxVol * 1.1))
+        .chartYAxis {
+            AxisMarks(position: .leading, values: .automatic(desiredCount: 3)) { value in
+                AxisGridLine()
+                AxisValueLabel {
+                    if let v = value.as(Double.self) {
+                        Text(compactVolumeLabel(v))
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            }
+        }
+        .chartXAxis {
+            AxisMarks(values: [weekKeys.first ?? "", weekKeys.last ?? ""]) { value in
+                AxisValueLabel {
+                    if let raw = value.as(String.self), let day = Int64(raw) {
+                        Text(shortDayLabel(epochDay: day))
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            }
+        }
+        .frame(height: 110)
+    }
+
+    private func compactVolumeLabel(_ value: Double) -> String {
+        if value >= 1_000 {
+            let k = value / 1_000
+            return k.truncatingRemainder(dividingBy: 1) == 0
+                ? "\(Int(k))k"
+                : String(format: "%.1fk", k)
+        }
+        return "\(Int(value.rounded()))"
+    }
+
+    private func shortDayLabel(epochDay: Int64) -> String {
+        let parts = WeekMath.shared.dayParts(epochDay: epochDay)
+        let months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+        let month = months[Int(parts.monthOfYear) - 1]
+        return "\(month) \(parts.dayOfMonth)"
     }
 
     private var sparkline: some View {
@@ -528,7 +614,7 @@ private struct ProgressionCardView: View {
             } else {
                 HStack {
                     Text(insightText(card.headlineKey, card.headlineArgs, unit))
-                        .font(.title3.weight(.semibold))
+                        .font(.headline)
                     Spacer()
                     TrendIconView(trend: card.trend)
                 }
@@ -542,7 +628,7 @@ private struct ProgressionCardView: View {
             }
             controls
             if let narration, narration.status != "failed" {
-                InsightNarrationView(narration: narration)
+                InsightNarrationView(narration: narration, onRefresh: onRefreshNarration)
                     .padding(.top, 8)
             }
         }

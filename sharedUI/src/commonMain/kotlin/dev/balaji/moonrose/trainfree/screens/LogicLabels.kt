@@ -252,6 +252,9 @@ internal fun insightHeadline(card: InsightCard, unitLabel: String): String {
 internal fun insightDetail(card: InsightCard, unitLabel: String): String {
     val args = card.detailArgs
     return when (card.detailKey) {
+        InsightCard.DETAIL_PCT_VS_PRIOR_WEEK -> stringResource(Res.string.insight_pct_vs_prior_week, args[0])
+        InsightCard.DETAIL_PCT_VS_N_WEEK_AVG ->
+            stringResource(Res.string.insight_pct_vs_n_week_avg, args[0], args[1])
         InsightCard.DETAIL_PCT_VS_4_WEEK_AVG -> stringResource(Res.string.insight_pct_vs_4_week_avg, args[0])
         InsightCard.DETAIL_SETS_IN_SESSIONS ->
             stringResource(Res.string.insight_sets_in_sessions, args[0], args[1])

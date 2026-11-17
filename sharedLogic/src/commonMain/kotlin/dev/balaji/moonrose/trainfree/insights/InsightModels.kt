@@ -69,6 +69,8 @@ data class InsightCard(
     val series: List<SparkSeries> = emptyList(),
     /** Chart y-axis mode: % change from each series' first week vs raw weight. */
     val showPctChange: Boolean = false,
+    /** Optional horizontal reference line value (e.g. active-week average on volume). */
+    val referenceValue: Double? = null,
 ) {
     companion object {
         /** args: [volume] + unit — "1,234 kg this week". */
@@ -88,6 +90,12 @@ data class InsightCard(
 
         /** args: [weight] + unit — "78.5 kg". */
         const val HEADLINE_LATEST_BODY_WEIGHT = "latest_body_weight"
+
+        /** args: [signedPct] — "+12% vs prior week". */
+        const val DETAIL_PCT_VS_PRIOR_WEEK = "pct_vs_prior_week"
+
+        /** args: [signedPct, weeks] — "+12% vs 2-week average". */
+        const val DETAIL_PCT_VS_N_WEEK_AVG = "pct_vs_n_week_avg"
 
         /** args: [signedPct] — "+12% vs 4-week average". */
         const val DETAIL_PCT_VS_4_WEEK_AVG = "pct_vs_4_week_avg"

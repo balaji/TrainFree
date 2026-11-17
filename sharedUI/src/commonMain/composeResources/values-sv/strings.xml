@@ -303,6 +303,8 @@
     <string name="insight_plateau_at">Platå vid ~%1$s %2$s</string>
     <string name="insight_est_1rm">Ber. 1RM %1$s %2$s</string>
     <string name="insight_latest_body_weight">%1$s %2$s</string>
+    <string name="insight_pct_vs_prior_week">%1$s% mot förra veckan</string>
+    <string name="insight_pct_vs_n_week_avg">%1$s% mot %2$s-veckorssnitt</string>
     <string name="insight_pct_vs_4_week_avg">%1$s% mot 4-veckorssnitt</string>
     <string name="insight_sets_in_sessions">%1$s set på %2$s pass</string>
     <string name="insight_workouts_30_days">%1$s pass de senaste 30 dagarna</string>
@@ -317,6 +319,7 @@
     <string name="insight_axis_pct_change">% förändring</string>
     <string name="insight_series_slope">%1$s %2$s/vecka</string>
     <string name="insight_narration_loading">Läser din träningsdata och skriver en notering om den här trenden.</string>
+    <string name="insight_narration_refresh">Uppdatera insikt</string>
 
     <!-- Profile validation -->
     <string name="profile_age_range">Åldern måste vara mellan %1$s och %2$s</string>

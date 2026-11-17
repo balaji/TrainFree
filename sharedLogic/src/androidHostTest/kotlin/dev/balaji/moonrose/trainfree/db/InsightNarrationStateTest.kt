@@ -73,17 +73,18 @@ class InsightNarrationStateTest {
     )
 
     /** The request derives entirely from the card, with detailKey standing in for the stats. */
-    private fun requestFor(card: InsightCard) = CardNarrationRequest(
+    private fun requestFor(card: InsightCard, variant: Int = 0) = CardNarrationRequest(
         cardId = card.id,
-        instructions = "inst:${card.kind}",
-        prompt = "prompt:${card.detailKey}",
-        statsHash = "hash:${card.detailKey}",
+        instructions = "inst:${card.kind}:$variant",
+        prompt = "prompt:${card.detailKey}:$variant",
+        statsHash = "hash:${card.detailKey}:$variant",
+        canRefresh = card.kind == "volume",
     )
 
     private fun state(provider: InsightGenerationProvider? = this.provider) = InsightNarrationState(
         provider = provider,
         cards = cardsFlow,
-        buildRequest = { requestFor(it) },
+        buildRequest = { card, variant -> requestFor(card, variant) },
         cacheFind = { cache[it] },
         cachePut = { cache[it.cardId] = it },
         scope = scope,
@@ -91,7 +92,7 @@ class InsightNarrationStateTest {
 
     @Test
     fun `cache hit serves ready text immediately without generating`() {
-        cache["volume"] = AiInsightCacheEntity("volume", "hash:v1", "Cached insight.", 0)
+        cache["volume"] = AiInsightCacheEntity("volume", "hash:v1:0", "Cached insight.", 0)
         val state = state()
         cardsFlow.value = listOf(card("volume", "v1"))
 
@@ -109,15 +110,15 @@ class InsightNarrationStateTest {
 
         assertEquals("loading", state.narrations.value.getValue("volume").status)
         assertEquals(1, provider.prewarms)
-        assertEquals("inst:volume", provider.calls.single().instructions)
-        assertEquals("prompt:v1", provider.calls.single().prompt)
+        assertEquals("inst:volume:0", provider.calls.single().instructions)
+        assertEquals("prompt:v1:0", provider.calls.single().prompt)
 
         provider.complete("  Fresh insight.  ")
         val narration = state.narrations.value.getValue("volume")
         assertEquals("ready", narration.status)
         assertEquals("Fresh insight.", narration.text)
         assertEquals("Fresh insight.", cache.getValue("volume").text)
-        assertEquals("hash:v1", cache.getValue("volume").statsHash)
+        assertEquals("hash:v1:0", cache.getValue("volume").statsHash)
     }
 
     @Test
@@ -149,11 +150,11 @@ class InsightNarrationStateTest {
         provider.complete("A text")
         // b:v1 was skipped; the live call is b:v2.
         assertEquals(2, provider.calls.size)
-        assertEquals("prompt:v2", provider.calls.last().prompt)
+        assertEquals("prompt:v2:0", provider.calls.last().prompt)
 
         provider.complete("B text")
         assertEquals("B text", state.narrations.value.getValue("b").text)
-        assertEquals("hash:v2", cache.getValue("b").statsHash)
+        assertEquals("hash:v2:0", cache.getValue("b").statsHash)
     }
 
     @Test
@@ -164,11 +165,11 @@ class InsightNarrationStateTest {
 
         provider.complete("Old text")
         assertEquals("loading", state.narrations.value.getValue("a").status)
-        assertEquals("hash:v1", cache.getValue("a").statsHash)
+        assertEquals("hash:v1:0", cache.getValue("a").statsHash)
 
         provider.complete("New text")
         assertEquals("New text", state.narrations.value.getValue("a").text)
-        assertEquals("hash:v2", cache.getValue("a").statsHash)
+        assertEquals("hash:v2:0", cache.getValue("a").statsHash)
     }
 
     @Test
@@ -206,13 +207,33 @@ class InsightNarrationStateTest {
 
     @Test
     fun `cards that disappear drop out of the map`() {
-        cache["volume"] = AiInsightCacheEntity("volume", "hash:v1", "Cached.", 0)
+        cache["volume"] = AiInsightCacheEntity("volume", "hash:v1:0", "Cached.", 0)
         val state = state()
         cardsFlow.value = listOf(card("volume", "v1"))
         assertEquals(setOf("volume"), state.narrations.value.keys)
 
         cardsFlow.value = emptyList()
         assertTrue(state.narrations.value.isEmpty())
+    }
+
+    @Test
+    fun `refresh rotates to the next variant and regenerates`() {
+        cache["volume"] = AiInsightCacheEntity("volume", "hash:v1:0", "Overview.", 0)
+        val state = state()
+        cardsFlow.value = listOf(card("volume", "v1"))
+        assertEquals("Overview.", state.narrations.value.getValue("volume").text)
+        assertTrue(state.narrations.value.getValue("volume").canRefresh)
+
+        state.refresh("volume")
+        assertEquals("loading", state.narrations.value.getValue("volume").status)
+        assertEquals("prompt:v1:1", provider.calls.single().prompt)
+
+        provider.complete("Fun elephant fact.")
+        val updated = state.narrations.value.getValue("volume")
+        assertEquals("ready", updated.status)
+        assertEquals("Fun elephant fact.", updated.text)
+        assertTrue(updated.canRefresh)
+        assertEquals("hash:v1:1", cache.getValue("volume").statsHash)
     }
 
     @Test
@@ -226,5 +247,27 @@ class InsightNarrationStateTest {
         cardsFlow.value = listOf(card("volume", "v2"))
         assertTrue(gated.narrations.value.isEmpty())
         assertTrue(provider.calls.isEmpty())
+    }
+
+    @Test
+    fun `frequency card serves random curated quotes without calling the LLM`() {
+        val state = state(provider = null)
+        val freqCard = InsightCard(
+            id = "frequency", kind = "frequency", exerciseName = null,
+            headlineKey = "", headlineArgs = emptyList(),
+            detailKey = "", detailArgs = emptyList(),
+            trend = "none", spark = emptyList(),
+        )
+        cardsFlow.value = listOf(freqCard)
+        val first = state.narrations.value.getValue("frequency")
+        assertEquals("ready", first.status)
+        assertTrue(first.canRefresh)
+        assertTrue(first.text.isNotBlank())
+
+        state.refresh("frequency")
+        val second = state.narrations.value.getValue("frequency")
+        assertEquals("ready", second.status)
+        assertTrue(second.canRefresh)
+        assertTrue(second.text != first.text)
     }
 }
