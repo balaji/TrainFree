@@ -24,6 +24,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.TrendingDown
@@ -49,6 +50,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -58,16 +60,25 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import com.patrykandpatrick.vico.compose.cartesian.CartesianChartHost
+import com.patrykandpatrick.vico.compose.cartesian.data.CartesianChartModelProducer
+import com.patrykandpatrick.vico.compose.cartesian.data.CartesianLayerRangeProvider
+import com.patrykandpatrick.vico.compose.cartesian.data.columnSeries
+import com.patrykandpatrick.vico.compose.cartesian.layer.ColumnCartesianLayer
+import com.patrykandpatrick.vico.compose.cartesian.layer.rememberColumnCartesianLayer
+import com.patrykandpatrick.vico.compose.cartesian.rememberCartesianChart
+import com.patrykandpatrick.vico.compose.cartesian.rememberVicoScrollState
+import com.patrykandpatrick.vico.compose.common.Fill
+import com.patrykandpatrick.vico.compose.common.component.rememberLineComponent
 import dev.balaji.moonrose.trainfree.db.InsightNarrationState
 import dev.balaji.moonrose.trainfree.db.ProgressScreenState
 import dev.balaji.moonrose.trainfree.insights.BodyPartSlice
+import dev.balaji.moonrose.trainfree.insights.HistoryWindow
 import dev.balaji.moonrose.trainfree.insights.InsightCard
 import dev.balaji.moonrose.trainfree.insights.InsightMath
 import dev.balaji.moonrose.trainfree.insights.SparkPoint
@@ -277,7 +288,7 @@ private fun InsightCardRow(
             if (card.kind == "frequency" && card.spark.isNotEmpty()) {
                 WeeklyVisitBars(
                     card.spark,
-                    Modifier.fillMaxWidth().height(40.dp).padding(top = 12.dp),
+                    Modifier.fillMaxWidth().height(48.dp).padding(top = 12.dp),
                 )
             } else if (card.spark.size >= 2) {
                 Sparkline(
@@ -381,7 +392,7 @@ private fun ProgressionCard(
                 ProgressionChart(
                     series = card.series,
                     showPctChange = card.showPctChange,
-                    modifier = Modifier.fillMaxWidth().height(56.dp).padding(top = 12.dp),
+                    modifier = Modifier.fillMaxWidth().height(140.dp).padding(top = 12.dp),
                 )
             }
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -489,45 +500,41 @@ private fun TrendIcon(trend: String) {
 }
 
 /**
- * Sessions per week as a stack of one segment per visit, one slot per week
- * (zero weeks stay as visible gaps in the fixed time axis). Segmenting the
- * bar makes the count directly countable at a glance instead of requiring a
- * height comparison. Zero-count weeks keep a faint track so an empty week
- * reads as "no visits", not "no data".
+ * Sessions per week as a Vico column chart, one slot per week on the fixed
+ * weekly time axis.
  */
 @Composable
 private fun WeeklyVisitBars(points: List<SparkPoint>, modifier: Modifier = Modifier) {
     val barColor = MaterialTheme.colorScheme.primary
-    val trackColor = MaterialTheme.colorScheme.surfaceVariant
-    Canvas(modifier) {
-        val maxCount = points.maxOf { it.value }.coerceAtLeast(1.0).toInt()
-        val slot = size.width / points.size
-        val gap = 2.dp.toPx()
-        val barWidth = (slot - gap).coerceAtLeast(1f)
-        val corner = CornerRadius(2.dp.toPx())
-        val segmentGap = 2.dp.toPx()
-        val segmentHeight = (size.height - (maxCount - 1) * segmentGap) / maxCount
-        points.forEachIndexed { i, p ->
-            val left = i * slot + gap / 2
-            val trackHeight = 2.dp.toPx()
-            drawRoundRect(
-                trackColor,
-                topLeft = Offset(left, size.height - trackHeight),
-                size = Size(barWidth, trackHeight),
-                cornerRadius = corner,
-            )
-            val count = p.value.toInt()
-            for (segment in 0 until count) {
-                val top = size.height - (segment + 1) * segmentHeight - segment * segmentGap
-                drawRoundRect(
-                    barColor,
-                    topLeft = Offset(left, top),
-                    size = Size(barWidth, segmentHeight),
-                    cornerRadius = corner,
-                )
+    val modelProducer = remember { CartesianChartModelProducer() }
+    LaunchedEffect(points) {
+        modelProducer.runTransaction {
+            columnSeries {
+                series(x = points.map { it.epochDay.toDouble() }, y = points.map { it.value })
             }
         }
     }
+
+    val chart = rememberCartesianChart(
+        rememberColumnCartesianLayer(
+            columnProvider = ColumnCartesianLayer.ColumnProvider.series(
+                rememberLineComponent(
+                    fill = Fill(barColor),
+                    thickness = 14.dp,
+                    shape = RoundedCornerShape(4.dp),
+                ),
+            ),
+            rangeProvider = remember { CartesianLayerRangeProvider.fixed(minY = 0.0) },
+        ),
+        getXStep = { _, _, _ -> HistoryWindow.WEEK_DAYS.toDouble() },
+    )
+
+    CartesianChartHost(
+        chart = chart,
+        modelProducer = modelProducer,
+        modifier = modifier,
+        scrollState = rememberVicoScrollState(scrollEnabled = false),
+    )
 }
 
 

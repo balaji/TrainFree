@@ -181,7 +181,11 @@ data class WorkoutSessionUiState(
         restTimer?.let { it.exerciseId == exerciseId && it.setIndex == setIndex } == true
 
     internal fun removeSetAt(exerciseIndex: Int, setIndex: Int): WorkoutSessionUiState {
-        val targetExId = exercises.getOrNull(exerciseIndex)?.id
+        val exercise = exercises.getOrNull(exerciseIndex) ?: return this
+        if (setIndex !in exercise.sets.indices) return this
+        if (exercise.sets.size <= 1) return removeExerciseAt(exerciseIndex)
+
+        val targetExId = exercise.id
         val nextTimer = restTimer?.let { timer ->
             if (timer.exerciseId != targetExId) {
                 timer

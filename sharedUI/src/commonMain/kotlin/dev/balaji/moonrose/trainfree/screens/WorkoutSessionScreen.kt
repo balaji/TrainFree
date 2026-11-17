@@ -112,6 +112,9 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
+import dev.balaji.moonrose.trainfree.navigation.ExerciseDetailRoute
 import dev.balaji.moonrose.trainfree.db.BarbellKeyboardState
 import dev.balaji.moonrose.trainfree.db.DraftSessionExercise
 import dev.balaji.moonrose.trainfree.db.DraftSessionSet
@@ -440,6 +443,7 @@ private fun WorkoutSessionBody(
     val scope = rememberCoroutineScope()
     var showPicker by remember { mutableStateOf(false) }
     var showRoutinePicker by remember { mutableStateOf(false) }
+    var selectedExerciseRoute by remember { mutableStateOf<ExerciseDetailRoute?>(null) }
     val pickerSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val routineSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val reorder = remember { SessionReorderState() }
@@ -528,6 +532,15 @@ private fun WorkoutSessionBody(
                             // A focused text field brings up the system IME;
                             // never stack it under the plate panel.
                             onFieldFocused = { plateKeyboard.close() },
+                            onOpenExercise = {
+                                focusManager.clearFocus()
+                                keyboardController?.hide()
+                                plateKeyboard.close()
+                                selectedExerciseRoute = ExerciseDetailRoute(
+                                    exerciseId = exercise.exercise.id,
+                                    title = exercise.exercise.name,
+                                )
+                            },
                             onAddSet = { formState.addSet(exIndex) },
                             onRemoveSet = { setIdx -> formState.removeSet(exIndex, setIdx) },
                             onUpdateWeight = { setIdx, v -> formState.updateActualWeight(exIndex, setIdx, v) },
@@ -651,6 +664,20 @@ private fun WorkoutSessionBody(
                     scope.launch { routineSheetState.hide() }.invokeOnCompletion { showRoutinePicker = false }
                 },
             )
+        }
+    }
+
+    selectedExerciseRoute?.let { detailRoute ->
+        Dialog(
+            onDismissRequest = { selectedExerciseRoute = null },
+            properties = DialogProperties(usePlatformDefaultWidth = false),
+        ) {
+            Surface(modifier = Modifier.fillMaxSize()) {
+                ExerciseDetailScreen(
+                    route = detailRoute,
+                    onGoBack = { selectedExerciseRoute = null },
+                )
+            }
         }
     }
 }
@@ -835,6 +862,7 @@ private fun SessionExerciseCard(
     restTimerDurationSeconds: Int,
     onOpenPlateKeypad: (Int, String) -> Unit,
     onFieldFocused: () -> Unit,
+    onOpenExercise: () -> Unit,
     onAddSet: () -> Unit,
     onRemoveSet: (Int) -> Unit,
     onUpdateWeight: (Int, String) -> Unit,
@@ -875,7 +903,10 @@ private fun SessionExerciseCard(
                 text = exercise.exercise.name,
                 style = MaterialTheme.typography.titleMedium,
                 color = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.weight(1f),
+                modifier = Modifier
+                    .weight(1f)
+                    .clickable(onClick = onOpenExercise)
+                    .padding(vertical = 8.dp),
             )
             Box {
                 IconButton(onClick = { showMenu = true }) {
@@ -958,7 +989,6 @@ private fun SessionExerciseCard(
                 workingSetNumber = exercise.workingSetNumber(setIdx),
                 previous = exercise.previousSet(setIdx),
                 isLiveSession = isLiveSession,
-                canDelete = exercise.sets.size > 1,
                 canComplete = exercise.isSetReadyToComplete(setIdx),
                 usesPlateKeypad = exercise.usesPlateKeyboard,
                 plateKeypadActive = plateKeypadSetIndex == setIdx,
@@ -1009,7 +1039,6 @@ private fun SessionSetRow(
     workingSetNumber: Int,
     previous: String?,
     isLiveSession: Boolean,
-    canDelete: Boolean,
     canComplete: Boolean,
     usesPlateKeypad: Boolean,
     plateKeypadActive: Boolean,
@@ -1118,7 +1147,7 @@ private fun SessionSetRow(
             modifier = Modifier
                 .fillMaxWidth()
                 .offset { IntOffset(swipeState.requireOffset().roundToInt(), 0) }
-                .then(if (canDelete) Modifier.anchoredDraggable(swipeState, Orientation.Horizontal) else Modifier)
+                .anchoredDraggable(swipeState, Orientation.Horizontal)
                 .graphicsLayer {
                     scaleX = popScale.value
                     scaleY = popScale.value

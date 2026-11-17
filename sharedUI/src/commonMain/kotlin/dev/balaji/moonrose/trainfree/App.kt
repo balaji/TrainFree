@@ -24,6 +24,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExtendedFloatingActionButton
@@ -298,7 +299,7 @@ private fun MainTabs() {
                 .consumeWindowInsets(padding),
         ) {
             CompositionLocalProvider(
-                LocalBottomFabPadding provides if (!sessionScreenVisible && !showWorkouts) 72.dp else 0.dp,
+                LocalBottomFabPadding provides if (!sessionScreenVisible && !showWorkouts) 78.dp else 0.dp,
             ) {
                 ScreenContent(
                     route = stack.current,
@@ -675,11 +676,17 @@ private fun WorkoutFloatingMenu(
                 )
             }
         }
-        FloatingActionButton(onClick = onToggle) {
+        FloatingActionButton(
+            onClick = onToggle,
+            modifier = Modifier.size(61.6.dp),
+            containerColor = MaterialTheme.colorScheme.primary,
+            contentColor = MaterialTheme.colorScheme.onPrimary,
+        ) {
             AnimatedContent(targetState = expanded) { isExpanded ->
                 Icon(
                     imageVector = if (isExpanded) Icons.Filled.Close else Icons.AutoMirrored.Filled.Assignment,
                     contentDescription = stringResource(if (isExpanded) Res.string.close else Res.string.tab_workouts),
+                    modifier = Modifier.size(26.4.dp),
                 )
             }
         }
