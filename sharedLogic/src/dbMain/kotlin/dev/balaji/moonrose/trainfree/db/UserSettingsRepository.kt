@@ -20,6 +20,9 @@ internal const val SETTING_WEEK_START = "week_start"
 internal const val SETTING_APPEARANCE = "appearance"
 internal const val SETTING_WEIGHT_UNIT = "weight_unit"
 internal const val SETTING_NOTIFICATIONS_ENABLED = "notifications_enabled"
+internal const val SETTING_HEALTH_SYNC_WORKOUTS = "health_sync_workouts"
+internal const val SETTING_HEALTH_SYNC_WEIGHT = "health_sync_weight"
+internal const val SETTING_HEALTH_LAST_WEIGHT_SYNC = "health_last_weight_sync_at"
 internal const val SETTING_REST_TIMER_DURATION = "rest_timer_duration_seconds"
 internal const val SETTING_REST_TIMER_SOUND = "rest_timer_sound"
 internal const val SETTING_APP_FONT = "app_font"
@@ -51,6 +54,18 @@ object UserSettingsRepository {
 
     suspend fun setNotificationsEnabled(enabled: Boolean) =
         set(SETTING_NOTIFICATIONS_ENABLED, enabled.toString())
+
+    suspend fun setHealthSyncWorkouts(enabled: Boolean) =
+        set(SETTING_HEALTH_SYNC_WORKOUTS, enabled.toString())
+
+    suspend fun setHealthSyncWeight(enabled: Boolean) =
+        set(SETTING_HEALTH_SYNC_WEIGHT, enabled.toString())
+
+    suspend fun lastHealthWeightSyncAt(): Long? =
+        AppDb.db.userSettingDao().find(SETTING_HEALTH_LAST_WEIGHT_SYNC)?.value?.toLongOrNull()
+
+    suspend fun setLastHealthWeightSyncAt(millis: Long) =
+        set(SETTING_HEALTH_LAST_WEIGHT_SYNC, millis.toString())
 
     suspend fun setRestTimerDurationSeconds(seconds: Int) =
         set(SETTING_REST_TIMER_DURATION, clampRestTimerSeconds(seconds).toString())
@@ -113,6 +128,8 @@ internal fun List<UserSettingEntity>.toUserSettings(): UserSettings {
         bmiFormula = BmiFormula.fromValue(byKey[SETTING_BMI_FORMULA]),
         bmiClassification = BmiClassification.fromValue(byKey[SETTING_BMI_CLASSIFICATION]),
         notificationsEnabled = byKey[SETTING_NOTIFICATIONS_ENABLED].toBoolean(),
+        healthSyncWorkouts = byKey[SETTING_HEALTH_SYNC_WORKOUTS].toBoolean(),
+        healthSyncWeight = byKey[SETTING_HEALTH_SYNC_WEIGHT].toBoolean(),
         restTimerDurationSeconds = byKey[SETTING_REST_TIMER_DURATION]?.toIntOrNull()
             ?.let(::clampRestTimerSeconds)
             ?: DEFAULT_REST_TIMER_SECONDS,

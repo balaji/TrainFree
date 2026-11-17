@@ -61,12 +61,24 @@ internal val MIGRATION_19_20 = object : Migration(19, 20) {
     }
 }
 
+internal val MIGRATION_20_21 = object : Migration(20, 21) {
+    override fun migrate(connection: SQLiteConnection) {
+        connection.execSQL(
+            "ALTER TABLE `body_metrics` ADD COLUMN `external_id` TEXT",
+        )
+        connection.execSQL(
+            "CREATE UNIQUE INDEX IF NOT EXISTS `index_body_metrics_external_id` " +
+                "ON `body_metrics` (`external_id`)",
+        )
+    }
+}
+
 fun createDatabase(): AppDatabase =
     databaseBuilder()
         .setDriver(BundledSQLiteDriver())
         .setQueryCoroutineContext(Dispatchers.IO)
         .addCallback(ExerciseSeedCallback)
-        .addMigrations(MIGRATION_17_18, MIGRATION_18_19, MIGRATION_19_20)
+        .addMigrations(MIGRATION_17_18, MIGRATION_18_19, MIGRATION_19_20, MIGRATION_20_21)
         // Pre-release safety net for schema history older than v17.
         .fallbackToDestructiveMigration(dropAllTables = true)
         .build()

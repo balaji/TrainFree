@@ -52,6 +52,7 @@ object BodyMetricsRepository {
         AppDb.db.bodyMetricDao().latest(PROFILE_ID)?.let {
             AppDb.db.profileDao().updateWeight(it.weightUnit.toKilograms(it.weight), now)
         }
+        HealthSyncManager.onBodyWeightLogged(id, weight, unit, loggedAt)
         return id
     }
 

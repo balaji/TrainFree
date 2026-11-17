@@ -242,6 +242,17 @@ enum L10n {
     static let notificationsDeniedTitle = String(localized: "notifications_denied_title", defaultValue: "Notifications are off")
     static let notificationsDeniedMessage = String(localized: "notifications_denied_message", defaultValue: "Train Free is not allowed to send notifications. Allow notifications for Train Free in system settings to turn this on.")
     static let openSettings = String(localized: "open_settings", defaultValue: "Open settings")
+    static let healthSyncSection = String(localized: "health_sync_section", defaultValue: "Apple Health")
+    static let healthSyncWorkouts = String(localized: "health_sync_workouts", defaultValue: "Sync completed workouts")
+    static let healthSyncWeight = String(localized: "health_sync_weight", defaultValue: "Sync body weight (two-way)")
+    static let healthSyncWeightNow = String(localized: "health_sync_weight_now", defaultValue: "Sync weight now")
+    static let healthSyncWeightSyncing = String(localized: "health_sync_weight_syncing", defaultValue: "Syncing…")
+    static func healthSyncWeightImported(_ count: Int) -> String {
+        String(localized: "health_sync_weight_imported", defaultValue: "\(count) weight entries imported")
+    }
+    static let healthSyncWeightUpToDate = String(localized: "health_sync_weight_up_to_date", defaultValue: "Body weight is up to date")
+    static let healthSyncDeniedTitle = String(localized: "health_sync_denied_title", defaultValue: "Health access needed")
+    static let healthSyncDeniedMessage = String(localized: "health_sync_denied_message", defaultValue: "Allow Train Free to access Health data in system settings to enable sync.")
     static let weekStartsOn = String(localized: "week_starts_on", defaultValue: "Week starts on")
     static let appearance = String(localized: "appearance", defaultValue: "Appearance")
     static let weightUnits = String(localized: "weight_units", defaultValue: "Weight units")

@@ -12,7 +12,11 @@ struct iOSApp: App {
                 .observeSystemColorScheme($systemColorScheme)
                 .preferredColorScheme(preferredScheme)
                 .task {
+                    HealthSyncManager.shared.register(provider: IosHealthSyncProvider.shared)
                     seedTestDataIfRequested()
+                    Task {
+                        _ = try? await HealthSyncManager.shared.syncBodyWeightsFromHealth(lookbackDays: 90)
+                    }
                     for await settings in UserSettingsRepository.shared.settings {
                         appearance = settings.appearance
                     }

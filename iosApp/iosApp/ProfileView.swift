@@ -1,5 +1,6 @@
 import SwiftUI
 import SharedUI
+import HealthKit
 import UserNotifications
 
 /// Native SwiftUI replacement for the Compose `ProfileScreen`: shows the
@@ -17,6 +18,9 @@ struct ProfileView: View {
     @State private var showOneRmCalculator = false
     @State private var showBmiCalculator = false
     @State private var showNotificationsDeniedAlert = false
+    @State private var showHealthDeniedAlert = false
+    @State private var syncingHealthWeight = false
+    @State private var healthSyncImportedCount: Int?
     @State private var backupController = BackupTransferController()
 
     var body: some View {
@@ -141,6 +145,50 @@ struct ProfileView: View {
                                 }))
                             }
                         }
+                        if HKHealthStore.isHealthDataAvailable(), let settings {
+                            Section(L10n.healthSyncSection) {
+                                Toggle(L10n.healthSyncWorkouts, isOn: settingBinding(settings.healthSyncWorkouts, save: { enabled in
+                                    var granted = false
+                                    if enabled {
+                                        granted = await IosHealthSyncProvider.shared.requestWorkoutAuthorization()
+                                        if !granted { showHealthDeniedAlert = true }
+                                    }
+                                    try await UserSettingsRepository.shared.setHealthSyncWorkouts(enabled: granted)
+                                }))
+                                Toggle(L10n.healthSyncWeight, isOn: settingBinding(settings.healthSyncWeight, save: { enabled in
+                                    var granted = false
+                                    if enabled {
+                                        granted = await IosHealthSyncProvider.shared.requestWeightAuthorization()
+                                        if !granted { showHealthDeniedAlert = true }
+                                    } else {
+                                        healthSyncImportedCount = nil
+                                    }
+                                    try await UserSettingsRepository.shared.setHealthSyncWeight(enabled: granted)
+                                    if granted {
+                                        syncingHealthWeight = true
+                                        defer { syncingHealthWeight = false }
+                                        let count = (try? await HealthSyncManager.shared.syncBodyWeightsFromHealth(lookbackDays: 90))?.intValue ?? 0
+                                        healthSyncImportedCount = count
+                                    }
+                                }))
+                                if settings.healthSyncWeight {
+                                    Button(syncingHealthWeight ? L10n.healthSyncWeightSyncing : L10n.healthSyncWeightNow) {
+                                        Task {
+                                            syncingHealthWeight = true
+                                            defer { syncingHealthWeight = false }
+                                            let count = (try? await HealthSyncManager.shared.syncBodyWeightsFromHealth(lookbackDays: 90))?.intValue ?? 0
+                                            healthSyncImportedCount = count
+                                        }
+                                    }
+                                    .disabled(syncingHealthWeight)
+                                    if let count = healthSyncImportedCount {
+                                        Text(count > 0 ? L10n.healthSyncWeightImported(count) : L10n.healthSyncWeightUpToDate)
+                                            .font(.footnote)
+                                            .foregroundStyle(.secondary)
+                                    }
+                                }
+                            }
+                        }
                         Section(L10n.backupSection) {
                             Button(backupController.uiState.working && backupController.uiState.pendingImport == nil ? L10n.exporting : L10n.exportBackup) {
                                 backupController.startExport()
@@ -172,6 +220,16 @@ struct ProfileView: View {
                         Button(L10n.cancel, role: .cancel) {}
                     } message: {
                         Text(L10n.notificationsDeniedMessage)
+                    }
+                    .alert(L10n.healthSyncDeniedTitle, isPresented: $showHealthDeniedAlert) {
+                        Button(L10n.openSettings) {
+                            if let url = URL(string: UIApplication.openSettingsURLString) {
+                                UIApplication.shared.open(url)
+                            }
+                        }
+                        Button(L10n.cancel, role: .cancel) {}
+                    } message: {
+                        Text(L10n.healthSyncDeniedMessage)
                     }
                     .alert(L10n.generateTestDataTitle, isPresented: $showGenerateAlert) {
                         TextField(L10n.daysOfHistory, text: $generateDaysText)

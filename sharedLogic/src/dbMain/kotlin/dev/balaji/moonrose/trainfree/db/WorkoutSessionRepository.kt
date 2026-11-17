@@ -258,6 +258,7 @@ object WorkoutSessionRepository {
         }.map { it.id }
         if (emptyIds.isNotEmpty()) AppDb.db.workoutSessionDetailDao().deleteByIds(emptyIds)
         AppDb.db.workoutSessionDao().setCompletedAt(sessionId, now, now)
+        HealthSyncManager.onWorkoutFinished(sessionId)
     }
 
     /** Cascades to `workout_session_details` via the FK. */

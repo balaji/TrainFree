@@ -40,6 +40,7 @@ kotlin {
         androidMain.dependencies {
             implementation(libs.compose.uiToolingPreview)
             implementation(libs.androidx.activity.compose)
+            implementation(libs.androidx.health.connect)
         }
         commonMain.dependencies {
             api(projects.sharedLogic)
