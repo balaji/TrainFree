@@ -3,6 +3,7 @@ package dev.balaji.moonrose.trainfree
 import dev.balaji.moonrose.trainfree.screens.formatCountdown
 import dev.balaji.moonrose.trainfree.screens.formatMonthDay
 import dev.balaji.moonrose.trainfree.screens.formatMonthYear
+import dev.balaji.moonrose.trainfree.screens.progressionYAxisBounds
 import dev.balaji.moonrose.trainfree.screens.remainingSecondsUntil
 import dev.balaji.moonrose.trainfree.screens.yAxisBounds
 import kotlin.test.Test
@@ -50,5 +51,13 @@ class SharedUICommonTest {
         val (lo, hi) = yAxisBounds(5.6, 7.2)
         assertTrue(lo <= 5.6 && hi >= 7.2 && hi - lo >= 2.0)
         assertEquals(80.0 to 120.0, yAxisBounds(80.0, 120.0))
+    }
+
+    @Test
+    fun progressionYAxisBoundsSupportsNegativePctChangeRanges() {
+        assertEquals(-6.0 to -4.0, progressionYAxisBounds(-5.0, -5.0))
+        val (lo, hi) = progressionYAxisBounds(-1.2, 0.3)
+        assertTrue(lo <= -1.2 && hi >= 0.3 && hi - lo >= 2.0)
+        assertEquals(-15.0 to 20.0, progressionYAxisBounds(-15.0, 20.0))
     }
 }

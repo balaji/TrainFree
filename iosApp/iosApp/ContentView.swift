@@ -357,10 +357,11 @@ private struct FloatingWorkoutMenuOverlay: View {
                         } label: {
                             Image(systemName: isExpanded ? "xmark" : "list.clipboard")
                                 .font(.title2.weight(.semibold))
+                                .scaleEffect(1.1)
                                 .foregroundStyle(.white)
                                 .contentTransition(.symbolEffect(.replace))
-                                .frame(width: 56, height: 56)
-                                .glassEffect(.regular.tint(.accentColor).interactive(), in: .circle)
+                                .frame(width: 61.6, height: 61.6)
+                                .glassEffect(.regular.tint(.blue).interactive(), in: .circle)
                                 .shadow(color: .black.opacity(0.18), radius: 8, y: 4)
                         }
                         .buttonStyle(.plain)

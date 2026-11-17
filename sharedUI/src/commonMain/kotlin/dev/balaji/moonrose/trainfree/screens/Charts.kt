@@ -6,24 +6,46 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.RoundRect
 import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.graphics.drawscope.clipPath
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.text.drawText
-import androidx.compose.ui.text.rememberTextMeasurer
+import androidx.compose.ui.graphics.drawscope.clipPath
 import androidx.compose.ui.unit.dp
+import com.patrykandpatrick.vico.compose.cartesian.CartesianChartHost
+import com.patrykandpatrick.vico.compose.cartesian.axis.HorizontalAxis
+import com.patrykandpatrick.vico.compose.cartesian.axis.VerticalAxis
+import com.patrykandpatrick.vico.compose.cartesian.axis.rememberAxisGuidelineComponent
+import com.patrykandpatrick.vico.compose.cartesian.axis.rememberAxisLabelComponent
+import com.patrykandpatrick.vico.compose.cartesian.axis.rememberAxisLineComponent
+import com.patrykandpatrick.vico.compose.cartesian.axis.rememberAxisTickComponent
+import com.patrykandpatrick.vico.compose.cartesian.data.CartesianChartModelProducer
+import com.patrykandpatrick.vico.compose.cartesian.data.CartesianLayerRangeProvider
+import com.patrykandpatrick.vico.compose.cartesian.data.CartesianValueFormatter
+import com.patrykandpatrick.vico.compose.cartesian.data.lineSeries
+import com.patrykandpatrick.vico.compose.cartesian.layer.LineCartesianLayer
+import com.patrykandpatrick.vico.compose.cartesian.layer.rememberLine
+import com.patrykandpatrick.vico.compose.cartesian.layer.rememberLineCartesianLayer
+import com.patrykandpatrick.vico.compose.cartesian.rememberCartesianChart
+import com.patrykandpatrick.vico.compose.cartesian.rememberVicoScrollState
+import com.patrykandpatrick.vico.compose.common.Fill
+import com.patrykandpatrick.vico.compose.common.data.ExtraStore
 import dev.balaji.moonrose.trainfree.calendar.WeekMath
 import dev.balaji.moonrose.trainfree.insights.BmiCategory
 import dev.balaji.moonrose.trainfree.insights.BmiClassification
+import dev.balaji.moonrose.trainfree.insights.HistoryWindow
 import dev.balaji.moonrose.trainfree.insights.InsightMath
 import dev.balaji.moonrose.trainfree.insights.SparkPoint
 import dev.balaji.moonrose.trainfree.insights.SparkSeries
+import kotlin.math.ceil
+import kotlin.math.floor
+import kotlin.math.round
 
 // Categorical palette for series lines and the body-part pie, in a fixed
 // CVD-safe order with a separate step set per color mode.
@@ -43,10 +65,47 @@ internal fun seriesColor(index: Int): Color {
     return palette[index % palette.size]
 }
 
+private val ProgressionLabelSpacingKey = ExtraStore.Key<Int>()
+private val ProgressionLabelOffsetKey = ExtraStore.Key<Int>()
+private val ProgressionShowYearKey = ExtraStore.Key<Boolean>()
+private val ProgressionShowPctChangeKey = ExtraStore.Key<Boolean>()
+
 /**
- * Overlaid line chart for 1–3 series sharing one x/y domain, with min/max
- * y-axis labels so the %-change toggle has a visible effect. In %-change
- * mode every series is re-based to percent moved since its first week.
+ * Ensures at least a 2-unit span on integer boundaries, allowing negative bounds
+ * when %-change mode drops below zero.
+ */
+internal fun progressionYAxisBounds(minY: Double, maxY: Double): Pair<Double, Double> {
+    if (maxY - minY >= 2.0) return minY to maxY
+    if (minY >= 0.0) return yAxisBounds(minY, maxY)
+    val center = round((minY + maxY) / 2.0)
+    if (center - 1.0 <= minY && center + 1.0 >= maxY) {
+        return (center - 1.0) to (center + 1.0)
+    }
+    val lo = floor(minY)
+    val hi = maxOf(ceil(maxY), lo + 2.0)
+    return lo to hi
+}
+
+private val ProgressionYRangeProvider = object : CartesianLayerRangeProvider {
+    override fun getMinY(minY: Double, maxY: Double, extraStore: ExtraStore) =
+        progressionYAxisBounds(minY, maxY).first
+
+    override fun getMaxY(minY: Double, maxY: Double, extraStore: ExtraStore) =
+        progressionYAxisBounds(minY, maxY).second
+}
+
+private val SparklineYRangeProvider = object : CartesianLayerRangeProvider {
+    override fun getMinY(minY: Double, maxY: Double, extraStore: ExtraStore) =
+        yAxisBounds(minY, maxY).first
+
+    override fun getMaxY(minY: Double, maxY: Double, extraStore: ExtraStore) =
+        yAxisBounds(minY, maxY).second
+}
+
+/**
+ * Overlaid Vico line chart for 1–3 series sharing one x/y domain, with y-axis
+ * labels and weekly date ticks. In %-change mode every series is re-based to
+ * percent moved since its first week.
  */
 @Composable
 internal fun ProgressionChart(
@@ -54,54 +113,103 @@ internal fun ProgressionChart(
     showPctChange: Boolean,
     modifier: Modifier = Modifier,
 ) {
-    val colors = series.indices.map { seriesColor(it) }
-    val labelStyle = MaterialTheme.typography.labelSmall
-        .copy(color = MaterialTheme.colorScheme.onSurfaceVariant)
-    val textMeasurer = rememberTextMeasurer()
-    val lines = series.map { s ->
-        if (showPctChange) {
+    val lines = series.mapIndexedNotNull { index, s ->
+        if (s.points.size < 2) return@mapIndexedNotNull null
+        val pts = if (showPctChange) {
             val base = s.points.first().value
             s.points.map { SparkPoint(it.epochDay, if (base == 0.0) 0.0 else (it.value / base - 1) * 100) }
         } else {
             s.points
         }
+        index to pts
     }
-    Canvas(modifier) {
-        val all = lines.flatten()
-        val minX = all.minOf { it.epochDay }
-        val maxX = all.maxOf { it.epochDay }
-        val minY = all.minOf { it.value }
-        val maxY = all.maxOf { it.value }
-        val spanX = (maxX - minX).coerceAtLeast(1).toFloat()
-        val spanY = (maxY - minY).toFloat().coerceAtLeast(1e-3f)
+    if (lines.isEmpty()) return
 
-        fun label(value: Double) =
-            if (showPctChange) "${InsightMath.formatNumber(value, 0)}%" else InsightMath.formatNumber(value, 0)
-        val maxLabel = textMeasurer.measure(label(maxY), labelStyle)
-        val minLabel = textMeasurer.measure(label(minY), labelStyle)
-        val chartLeft = maxOf(maxLabel.size.width, minLabel.size.width) + 6.dp.toPx()
-        val chartWidth = (size.width - chartLeft).coerceAtLeast(1f)
+    val allPoints = lines.flatMap { it.second }
+    val minX = allPoints.minOf { it.epochDay }
+    val maxX = allPoints.maxOf { it.epochDay }
+    val weekSpan = ((maxX - minX) / HistoryWindow.WEEK_DAYS).toInt().coerceAtLeast(0)
+    val labelSpacing = HistoryWindow.labelSpacingWeeks(weekSpan)
+    val labelOffset = weekSpan % labelSpacing
+    val showYear = HistoryWindow.spansYears(
+        listOf(SparkPoint(minX, 0.0), SparkPoint(maxX, 0.0)),
+    )
 
-        drawText(maxLabel, topLeft = Offset(0f, 0f))
-        drawText(minLabel, topLeft = Offset(0f, size.height - minLabel.size.height))
+    val axisColor = MaterialTheme.colorScheme.outlineVariant
+    val labelStyle = MaterialTheme.typography.labelSmall.copy(
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
+    val months = (1..12).map { monthAbbreviation(it) }
+    val lineComponents = lines.map { (colorIndex, _) ->
+        LineCartesianLayer.rememberLine(
+            LineCartesianLayer.LineFill.single(Fill(seriesColor(colorIndex))),
+        )
+    }
 
-        lines.forEachIndexed { seriesIndex, points ->
-            if (points.size < 2) return@forEachIndexed
-            val color = colors[seriesIndex]
-            val path = Path()
-            points.forEachIndexed { i, p ->
-                val x = chartLeft + (p.epochDay - minX) / spanX * chartWidth
-                val y = size.height - (p.value - minY).toFloat() / spanY * size.height
-                if (i == 0) path.moveTo(x, y) else path.lineTo(x, y)
+    val modelProducer = remember { CartesianChartModelProducer() }
+    LaunchedEffect(lines, showPctChange, labelSpacing, labelOffset, showYear) {
+        modelProducer.runTransaction {
+            lineSeries {
+                lines.forEach { (_, pts) ->
+                    series(x = pts.map { it.epochDay.toDouble() }, y = pts.map { it.value })
+                }
             }
-            drawPath(path, color, style = Stroke(width = 2.dp.toPx()))
-            points.last().let { p ->
-                val x = chartLeft + (p.epochDay - minX) / spanX * chartWidth
-                val y = size.height - (p.value - minY).toFloat() / spanY * size.height
-                drawCircle(color, radius = 3.dp.toPx(), center = Offset(x, y))
+            extras {
+                it[ProgressionLabelSpacingKey] = labelSpacing
+                it[ProgressionLabelOffsetKey] = labelOffset
+                it[ProgressionShowYearKey] = showYear
+                it[ProgressionShowPctChangeKey] = showPctChange
             }
         }
     }
+
+    val chart = rememberCartesianChart(
+        rememberLineCartesianLayer(
+            lineProvider = LineCartesianLayer.LineProvider.series(lineComponents),
+            rangeProvider = ProgressionYRangeProvider,
+        ),
+        startAxis = VerticalAxis.rememberStart(
+            line = null,
+            tick = null,
+            label = rememberAxisLabelComponent(style = labelStyle),
+            guideline = rememberAxisGuidelineComponent(fill = Fill(axisColor)),
+            valueFormatter = remember {
+                CartesianValueFormatter { context, value, _ ->
+                    val pct = context.model.extraStore.getOrNull(ProgressionShowPctChangeKey) == true
+                    val formatted = InsightMath.formatNumber(value, 0)
+                    if (pct) "$formatted%" else formatted
+                }
+            },
+            itemPlacer = remember { VerticalAxis.ItemPlacer.count(count = { 3 }) },
+        ),
+        bottomAxis = HorizontalAxis.rememberBottom(
+            line = rememberAxisLineComponent(fill = Fill(axisColor)),
+            tick = rememberAxisTickComponent(fill = Fill(axisColor)),
+            label = rememberAxisLabelComponent(style = labelStyle),
+            guideline = null,
+            valueFormatter = remember(months) {
+                CartesianValueFormatter { context, value, _ ->
+                    val useYear = context.model.extraStore.getOrNull(ProgressionShowYearKey) == true
+                    if (useYear) formatMonthYear(value.toLong(), months) else formatMonthDay(value.toLong(), months)
+                }
+            },
+            itemPlacer = remember {
+                HorizontalAxis.ItemPlacer.aligned(
+                    spacing = { (it.getOrNull(ProgressionLabelSpacingKey) ?: 1).coerceAtLeast(1) },
+                    offset = { (it.getOrNull(ProgressionLabelOffsetKey) ?: 0).coerceAtLeast(0) },
+                    addExtremeLabelPadding = false,
+                )
+            },
+        ),
+        getXStep = { _, _, _ -> HistoryWindow.WEEK_DAYS.toDouble() },
+    )
+
+    CartesianChartHost(
+        chart = chart,
+        modelProducer = modelProducer,
+        modifier = modifier,
+        scrollState = rememberVicoScrollState(scrollEnabled = false),
+    )
 }
 
 private val MonthAbbrev = listOf("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")
@@ -120,27 +228,42 @@ internal fun formatMonthYear(epochDay: Long, months: List<String> = MonthAbbrev)
 
 @Composable
 internal fun Sparkline(points: List<SparkPoint>, modifier: Modifier = Modifier) {
-    val color = MaterialTheme.colorScheme.primary
-    Canvas(modifier) {
-        val minX = points.minOf { it.epochDay }
-        val maxX = points.maxOf { it.epochDay }
-        val minY = points.minOf { it.value }
-        val maxY = points.maxOf { it.value }
-        val spanX = (maxX - minX).coerceAtLeast(1).toFloat()
-        val spanY = (maxY - minY).toFloat().coerceAtLeast(1e-3f)
-        val path = Path()
-        points.forEachIndexed { i, p ->
-            val x = (p.epochDay - minX) / spanX * size.width
-            val y = size.height - (p.value - minY).toFloat() / spanY * size.height
-            if (i == 0) path.moveTo(x, y) else path.lineTo(x, y)
-        }
-        drawPath(path, color, style = Stroke(width = 2.dp.toPx()))
-        points.lastOrNull()?.let { p ->
-            val x = (p.epochDay - minX) / spanX * size.width
-            val y = size.height - (p.value - minY).toFloat() / spanY * size.height
-            drawCircle(color, radius = 3.dp.toPx(), center = Offset(x, y))
+    // Vico's lineSeries expects strictly increasing x-values; deduplicate by epochDay
+    // in case multiple entries (e.g. body weight) were logged on the same day.
+    val ordered = remember(points) {
+        points.groupBy { it.epochDay }
+            .entries
+            .sortedBy { it.key }
+            .map { SparkPoint(it.key, it.value.last().value) }
+    }
+    if (ordered.size < 2) return
+
+    val lineColor = MaterialTheme.colorScheme.primary
+    val modelProducer = remember { CartesianChartModelProducer() }
+    LaunchedEffect(ordered) {
+        modelProducer.runTransaction {
+            lineSeries {
+                series(x = ordered.map { it.epochDay.toDouble() }, y = ordered.map { it.value })
+            }
         }
     }
+
+    val chart = rememberCartesianChart(
+        rememberLineCartesianLayer(
+            lineProvider = LineCartesianLayer.LineProvider.series(
+                LineCartesianLayer.rememberLine(LineCartesianLayer.LineFill.single(Fill(lineColor))),
+            ),
+            rangeProvider = SparklineYRangeProvider,
+        ),
+        getXStep = { _, _, _ -> 1.0 },
+    )
+
+    CartesianChartHost(
+        chart = chart,
+        modelProducer = modelProducer,
+        modifier = modifier,
+        scrollState = rememberVicoScrollState(scrollEnabled = false),
+    )
 }
 
 // Health-band palette for the BMI spectrum, sharing the categorical hues used

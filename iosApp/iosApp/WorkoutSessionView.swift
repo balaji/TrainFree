@@ -58,6 +58,7 @@ struct WorkoutSessionView: View {
         sessionTitle: nil
     )
     @State private var showExercisePicker = false
+    @State private var selectedExerciseId: Int64?
     @State private var showRoutinePicker = false
     @State private var showDiscardConfirm = false
     @State private var showDiscardChangesConfirm = false
@@ -228,6 +229,9 @@ struct WorkoutSessionView: View {
                 formState?.loadRoutine(routineId: routineId)
                 showRoutinePicker = false
             }
+        }
+        .navigationDestination(item: $selectedExerciseId) { exerciseId in
+            ExerciseDetailView(exerciseId: exerciseId)
         }
         .alert(L10n.discardWorkoutTitle, isPresented: $showDiscardConfirm) {
             Button(L10n.discard, role: .destructive) {
@@ -409,11 +413,18 @@ struct WorkoutSessionView: View {
                         )
                     } header: {
                         HStack {
-                            Text(exercise.exercise.name)
-                                .font(.headline)
-                                .foregroundStyle(Color.accentColor)
-                                .textCase(nil)
-                                .reorderHandle(
+                            Button {
+                                dismissKeyboard()
+                                activeRowID = nil
+                                selectedExerciseId = exercise.exercise.id
+                            } label: {
+                                Text(exercise.exercise.name)
+                                    .font(.headline)
+                                    .foregroundStyle(Color.accentColor)
+                                    .textCase(nil)
+                            }
+                            .buttonStyle(.plain)
+                            .reorderHandle(
                                     onStart: { startY in
                                         activeRowID = nil
                                         withAnimation(.easeOut(duration: 0.15)) {
@@ -517,8 +528,6 @@ private struct SessionExerciseSection: View {
     let onActivateRow: (Int) -> Void
     let onClearActiveRow: () -> Void
 
-    private var setsCount: Int { Int(exercise.sets.count) }
-
     /// Only normal sets take a number; warm-up and drop sets show a marker.
     private func workingSetNumber(_ setIdx: Int) -> Int {
         Int(exercise.workingSetNumber(setIndex: Int32(setIdx)))
@@ -607,14 +616,10 @@ private struct SessionExerciseSection: View {
                 .id(SessionSetRowID(exerciseId: exercise.id, setIndex: setIdx))
                 .listRowSeparator(.hidden)
                 .swipeActions(edge: .trailing, allowsFullSwipe: true) {
-                    // The last remaining set can't be deleted; delete the
-                    // exercise instead via its kebab menu.
-                    if setsCount > 1 {
-                        Button(role: .destructive) {
-                            formState.removeSet(exerciseIndex: Int32(exIndex), setIndex: Int32(setIdx))
-                        } label: {
-                            Label(L10n.delete, systemImage: "trash")
-                        }
+                    Button(role: .destructive) {
+                        formState.removeSet(exerciseIndex: Int32(exIndex), setIndex: Int32(setIdx))
+                    } label: {
+                        Label(L10n.delete, systemImage: "trash")
                     }
                 }
 

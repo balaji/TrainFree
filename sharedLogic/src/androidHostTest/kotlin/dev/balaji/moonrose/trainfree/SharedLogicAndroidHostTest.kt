@@ -131,6 +131,18 @@ class SharedLogicAndroidHostTest {
     }
 
     @Test
+    fun removingLastSetRemovesExerciseAndCancelsOwnedTimer() {
+        val state = initialState().toggleCompletedAt(exerciseIndex = 1, setIndex = 0, now = 1_000L)
+        assertEquals(2, state.exercises.size)
+        assertTrue(state.isRestTimerOn(exerciseId = 20L, setIndex = 0))
+
+        val after = state.removeSetAt(exerciseIndex = 1, setIndex = 0)
+        assertEquals(1, after.exercises.size)
+        assertEquals(10L, after.exercises[0].id)
+        assertNull(after.restTimer)
+    }
+
+    @Test
     fun removingExerciseCancelsTimerOnlyIfOwnedByThatExercise() {
         val state = initialState().toggleCompletedAt(exerciseIndex = 0, setIndex = 0, now = 1_000L)
 
