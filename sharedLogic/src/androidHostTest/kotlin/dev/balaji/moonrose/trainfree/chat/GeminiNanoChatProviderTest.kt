@@ -560,4 +560,34 @@ class GeminiNanoChatProviderTest {
         assertFalse(completed)
         assertFalse(errored)
     }
+
+    @Test
+    fun skipsToolDeclarationsWhenAllowToolsIsFalse() = runBlocking {
+        val toolbox = RecordingChatToolboxPort()
+        val client = FakeGeminiNanoClient(
+            features = listOf(Feature.SYSTEM_PROMPT, Feature.FUNCTION_CALLING),
+            streams = { flowOf(GeminiStreamChunk(text = "Keep your lats tight.")) },
+        )
+
+        val provider = GeminiNanoChatProvider(client, toolbox, Dispatchers.Unconfined)
+        assertTrue(provider.resolveAvailability())
+        assertTrue(provider.supportsToolCalling())
+
+        var completedText = ""
+        provider.generate(
+            request = ChatRequest(
+                instructions = "Form tips only.",
+                history = emptyList(),
+                userMessage = "Form tips for Barbell Bench Press",
+                allowTools = false,
+            ),
+            onPartial = {},
+            onComplete = { text, _ -> completedText = text },
+            onError = { _, _ -> },
+        )
+
+        assertEquals("Keep your lats tight.", completedText)
+        assertTrue(toolbox.calls.isEmpty())
+        assertTrue(client.requests.single().dynamicTools.orEmpty().isEmpty())
+    }
 }

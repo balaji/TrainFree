@@ -88,6 +88,23 @@ final class IosHealthSyncProvider: HealthSyncProvider {
         }
     }
 
+    func deleteStrengthWorkout(sessionId: Int64) async throws -> KotlinBoolean {
+        guard HKHealthStore.isHealthDataAvailable() else { return KotlinBoolean(bool: false) }
+        guard store.authorizationStatus(for: workoutType) == .sharingAuthorized else {
+            return KotlinBoolean(bool: false)
+        }
+        let predicate = HKQuery.predicateForObjects(
+            withMetadataKey: HKMetadataKeySyncIdentifier,
+            allowedValues: ["trainfree_session_\(sessionId)"]
+        )
+        do {
+            _ = try await store.deleteObjects(of: workoutType, predicate: predicate)
+            return KotlinBoolean(bool: true)
+        } catch {
+            return KotlinBoolean(bool: false)
+        }
+    }
+
     func writeBodyWeight(
         metricId: Int64,
         weightKg: Double,

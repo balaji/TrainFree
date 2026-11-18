@@ -12,6 +12,7 @@ struct JournalEditorView: View {
     @State private var previewMode = false
     @State private var showDiscardConfirm = false
     @State private var showDeleteConfirm = false
+    @State private var selectedWorkout: DaySession?
 
     init(epochDay: Int64) {
         self.epochDay = epochDay
@@ -34,6 +35,10 @@ struct JournalEditorView: View {
         } else {
             dismiss()
         }
+    }
+
+    private func dismissKeyboard() {
+        UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
     }
 
     private func applyFormat(_ transform: (String, Int32, Int32) -> MarkdownEditResult) {
@@ -73,6 +78,33 @@ struct JournalEditorView: View {
                         }
                         .padding(.horizontal)
                         .padding(.vertical, 8)
+
+                        if !uiState.workouts.isEmpty {
+                            ScrollView(.horizontal, showsIndicators: false) {
+                                HStack(spacing: 16) {
+                                    ForEach(uiState.workouts, id: \.id) { workout in
+                                        Button {
+                                            dismissKeyboard()
+                                            selectedWorkout = workout
+                                        } label: {
+                                            HStack(spacing: 4) {
+                                                Image(systemName: "dumbbell.fill")
+                                                    .font(.caption)
+                                                Text(workout.title)
+                                                    .font(.subheadline)
+                                                    .underline()
+                                                    .lineLimit(1)
+                                            }
+                                            .foregroundStyle(Color.accentColor)
+                                            .padding(.vertical, 4)
+                                        }
+                                        .buttonStyle(.plain)
+                                    }
+                                }
+                                .padding(.horizontal)
+                                .padding(.bottom, 8)
+                            }
+                        }
 
                         if !previewMode {
                             Divider()
@@ -170,7 +202,7 @@ struct JournalEditorView: View {
             }
             .navigationTitle(dayTitle)
             .navigationBarTitleDisplayMode(.inline)
-            .interactiveDismissDisabled(uiState.hasUnsavedChanges)
+            .interactiveDismissDisabled(uiState.hasUnsavedChanges || selectedWorkout != nil)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button(L10n.cancel) {
@@ -220,6 +252,87 @@ struct JournalEditorView: View {
                 }
             }
         }
+        .overlay {
+            ZStack {
+                if let selectedWorkout {
+                    Color.black.opacity(0.45)
+                        .ignoresSafeArea()
+                        .transition(.opacity)
+                        .onTapGesture {
+                            self.selectedWorkout = nil
+                        }
+
+                    WorkoutSetDetailsPopup(
+                        session: selectedWorkout,
+                        weightUnit: uiState.weightUnit,
+                        onDismiss: { self.selectedWorkout = nil }
+                    )
+                    .transition(.scale(scale: 0.94).combined(with: .opacity))
+                }
+            }
+            .animation(.spring(response: 0.28, dampingFraction: 0.86), value: selectedWorkout?.id)
+        }
+    }
+}
+
+private struct WorkoutSetDetailsPopup: View {
+    let session: DaySession
+    let weightUnit: WeightUnit
+    let onDismiss: () -> Void
+
+    @ViewBuilder
+    private var exerciseListContent: some View {
+        if session.exercises.isEmpty {
+            Text("—")
+                .font(.body)
+                .foregroundStyle(.secondary)
+                .frame(maxWidth: .infinity, alignment: .leading)
+        } else {
+            VStack(alignment: .leading, spacing: 10) {
+                ForEach(Array(session.exercises.enumerated()), id: \.offset) { index, exercise in
+                    if index > 0 {
+                        Divider()
+                    }
+                    ExerciseSummaryRow(exercise: exercise, weightUnit: weightUnit)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            Text(session.title)
+                .font(.headline)
+                .frame(maxWidth: .infinity, alignment: .leading)
+
+            ViewThatFits(in: .vertical) {
+                exerciseListContent
+                ScrollView {
+                    exerciseListContent
+                }
+            }
+            .frame(maxHeight: 380)
+
+            HStack {
+                Spacer()
+                Button(L10n.close, action: onDismiss)
+                    .fontWeight(.semibold)
+            }
+        }
+        .padding(20)
+        .frame(maxWidth: 360)
+        .background(
+            Color(.systemBackground),
+            in: RoundedRectangle(cornerRadius: 24, style: .continuous)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 24, style: .continuous)
+                .strokeBorder(Color.primary.opacity(0.08), lineWidth: 1)
+        )
+        .shadow(color: .black.opacity(0.2), radius: 24, y: 12)
+        .padding(.horizontal, 24)
+        .accessibilityAddTraits(.isModal)
     }
 }
 

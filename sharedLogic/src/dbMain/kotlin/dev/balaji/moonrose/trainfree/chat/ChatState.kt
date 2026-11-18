@@ -51,9 +51,20 @@ class ChatState internal constructor(
     /** Refreshes availability, prewarms if available, and builds starter chips for [seed]. */
     fun openWithSeed(seed: ChatSeedContext = ChatSeedContext()) {
         val availability = provider?.availability() ?: "device_not_eligible"
-        val previousSeed = _uiState.value.seedContext
-        val seedChanged = previousSeed != seed
-        if (seedChanged) {
+        val previousState = _uiState.value
+        val seedChanged = previousState.seedContext != seed
+        val autoPrompt = seed.autoPrompt.trim()
+        val lastMessage = previousState.messages.lastOrNull()
+        val hasCompletedReply = lastMessage != null &&
+            lastMessage.role == ChatMessage.ROLE_ASSISTANT &&
+            lastMessage.status == ChatMessage.STATUS_COMPLETE &&
+            lastMessage.text.isNotBlank()
+        val shouldReset = seedChanged || (autoPrompt.isNotEmpty() && !previousState.isGenerating && !hasCompletedReply)
+        val shouldAutoSend = autoPrompt.isNotEmpty() &&
+            availability == "available" &&
+            (seedChanged || (!previousState.isGenerating && !hasCompletedReply))
+
+        if (shouldReset) {
             // Seed change starts a fresh scoped conversation so prior context doesn't leak.
             cancelActiveWork()
             needsSessionReset = true
@@ -62,15 +73,17 @@ class ChatState internal constructor(
             current.copy(
                 availability = availability,
                 seedContext = seed,
-                messages = if (seedChanged) emptyList() else current.messages,
-                isGenerating = if (seedChanged) false else current.isGenerating,
+                messages = if (shouldReset) emptyList() else current.messages,
+                isGenerating = if (shouldReset) false else current.isGenerating,
                 suggestedPrompts = defaultPromptsFor(seed, topExercise = null),
             )
         }
-        if (availability == "available") {
+        if (shouldAutoSend) {
+            sendMessage(autoPrompt)
+        } else if (availability == "available") {
             provider?.prewarm()
         }
-        if (seed.kind == "general") {
+        if (seed.kind == "general" && !seed.readOnly) {
             scope.launch {
                 val top = runCatching { loadTopTrainedExercise() }.getOrNull()
                 if (_uiState.value.seedContext == seed) {
@@ -169,12 +182,13 @@ class ChatState internal constructor(
         val request = ChatRequest(
             instructions = ChatPromptBuilder.buildInstructions(
                 seedContext = seed,
-                supportsToolCalling = provider.supportsToolCalling(),
+                supportsToolCalling = if (seed.readOnly) false else provider.supportsToolCalling(),
             ),
             history = history,
             userMessage = userMessage,
             preloadedContext = preloaded?.summary.orEmpty(),
             resetSession = reset,
+            allowTools = !seed.readOnly,
         )
 
         activeHandle = provider.generate(
@@ -186,8 +200,12 @@ class ChatState internal constructor(
             onComplete = { finalText, toolSources ->
                 if (generationId != activeGenerationId) return@generate
                 activeHandle = null
-                val mergedSources = (toolSources + preloaded?.sources.orEmpty())
-                    .distinctBy { listOf(it.kind, it.exerciseId, it.epochDay, it.programId, it.routineId, it.label) }
+                val mergedSources = if (seed.readOnly) {
+                    emptyList()
+                } else {
+                    (toolSources + preloaded?.sources.orEmpty())
+                        .distinctBy { listOf(it.kind, it.exerciseId, it.epochDay, it.programId, it.routineId, it.label) }
+                }
                 val trimmed = finalText.trim()
                 if (trimmed.isEmpty()) {
                     updateMessage(assistantId) {
@@ -199,7 +217,8 @@ class ChatState internal constructor(
                     }
                 } else {
                     val wroteProgram = toolSources.any { it.programId > 0L }
-                    val offerAddAsProgram = provider.supportsToolCalling() &&
+                    val offerAddAsProgram = !seed.readOnly &&
+                        provider.supportsToolCalling() &&
                         !wroteProgram &&
                         shouldOfferAddAsProgram(userMessage, trimmed)
                     updateMessage(assistantId) {
@@ -297,32 +316,36 @@ class ChatState internal constructor(
     private fun defaultPromptsFor(
         seed: ChatSeedContext,
         topExercise: String?,
-    ): List<ChatSuggestedPrompt> = when (seed.kind) {
-        "exercise" -> buildList {
-            val name = seed.exerciseName
-            add(ChatSuggestedPrompt(ChatSuggestedPrompt.KEY_EXERCISE_PROGRESSION, name))
-            add(ChatSuggestedPrompt(ChatSuggestedPrompt.KEY_EXERCISE_FORM, name))
-            add(ChatSuggestedPrompt(ChatSuggestedPrompt.KEY_EXERCISE_SUBSTITUTES, name))
-        }
-        "day" -> {
-            val dateLabel = if (seed.epochDay > 0L) ChatToolbox.shortDate(seed.epochDay) else ""
-            listOf(
-                ChatSuggestedPrompt(ChatSuggestedPrompt.KEY_DAY_SUMMARY, dateLabel),
-                ChatSuggestedPrompt(ChatSuggestedPrompt.KEY_SUMMARY),
-                ChatSuggestedPrompt(ChatSuggestedPrompt.KEY_PRS),
-            )
-        }
-        else -> buildList {
-            add(ChatSuggestedPrompt(ChatSuggestedPrompt.KEY_SUMMARY))
-            add(ChatSuggestedPrompt(ChatSuggestedPrompt.KEY_REVIEW_PROGRESS))
-            add(ChatSuggestedPrompt(ChatSuggestedPrompt.KEY_PRS))
-            if (!topExercise.isNullOrBlank()) {
-                add(ChatSuggestedPrompt(ChatSuggestedPrompt.KEY_EXERCISE_PROGRESSION, topExercise))
-            } else {
-                add(ChatSuggestedPrompt(ChatSuggestedPrompt.KEY_LAST_WORKOUT))
+    ): List<ChatSuggestedPrompt> = if (seed.readOnly) {
+        emptyList()
+    } else {
+        when (seed.kind) {
+            "exercise" -> buildList {
+                val name = seed.exerciseName
+                add(ChatSuggestedPrompt(ChatSuggestedPrompt.KEY_EXERCISE_PROGRESSION, name))
+                add(ChatSuggestedPrompt(ChatSuggestedPrompt.KEY_EXERCISE_FORM, name))
+                add(ChatSuggestedPrompt(ChatSuggestedPrompt.KEY_EXERCISE_SUBSTITUTES, name))
             }
-            add(ChatSuggestedPrompt(ChatSuggestedPrompt.KEY_NEXT_ROUTINE))
-            add(ChatSuggestedPrompt(ChatSuggestedPrompt.KEY_SUGGEST_ROUTINE))
+            "day" -> {
+                val dateLabel = if (seed.epochDay > 0L) ChatToolbox.shortDate(seed.epochDay) else ""
+                listOf(
+                    ChatSuggestedPrompt(ChatSuggestedPrompt.KEY_DAY_SUMMARY, dateLabel),
+                    ChatSuggestedPrompt(ChatSuggestedPrompt.KEY_SUMMARY),
+                    ChatSuggestedPrompt(ChatSuggestedPrompt.KEY_PRS),
+                )
+            }
+            else -> buildList {
+                add(ChatSuggestedPrompt(ChatSuggestedPrompt.KEY_SUMMARY))
+                add(ChatSuggestedPrompt(ChatSuggestedPrompt.KEY_REVIEW_PROGRESS))
+                add(ChatSuggestedPrompt(ChatSuggestedPrompt.KEY_PRS))
+                if (!topExercise.isNullOrBlank()) {
+                    add(ChatSuggestedPrompt(ChatSuggestedPrompt.KEY_EXERCISE_PROGRESSION, topExercise))
+                } else {
+                    add(ChatSuggestedPrompt(ChatSuggestedPrompt.KEY_LAST_WORKOUT))
+                }
+                add(ChatSuggestedPrompt(ChatSuggestedPrompt.KEY_NEXT_ROUTINE))
+                add(ChatSuggestedPrompt(ChatSuggestedPrompt.KEY_SUGGEST_ROUTINE))
+            }
         }
     }
 

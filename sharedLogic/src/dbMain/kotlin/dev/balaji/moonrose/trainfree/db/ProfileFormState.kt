@@ -38,7 +38,16 @@ private const val MAX_WHEEL_FEET = 8
  * to localized labels (genderLabel in LogicLabels.kt on Compose, and the
  * mirror in ProfileFormView.swift on iOS) and never store display text.
  */
-val GENDER_KEYS: List<String> = listOf("male", "female", "other", "prefer_not_to_say")
+val GENDER_KEYS: List<String> = listOf("male", "female", "other")
+
+private const val LEGACY_PREFER_NOT_TO_SAY = "prefer_not_to_say"
+
+/**
+ * Normalizes blank inputs and the removed legacy `"prefer_not_to_say"` key
+ * to `null`, so undeclared gender is consistently represented as `null`.
+ */
+internal fun normalizeGender(value: String?): String? =
+    value?.takeIf { it.isNotBlank() && it != LEGACY_PREFER_NOT_TO_SAY }
 
 /** Wheel starting point when the profile has no height yet: 170 cm ≈ 5 ft 7 in. */
 private val DEFAULT_FEET_INCHES = HeightConversion.cmToFeetInches(170.0)
@@ -90,7 +99,7 @@ class ProfileFormState internal constructor(
     private val _uiState = MutableStateFlow(
         ProfileFormUiState(
             age = initial?.age?.toString() ?: "",
-            gender = initial?.gender,
+            gender = normalizeGender(initial?.gender),
             unit = unit,
             weight = initialWeightKg?.let { InsightMath.formatNumber(unit.fromKilograms(it)) } ?: "",
             height = initialHeightCm?.let { InsightMath.formatNumber(it) } ?: "",
@@ -104,8 +113,8 @@ class ProfileFormState internal constructor(
         _uiState.value = _uiState.value.copy(age = value.filterDigits(), ageError = false)
     }
 
-    fun updateGender(value: String) {
-        _uiState.value = _uiState.value.copy(gender = value)
+    fun updateGender(value: String?) {
+        _uiState.value = _uiState.value.copy(gender = normalizeGender(value))
     }
 
     fun updateUnit(unit: WeightUnit) {
@@ -167,7 +176,7 @@ class ProfileFormState internal constructor(
             saveUnit(state.unit)
             saveProfile(
                 state.age.toIntOrNull(),
-                state.gender,
+                normalizeGender(state.gender),
                 weightKgToSave(state),
                 heightCmToSave(state),
             )

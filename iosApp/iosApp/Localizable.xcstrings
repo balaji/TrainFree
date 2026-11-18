@@ -2058,23 +2058,6 @@
         }
       }
     },
-    "gender_prefer_not_to_say": {
-      "extractionState": "manual",
-      "localizations": {
-        "sv": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Vill inte uppge"
-          }
-        },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Prefer not to say"
-          }
-        }
-      }
-    },
     "create_a_profile": {
       "extractionState": "manual",
       "localizations": {
@@ -4993,6 +4976,27 @@
       "localizations": {
         "sv": { "stringUnit": { "state": "translated", "value": "Byt namn på pass" } },
         "en": { "stringUnit": { "state": "translated", "value": "Rename workout" } }
+      }
+    },
+    "exercise_count_one": {
+      "extractionState": "manual",
+      "localizations": {
+        "sv": { "stringUnit": { "state": "translated", "value": "1 övning" } },
+        "en": { "stringUnit": { "state": "translated", "value": "1 exercise" } }
+      }
+    },
+    "workout_complete_title": {
+      "extractionState": "manual",
+      "localizations": {
+        "sv": { "stringUnit": { "state": "translated", "value": "Träningspass klart!" } },
+        "en": { "stringUnit": { "state": "translated", "value": "Workout Complete!" } }
+      }
+    },
+    "exercise_history_need_two_weeks": {
+      "extractionState": "manual",
+      "localizations": {
+        "sv": { "stringUnit": { "state": "translated", "value": "Behöver minst 2 veckors data." } },
+        "en": { "stringUnit": { "state": "translated", "value": "Need at least 2 weeks of data." } }
       }
     }
   },

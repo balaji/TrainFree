@@ -157,7 +157,7 @@ class GeminiNanoChatProvider internal constructor(
         onPartial: (String) -> Unit,
     ): Pair<String, List<ChatSourceRef>> {
         val useSystemPrompt = systemPromptSupported == true
-        val canUseTools = functionCallingSupported == true
+        val canUseTools = request.allowTools && functionCallingSupported == true
         val contents = GeminiNanoToolCodec.buildInitialContents(request, useSystemPrompt)
         val collectedSources = mutableListOf<ChatSourceRef>()
 

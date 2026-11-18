@@ -63,13 +63,25 @@ private sealed interface BmiInfo {
 }
 
 /**
+ * Initial `(weightKg, heightCm)` to auto-calculate when opening the BMI
+ * calculator: populated when the saved profile already has positive finite
+ * weight and height, or `null` so the user can fill in missing values first.
+ */
+internal fun initialBmiInputs(profile: Profile?): Pair<Double, Double>? {
+    val weightKg = profile?.weight?.takeIf { it.isFinite() && it > 0.0 } ?: return null
+    val heightCm = profile.height?.takeIf { it.isFinite() && it > 0.0 } ?: return null
+    return weightKg to heightCm
+}
+
+/**
  * Bottom-sheet BMI calculator reached from Profile > Tools. Weight and height
  * prefill from the saved profile in the user's unit system: kg/cm text fields
  * in metric, or lb text plus a tap-to-reveal feet/inches wheel in imperial.
- * Everything is converted to kg/cm for the calculation, and either input can
- * be overridden for a one-off estimate. Tapping a formula or classification
- * row saves it as the app-wide default and re-derives the shown result, so
- * the options can be compared in place.
+ * When both profile values are already present, the initial result is
+ * calculated on load. Everything is converted to kg/cm for the calculation, and
+ * either input can be overridden for a one-off estimate. Tapping a formula or
+ * classification row saves it as the app-wide default and re-derives the shown
+ * result, so the options can be compared in place.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -86,9 +98,10 @@ internal fun BmiCalculatorSheet(settings: UserSettings, profile: Profile?, onDis
     var inches by remember { mutableStateOf(initialFeetInches.inches) }
     var wheelsExpanded by remember { mutableStateOf(false) }
 
-    // Inputs captured at Calculate time (kg, cm); BMI and category derive from
-    // the current settings so option taps update the shown result live.
-    var calculated by remember { mutableStateOf<Pair<Double, Double>?>(null) }
+    // Seeded from the profile when both weight and height are already present,
+    // and updated when Calculate is tapped (kg, cm); BMI and category derive
+    // from the current settings so option taps update the shown result live.
+    var calculated by remember { mutableStateOf(initialBmiInputs(profile)) }
     var infoFor by remember { mutableStateOf<BmiInfo?>(null) }
 
     val weight = weightText.toDoubleOrNull()?.takeIf { it > 0 }

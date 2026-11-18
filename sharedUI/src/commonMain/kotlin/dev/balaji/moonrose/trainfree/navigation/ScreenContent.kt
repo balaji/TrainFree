@@ -33,12 +33,9 @@ fun ScreenContent(
         WorkoutsRoute -> ProgramsScreen(onNavigate = onNavigate, onGoBack = onGoBack)
         CalendarRoute -> CalendarScreen(
             onDayClick = { epochDay -> onNavigate(DayDetailRoute(epochDay)) },
-            onLogWorkout = { epochDay -> onNavigate(WorkoutLogRoute(epochDay)) },
             onEditJournal = { epochDay -> onNavigate(JournalEditorRoute(epochDay)) },
         )
-        ProgressRoute -> ProgressScreen(
-            onOpenChat = onOpenChat?.let { open -> { open(ChatSeedContext()) } },
-        )
+        ProgressRoute -> ProgressScreen()
         ProfileRoute -> ProfileScreen()
         is RoutineDetailRoute -> RoutineDetailScreen(route = route, onNavigate = onNavigate, onGoBack = onGoBack)
         ExerciseCreateRoute -> ExerciseCreateScreen(onGoBack = onGoBack)
@@ -47,9 +44,21 @@ fun ScreenContent(
             onGoBack = onGoBack,
             onOpenChat = onOpenChat,
         )
-        is WorkoutSessionRoute -> WorkoutSessionScreen(route = route, onGoBack = onGoBack)
-        is WorkoutLogRoute -> WorkoutLogScreen(route = route, onGoBack = onGoBack)
-        is WorkoutEditRoute -> WorkoutEditScreen(route = route, onGoBack = onGoBack)
+        is WorkoutSessionRoute -> WorkoutSessionScreen(
+            route = route,
+            onGoBack = onGoBack,
+            onOpenChat = onOpenChat,
+        )
+        is WorkoutLogRoute -> WorkoutLogScreen(
+            route = route,
+            onGoBack = onGoBack,
+            onOpenChat = onOpenChat,
+        )
+        is WorkoutEditRoute -> WorkoutEditScreen(
+            route = route,
+            onGoBack = onGoBack,
+            onOpenChat = onOpenChat,
+        )
         is JournalEditorRoute -> JournalEditorScreen(route = route, onGoBack = onGoBack)
         is DayDetailRoute -> DayDetailScreen(
             route = route,
@@ -57,7 +66,6 @@ fun ScreenContent(
             onOpenChat = onOpenChat,
             onLogWorkout = { onNavigate(WorkoutLogRoute(route.epochDay)) },
             onEditSession = { sessionId -> onNavigate(WorkoutEditRoute(sessionId)) },
-            onEditJournal = { onNavigate(JournalEditorRoute(route.epochDay)) },
         )
     }
 }

@@ -35,6 +35,8 @@ data class ChatSeedContext(
     val exerciseId: Long = 0L,
     val exerciseName: String = "",
     val epochDay: Long = 0L,
+    val autoPrompt: String = "",
+    val readOnly: Boolean = false,
 )
 
 /**
@@ -107,6 +109,7 @@ data class ChatRequest(
     val preloadedContext: String = "",
     /** True when the conversation was cleared or compacted so stateful sessions (iOS) should reset. */
     val resetSession: Boolean = false,
+    val allowTools: Boolean = true,
 )
 
 /** Observed by SwiftUI and Compose chat views via [ChatState.uiState]. */

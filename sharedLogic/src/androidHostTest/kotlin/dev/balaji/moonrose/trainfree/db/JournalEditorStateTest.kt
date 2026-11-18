@@ -1,6 +1,8 @@
 package dev.balaji.moonrose.trainfree.db
 
 import dev.balaji.moonrose.trainfree.journal.MAX_JOURNAL_WORDS
+import dev.balaji.moonrose.trainfree.model.SetType
+import dev.balaji.moonrose.trainfree.model.WeightUnit
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -9,12 +11,18 @@ import kotlin.test.assertTrue
 import kotlinx.coroutines.Dispatchers
 
 class JournalEditorStateTest {
-    private class FakeJournalStore(initial: Map<Long, String> = emptyMap()) : JournalStore {
+    private class FakeJournalStore(
+        initial: Map<Long, String> = emptyMap(),
+        private val workoutsByDay: Map<Long, JournalDayWorkouts> = emptyMap(),
+    ) : JournalStore {
         val entries = initial.toMutableMap()
         var saveCalls = 0
         var deleteCalls = 0
 
         override suspend fun getForDay(epochDay: Long): String? = entries[epochDay]
+
+        override suspend fun getWorkoutsForDay(epochDay: Long): JournalDayWorkouts =
+            workoutsByDay[epochDay] ?: JournalDayWorkouts()
 
         override suspend fun save(epochDay: Long, content: String) {
             saveCalls++
@@ -88,5 +96,62 @@ class JournalEditorStateTest {
         assertTrue(state2.uiState.value.deleted)
         assertNull(store2.entries[20_002L])
         assertEquals(1, store2.deleteCalls)
+    }
+
+    @Test
+    fun loadsWorkoutsAndWeightUnitAndPreservesAcrossEditsAndSave() {
+        val workouts = listOf(
+            DaySession(
+                id = 1L,
+                title = "Push Day",
+                exercises = listOf(
+                    DaySessionExercise(
+                        name = "Bench Press",
+                        sets = listOf(
+                            DaySessionSet(
+                                targetWeight = "185",
+                                targetReps = "5",
+                                targetDuration = "",
+                                targetDistance = "",
+                                actualWeight = "185",
+                                actualReps = "5",
+                                actualDuration = "",
+                                actualDistance = "",
+                                setType = SetType.NORMAL,
+                                completed = true,
+                            ),
+                        ),
+                    ),
+                ),
+            ),
+            DaySession(
+                id = 2L,
+                title = "Evening Run",
+                exercises = emptyList(),
+            ),
+        )
+        val store = FakeJournalStore(
+            workoutsByDay = mapOf(
+                20_005L to JournalDayWorkouts(sessions = workouts, weightUnit = WeightUnit.IMPERIAL),
+            ),
+        )
+
+        val stateWithWorkouts = JournalEditorState(20_005L, store, Dispatchers.Unconfined)
+        assertFalse(stateWithWorkouts.uiState.value.loading)
+        assertEquals(workouts, stateWithWorkouts.uiState.value.workouts)
+        assertEquals(WeightUnit.IMPERIAL, stateWithWorkouts.uiState.value.weightUnit)
+
+        stateWithWorkouts.updateText("Felt strong today")
+        assertEquals(workouts, stateWithWorkouts.uiState.value.workouts)
+        assertEquals(WeightUnit.IMPERIAL, stateWithWorkouts.uiState.value.weightUnit)
+
+        stateWithWorkouts.save()
+        assertEquals(workouts, stateWithWorkouts.uiState.value.workouts)
+        assertEquals(WeightUnit.IMPERIAL, stateWithWorkouts.uiState.value.weightUnit)
+
+        val emptyDayState = JournalEditorState(20_006L, store, Dispatchers.Unconfined)
+        assertFalse(emptyDayState.uiState.value.loading)
+        assertTrue(emptyDayState.uiState.value.workouts.isEmpty())
+        assertEquals(WeightUnit.METRIC, emptyDayState.uiState.value.weightUnit)
     }
 }

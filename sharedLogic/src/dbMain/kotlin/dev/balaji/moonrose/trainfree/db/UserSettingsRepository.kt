@@ -55,8 +55,12 @@ object UserSettingsRepository {
     suspend fun setNotificationsEnabled(enabled: Boolean) =
         set(SETTING_NOTIFICATIONS_ENABLED, enabled.toString())
 
-    suspend fun setHealthSyncWorkouts(enabled: Boolean) =
+    suspend fun setHealthSyncWorkouts(enabled: Boolean) {
         set(SETTING_HEALTH_SYNC_WORKOUTS, enabled.toString())
+        if (enabled) {
+            HealthSyncManager.syncWorkoutsToHealth()
+        }
+    }
 
     suspend fun setHealthSyncWeight(enabled: Boolean) =
         set(SETTING_HEALTH_SYNC_WEIGHT, enabled.toString())

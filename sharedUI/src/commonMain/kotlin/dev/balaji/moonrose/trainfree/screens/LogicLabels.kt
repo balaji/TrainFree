@@ -280,7 +280,6 @@ internal fun genderLabel(key: String): String = when (key) {
     "male" -> stringResource(Res.string.gender_male)
     "female" -> stringResource(Res.string.gender_female)
     "other" -> stringResource(Res.string.gender_other)
-    "prefer_not_to_say" -> stringResource(Res.string.gender_prefer_not_to_say)
     else -> key
 }
 

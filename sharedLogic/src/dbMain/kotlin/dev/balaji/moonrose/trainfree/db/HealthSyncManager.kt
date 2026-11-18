@@ -26,6 +26,7 @@ private const val DEFAULT_WORKOUT_TITLE = "Strength Training"
 object HealthSyncManager {
     @Volatile
     private var provider: HealthSyncProvider? = null
+    private val workoutSyncMutex = Mutex()
     private val weightImportMutex = Mutex()
 
     fun register(provider: HealthSyncProvider) {
@@ -51,21 +52,77 @@ object HealthSyncManager {
         try {
             if (!UserSettingsRepository.settings.first().healthSyncWorkouts) return
             val session = AppDb.db.workoutSessionDao().findById(sessionId) ?: return
-            if (session.testData) return
-            val completedAt = session.completedAt ?: return
-            if (completedAt <= session.performedAt) return
-            val title = session.title.ifBlank { DEFAULT_WORKOUT_TITLE }
-            activeProvider.writeStrengthWorkout(
-                sessionId = session.id,
-                title = title,
-                startMillis = session.performedAt,
-                endMillis = completedAt,
-            )
+            writeSessionIfEligible(session, activeProvider)
         } catch (ce: CancellationException) {
             throw ce
         } catch (_: Throwable) {
             // Health sync is best-effort; never fail workout completion.
         }
+    }
+
+    /**
+     * Backfills all eligible completed live workouts from `workout_sessions` to
+     * Apple Health / Health Connect. Platform providers use deterministic sync
+     * identifiers (`trainfree_session_<id>`), so already-synced workouts are
+     * upserted/deduplicated without creating duplicates.
+     */
+    suspend fun syncWorkoutsToHealth(): Int {
+        val activeProvider = provider ?: return 0
+        return workoutSyncMutex.withLock {
+            try {
+                if (!UserSettingsRepository.settings.first().healthSyncWorkouts) return@withLock 0
+                val sessions = AppDb.db.workoutSessionDao().getAll()
+                syncWorkoutEntities(sessions, activeProvider)
+            } catch (ce: CancellationException) {
+                throw ce
+            } catch (_: Throwable) {
+                0
+            }
+        }
+    }
+
+    /**
+     * Deletes a previously synced workout session from Apple Health / Health Connect.
+     */
+    suspend fun onWorkoutDeleted(sessionId: Long) {
+        val activeProvider = provider ?: return
+        try {
+            if (!UserSettingsRepository.settings.first().healthSyncWorkouts) return
+            activeProvider.deleteStrengthWorkout(sessionId = sessionId)
+        } catch (ce: CancellationException) {
+            throw ce
+        } catch (_: Throwable) {
+            // Health sync is best-effort; never fail local deletion.
+        }
+    }
+
+    internal suspend fun writeSessionIfEligible(
+        session: WorkoutSessionEntity,
+        activeProvider: HealthSyncProvider,
+    ): Boolean {
+        if (session.testData) return false
+        val completedAt = session.completedAt ?: return false
+        if (completedAt <= session.performedAt) return false
+        val title = session.title.ifBlank { DEFAULT_WORKOUT_TITLE }
+        return activeProvider.writeStrengthWorkout(
+            sessionId = session.id,
+            title = title,
+            startMillis = session.performedAt,
+            endMillis = completedAt,
+        )
+    }
+
+    internal suspend fun syncWorkoutEntities(
+        sessions: List<WorkoutSessionEntity>,
+        activeProvider: HealthSyncProvider,
+    ): Int {
+        var synced = 0
+        for (session in sessions) {
+            if (writeSessionIfEligible(session, activeProvider)) {
+                synced++
+            }
+        }
+        return synced
     }
 
     /**

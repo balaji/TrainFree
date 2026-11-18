@@ -114,6 +114,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import dev.balaji.moonrose.trainfree.chat.ChatSeedContext
 import dev.balaji.moonrose.trainfree.navigation.ExerciseDetailRoute
 import dev.balaji.moonrose.trainfree.db.BarbellKeyboardState
 import dev.balaji.moonrose.trainfree.db.DraftSessionExercise
@@ -142,7 +143,11 @@ import dev.balaji.moonrose.trainfree.sharedui.resources.*
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun WorkoutSessionScreen(route: WorkoutSessionRoute, onGoBack: () -> Unit) {
+fun WorkoutSessionScreen(
+    route: WorkoutSessionRoute,
+    onGoBack: () -> Unit,
+    onOpenChat: ((ChatSeedContext) -> Unit)? = null,
+) {
     // "Resume or start" happens once per navigation entry; if the active
     // session already matches this route, use its id immediately so returning
     // to an in-progress workout doesn't flash a loading spinner.
@@ -192,6 +197,7 @@ fun WorkoutSessionScreen(route: WorkoutSessionRoute, onGoBack: () -> Unit) {
         WorkoutSessionBody(
             formState = formState,
             uiState = uiState,
+            onOpenChat = onOpenChat,
             modifier = Modifier
                 .padding(padding)
                 .consumeWindowInsets(padding)
@@ -243,7 +249,11 @@ fun WorkoutSessionScreen(route: WorkoutSessionRoute, onGoBack: () -> Unit) {
 }
 
 @Composable
-fun WorkoutLogScreen(route: WorkoutLogRoute, onGoBack: () -> Unit) {
+fun WorkoutLogScreen(
+    route: WorkoutLogRoute,
+    onGoBack: () -> Unit,
+    onOpenChat: ((ChatSeedContext) -> Unit)? = null,
+) {
     val formState = remember(route.epochDay) {
         WorkoutSessionRepository.newCompletedLogFormState(route.epochDay)
     }
@@ -252,11 +262,16 @@ fun WorkoutLogScreen(route: WorkoutLogRoute, onGoBack: () -> Unit) {
         formState = formState,
         allowRoutineTemplate = true,
         onGoBack = onGoBack,
+        onOpenChat = onOpenChat,
     )
 }
 
 @Composable
-fun WorkoutEditScreen(route: WorkoutEditRoute, onGoBack: () -> Unit) {
+fun WorkoutEditScreen(
+    route: WorkoutEditRoute,
+    onGoBack: () -> Unit,
+    onOpenChat: ((ChatSeedContext) -> Unit)? = null,
+) {
     val formState = remember(route.sessionId) {
         WorkoutSessionRepository.editCompletedFormState(route.sessionId)
     }
@@ -265,6 +280,7 @@ fun WorkoutEditScreen(route: WorkoutEditRoute, onGoBack: () -> Unit) {
         formState = formState,
         allowRoutineTemplate = false,
         onGoBack = onGoBack,
+        onOpenChat = onOpenChat,
     )
 }
 
@@ -274,6 +290,7 @@ private fun CompletedWorkoutSessionScreen(
     formState: WorkoutSessionFormState,
     allowRoutineTemplate: Boolean,
     onGoBack: () -> Unit,
+    onOpenChat: ((ChatSeedContext) -> Unit)? = null,
 ) {
     val uiState by formState.uiState.collectAsState()
     if (uiState.finished || uiState.discarded || uiState.deleted) {
@@ -303,6 +320,7 @@ private fun CompletedWorkoutSessionScreen(
             formState = formState,
             uiState = uiState,
             allowRoutineTemplate = allowRoutineTemplate,
+            onOpenChat = onOpenChat,
             modifier = Modifier
                 .padding(padding)
                 .consumeWindowInsets(padding)
@@ -438,6 +456,7 @@ private fun WorkoutSessionBody(
     formState: WorkoutSessionFormState,
     uiState: WorkoutSessionUiState,
     allowRoutineTemplate: Boolean = false,
+    onOpenChat: ((ChatSeedContext) -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
     val scope = rememberCoroutineScope()
@@ -676,6 +695,7 @@ private fun WorkoutSessionBody(
                 ExerciseDetailScreen(
                     route = detailRoute,
                     onGoBack = { selectedExerciseRoute = null },
+                    onOpenChat = onOpenChat,
                 )
             }
         }

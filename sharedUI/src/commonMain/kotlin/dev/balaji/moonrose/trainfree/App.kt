@@ -85,6 +85,7 @@ import dev.balaji.moonrose.trainfree.navigation.WorkoutsRoute
 import dev.balaji.moonrose.trainfree.notifications.rememberRestTimerNotifier
 import dev.balaji.moonrose.trainfree.screens.ChatSheet
 import dev.balaji.moonrose.trainfree.screens.ProfileSetupFlow
+import dev.balaji.moonrose.trainfree.screens.WorkoutCompletionDialog
 import dev.balaji.moonrose.trainfree.screens.formatElapsed
 import dev.balaji.moonrose.trainfree.screens.rememberChatGenerationProvider
 import dev.balaji.moonrose.trainfree.screens.remainingSecondsUntil
@@ -144,6 +145,7 @@ private fun MainTabs() {
     PlatformBackHandler(enabled = stack.canGoBack) { stack.pop() }
 
     val activeSession by WorkoutSessionRepository.activeSession.collectAsState()
+    val completionCelebration by WorkoutSessionRepository.completionCelebration.collectAsState()
     val scope = rememberCoroutineScope()
     var showDiscardConfirm by remember { mutableStateOf(false) }
     var showNothingToSave by remember { mutableStateOf(false) }
@@ -358,6 +360,7 @@ private fun MainTabs() {
                                 showWorkouts = false
                             }
                         },
+                        onOpenChat = openChat,
                     )
                 }
                 if (showOverlayBar) {
@@ -396,6 +399,7 @@ private fun MainTabs() {
                         route = sessionRoute,
                         onNavigate = {},
                         onGoBack = { directWorkoutSession = null },
+                        onOpenChat = openChat,
                     )
                 }
             }
@@ -489,6 +493,13 @@ private fun MainTabs() {
                     Text(stringResource(Res.string.no))
                 }
             },
+        )
+    }
+
+    completionCelebration?.let { celebration ->
+        WorkoutCompletionDialog(
+            celebration = celebration,
+            onDismiss = { WorkoutSessionRepository.dismissCompletionCelebration() },
         )
     }
 }

@@ -1,6 +1,9 @@
 package dev.balaji.moonrose.trainfree.db
 
 import dev.balaji.moonrose.trainfree.model.ExerciseType
+import dev.balaji.moonrose.trainfree.model.SetType
+import dev.balaji.moonrose.trainfree.model.WorkoutCompletionCelebration
+import dev.balaji.moonrose.trainfree.model.buildWorkoutCompletionCelebration
 import dev.balaji.moonrose.trainfree.model.isSetComplete
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -21,6 +24,26 @@ data class ActiveWorkoutSession(
     val startedAt: Long,
 )
 
+internal fun summarizeCompletedSession(
+    sessionId: Long,
+    workoutTitle: String,
+    performedAtMillis: Long,
+    completedAtMillis: Long,
+    keptDetails: List<WorkoutSessionDetailEntity>,
+): WorkoutCompletionCelebration {
+    val workingDetails = keptDetails.filter { it.setType != SetType.WARMUP }
+    val countedDetails = workingDetails.ifEmpty { keptDetails }
+    val durationSeconds = ((completedAtMillis - performedAtMillis) / 1000L).coerceAtLeast(0L)
+    return buildWorkoutCompletionCelebration(
+        sessionId = sessionId,
+        workoutTitle = workoutTitle,
+        completedSets = countedDetails.size,
+        exerciseCount = countedDetails.map { it.exerciseId }.distinct().size,
+        durationSeconds = durationSeconds,
+        seed = completedAtMillis,
+    )
+}
+
 object WorkoutSessionRepository {
     private val repositoryScope = CoroutineScope(Dispatchers.Main + SupervisorJob())
 
@@ -31,6 +54,14 @@ object WorkoutSessionRepository {
      * countdown nor misses its completion alert.
      */
     val activeRestTimer: StateFlow<RestTimerTarget?> = _activeRestTimer.asStateFlow()
+
+    private val _completionCelebration = MutableStateFlow<WorkoutCompletionCelebration?>(null)
+    /** Emitted when a live workout session finishes; cleared once dismissed or a new session starts. */
+    val completionCelebration: StateFlow<WorkoutCompletionCelebration?> = _completionCelebration.asStateFlow()
+
+    fun dismissCompletionCelebration() {
+        _completionCelebration.value = null
+    }
 
     private var cachedFormState: WorkoutSessionFormState? = null
 
@@ -76,6 +107,7 @@ object WorkoutSessionRepository {
         cachedFormState?.closeQuietly()
         cachedFormState = null
         _activeRestTimer.value = null
+        _completionCelebration.value = null
     }
 
     /**
@@ -115,6 +147,7 @@ object WorkoutSessionRepository {
         cachedFormState?.closeQuietly()
         cachedFormState = null
         _activeRestTimer.value = null
+        _completionCelebration.value = null
 
         val now = nowMillis()
         val routineName = AppDb.db.routineDao().findById(routineId)?.name
@@ -192,6 +225,7 @@ object WorkoutSessionRepository {
         cachedFormState?.closeQuietly()
         cachedFormState = null
         _activeRestTimer.value = null
+        _completionCelebration.value = null
 
         val now = nowMillis()
         return AppDb.db.workoutSessionDao().insert(
@@ -252,13 +286,27 @@ object WorkoutSessionRepository {
         val typeByExercise = details.map { it.exerciseId }.distinct().associateWith { id ->
             ExerciseType.fromValue(ExerciseRepository.findById(id)?.exerciseType) ?: ExerciseType.STRENGTH
         }
-        val emptyIds = details.filter { d ->
+        val (keptDetails, emptyDetails) = details.partition { d ->
             val type = typeByExercise.getValue(d.exerciseId)
-            !d.completed || !type.isSetComplete(d.actualReps, d.actualDuration, d.actualDistance)
-        }.map { it.id }
-        if (emptyIds.isNotEmpty()) AppDb.db.workoutSessionDetailDao().deleteByIds(emptyIds)
+            d.completed && type.isSetComplete(d.actualReps, d.actualDuration, d.actualDistance)
+        }
+        if (emptyDetails.isNotEmpty()) {
+            AppDb.db.workoutSessionDetailDao().deleteByIds(emptyDetails.map { it.id })
+        }
         AppDb.db.workoutSessionDao().setCompletedAt(sessionId, now, now)
         HealthSyncManager.onWorkoutFinished(sessionId)
+        val session = AppDb.db.workoutSessionDao().findById(sessionId)
+        if (session != null && keptDetails.isNotEmpty()) {
+            val routineName = session.routineId?.let { AppDb.db.routineDao().findById(it)?.name }
+            val title = resolveWorkoutTitle(session.title, routineName, session.performedAt)
+            _completionCelebration.value = summarizeCompletedSession(
+                sessionId = sessionId,
+                workoutTitle = title,
+                performedAtMillis = session.performedAt,
+                completedAtMillis = now,
+                keptDetails = keptDetails,
+            )
+        }
     }
 
     /** Cascades to `workout_session_details` via the FK. */
@@ -275,6 +323,7 @@ object WorkoutSessionRepository {
     /** Deletes a completed historical workout without disturbing any active live session/timer. */
     suspend fun deleteCompletedSession(sessionId: Long) {
         AppDb.db.workoutSessionDao().delete(sessionId)
+        HealthSyncManager.onWorkoutDeleted(sessionId)
     }
 
     /** Renames an existing workout session (used by the Journal day screen). */

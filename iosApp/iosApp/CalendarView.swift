@@ -15,7 +15,6 @@ private struct IdentifiableCalendarDay: Identifiable {
 }
 
 private enum PendingDaySheet {
-    case logWorkout(Int64)
     case writeJournal(Int64)
 }
 
@@ -26,7 +25,6 @@ struct CalendarView: View {
     @State private var actionDay: IdentifiableCalendarDay?
     @State private var pendingDaySheet: PendingDaySheet?
     @State private var pushedDayDetail: IdentifiableEpochDay?
-    @State private var logWorkoutDay: IdentifiableEpochDay?
     @State private var journalEditorDay: IdentifiableEpochDay?
 
     private var weekStartsMonday: Bool { settings?.weekStart == WeekStart.monday }
@@ -62,11 +60,7 @@ struct CalendarView: View {
             DayActionSheetView(
                 day: target.day,
                 title: Self.dayTitle(target.id),
-                onLogWorkout: {
-                    pendingDaySheet = .logWorkout(target.id)
-                    actionDay = nil
-                },
-                onEditExistingWorkout: {
+                onOpenWorkouts: {
                     actionDay = nil
                     pushedDayDetail = IdentifiableEpochDay(id: target.id)
                 },
@@ -75,13 +69,6 @@ struct CalendarView: View {
                     actionDay = nil
                 }
             )
-        }
-        .sheet(item: $logWorkoutDay) { target in
-            NavigationStack {
-                WorkoutSessionView(
-                    mode: .logCompleted(epochDay: target.id, title: L10n.logWorkoutTitle)
-                )
-            }
         }
         .sheet(item: $journalEditorDay) { target in
             JournalEditorView(epochDay: target.id)
@@ -147,8 +134,6 @@ struct CalendarView: View {
         guard let pending = pendingDaySheet else { return }
         pendingDaySheet = nil
         switch pending {
-        case .logWorkout(let epochDay):
-            logWorkoutDay = IdentifiableEpochDay(id: epochDay)
         case .writeJournal(let epochDay):
             journalEditorDay = IdentifiableEpochDay(id: epochDay)
         }
@@ -313,8 +298,7 @@ private struct JournalDayRow: View {
 private struct DayActionSheetView: View {
     let day: CalendarDay
     let title: String
-    let onLogWorkout: () -> Void
-    let onEditExistingWorkout: () -> Void
+    let onOpenWorkouts: () -> Void
     let onWriteJournal: () -> Void
 
     @State private var sheetHeight: CGFloat
@@ -322,16 +306,14 @@ private struct DayActionSheetView: View {
     init(
         day: CalendarDay,
         title: String,
-        onLogWorkout: @escaping () -> Void,
-        onEditExistingWorkout: @escaping () -> Void,
+        onOpenWorkouts: @escaping () -> Void,
         onWriteJournal: @escaping () -> Void
     ) {
         self.day = day
         self.title = title
-        self.onLogWorkout = onLogWorkout
-        self.onEditExistingWorkout = onEditExistingWorkout
+        self.onOpenWorkouts = onOpenWorkouts
         self.onWriteJournal = onWriteJournal
-        _sheetHeight = State(initialValue: day.isFuture ? 130 : (day.hasCompletedWorkout ? 235 : 182))
+        _sheetHeight = State(initialValue: day.isFuture ? 130 : 182)
     }
 
     var body: some View {
@@ -345,19 +327,11 @@ private struct DayActionSheetView: View {
             VStack(spacing: 0) {
                 if !day.isFuture {
                     DayActionRow(
-                        title: L10n.logWorkoutTitle,
+                        title: L10n.tabWorkouts,
                         systemImage: "dumbbell.fill",
                         iconColor: .accentColor,
-                        action: onLogWorkout
+                        action: onOpenWorkouts
                     )
-                    if day.hasCompletedWorkout {
-                        DayActionRow(
-                            title: L10n.editWorkoutTitle,
-                            systemImage: "pencil",
-                            iconColor: .accentColor,
-                            action: onEditExistingWorkout
-                        )
-                    }
                 }
                 DayActionRow(
                     title: L10n.journal,

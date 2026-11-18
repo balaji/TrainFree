@@ -38,6 +38,8 @@ interface HealthSyncProvider {
         endMillis: Long,
     ): Boolean
 
+    suspend fun deleteStrengthWorkout(sessionId: Long): Boolean
+
     suspend fun writeBodyWeight(
         metricId: Long,
         weightKg: Double,

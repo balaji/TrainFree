@@ -9,7 +9,6 @@ private struct IdentifiableSessionId: Identifiable {
 /// calendar day, bound to the shared `DayDetailState` via SKIE's Swift `Flow`
 /// bridge.
 struct DayDetailView: View {
-    @Environment(ChatCoordinator.self) private var chatCoordinator
     let epochDay: Int64
     @State private var state: DayDetailState
     @State private var uiState = DayDetailUiState(
@@ -21,7 +20,6 @@ struct DayDetailView: View {
     )
     @State private var showLogWorkout = false
     @State private var editingSession: IdentifiableSessionId?
-    @State private var showJournalEditor = false
     @State private var sessionPendingDelete: DaySession?
     @State private var showDeleteConfirm = false
     @State private var sessionPendingRename: DaySession?
@@ -39,12 +37,12 @@ struct DayDetailView: View {
                 ProgressView()
             } else {
                 List {
-                    if chatCoordinator.isEntryVisible && !uiState.sessions.isEmpty {
+                    if !uiState.isFuture {
                         Section {
                             Button {
-                                chatCoordinator.openForDay(epochDay: epochDay)
+                                showLogWorkout = true
                             } label: {
-                                Label(L10n.chatAskWorkout, systemImage: "sparkles")
+                                Label(L10n.logCompletedWorkout, systemImage: "plus")
                             }
                         }
                     }
@@ -53,13 +51,6 @@ struct DayDetailView: View {
                         Section {
                             Text(L10n.noWorkoutsThisDay)
                                 .foregroundStyle(.secondary)
-                            if !uiState.isFuture {
-                                Button {
-                                    showLogWorkout = true
-                                } label: {
-                                    Label(L10n.logCompletedWorkout, systemImage: "plus")
-                                }
-                            }
                         }
                     } else {
                         ForEach(uiState.sessions, id: \.id) { session in
@@ -99,38 +90,6 @@ struct DayDetailView: View {
                                 }
                             }
                         }
-
-                        if !uiState.isFuture {
-                            Section {
-                                Button {
-                                    showLogWorkout = true
-                                } label: {
-                                    Label(L10n.logCompletedWorkout, systemImage: "plus")
-                                }
-                            }
-                        }
-                    }
-
-                    Section {
-                        if let journal = uiState.journalContent, !journal.isEmpty {
-                            MarkdownTextView(markdown: journal)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                .padding(.vertical, 4)
-                        }
-                    } header: {
-                        HStack {
-                            Circle()
-                                .fill(Color.purple)
-                                .frame(width: 8, height: 8)
-                            Text(L10n.journal)
-                                .font(.headline)
-                                .textCase(nil)
-                            Spacer()
-                            Button(uiState.journalContent != nil ? L10n.editJournal : L10n.writeJournal) {
-                                showJournalEditor = true
-                            }
-                            .textCase(nil)
-                        }
                     }
                 }
                 .floatingWorkoutMenuClearance()
@@ -151,9 +110,6 @@ struct DayDetailView: View {
                     mode: .editCompleted(sessionId: target.id, title: L10n.editWorkoutTitle)
                 )
             }
-        }
-        .sheet(isPresented: $showJournalEditor) {
-            JournalEditorView(epochDay: epochDay)
         }
         .alert(L10n.renameWorkout, isPresented: $showRenameAlert, presenting: sessionPendingRename) { target in
             TextField(L10n.workoutTitle, text: Binding(
@@ -194,7 +150,7 @@ struct DayDetailView: View {
     }
 }
 
-private struct ExerciseSummaryRow: View {
+struct ExerciseSummaryRow: View {
     let exercise: DaySessionExercise
     let weightUnit: WeightUnit
 

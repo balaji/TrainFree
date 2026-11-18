@@ -58,7 +58,8 @@ struct BmiCalculatorView: View {
     @State private var inches = 10
     @State private var heightWheelsExpanded = false
     @State private var prefilled = false
-    // Inputs captured at Calculate time; BMI and category derive from the
+    // Seeded from the profile when both weight and height are already present,
+    // and updated when Calculate is tapped; BMI and category derive from the
     // current settings so option taps update the shown result live.
     @State private var calculatedKg: Double? = nil
     @State private var calculatedCm: Double? = nil
@@ -231,7 +232,8 @@ struct BmiCalculatorView: View {
         .presentationDetents([.medium, .large])
     }
 
-    /// Seed the inputs from the saved profile once, in the active unit system.
+    /// Seed the inputs from the saved profile once, in the active unit system,
+    /// and pre-calculate the result when both weight and height are present.
     private func prefill() {
         guard !prefilled else { return }
         prefilled = true
@@ -245,6 +247,11 @@ struct BmiCalculatorView: View {
             inches = Int(fi.inches)
         } else if let height = profile?.height?.doubleValue {
             heightText = InsightMath.shared.formatNumber(value: height, maxDecimals: 1)
+        }
+        if let weight = profile?.weight?.doubleValue, weight.isFinite, weight > 0,
+           let height = profile?.height?.doubleValue, height.isFinite, height > 0 {
+            calculatedKg = weight
+            calculatedCm = height
         }
     }
 }

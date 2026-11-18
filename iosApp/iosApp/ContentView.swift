@@ -124,7 +124,7 @@ private extension View {
 
 // MARK: - Workouts entry point
 
-private struct SheetAppearanceModifier: ViewModifier {
+struct SheetAppearanceModifier: ViewModifier {
     @State private var appearance: Appearance = .system
     @State private var systemColorScheme: ColorScheme = .light
 
@@ -156,6 +156,7 @@ private struct WorkoutsSheet: View {
     let activeSession: ActiveWorkoutSession?
     let restRemainingSeconds: Int
     let restTotalSeconds: Int
+    let completionCelebration: WorkoutCompletionCelebration?
     @State private var showDiscardConfirm = false
     @State private var showNothingToSave = false
 
@@ -185,6 +186,10 @@ private struct WorkoutsSheet: View {
                     showNothingToSave: $showNothingToSave
                 )
             )
+            .workoutCompletionPopup(celebration: completionCelebration) {
+                WorkoutSessionRepository.shared.dismissCompletionCelebration()
+            }
+            .interactiveDismissDisabled(completionCelebration != nil)
             .modifier(SheetAppearanceModifier())
     }
 }
@@ -413,6 +418,7 @@ struct ContentView: View {
     @State private var showNothingToSave = false
     @State private var pendingWorkoutTarget: WorkoutSessionTarget?
     @State private var pendingShowWorkouts = false
+    @State private var completionCelebration: WorkoutCompletionCelebration?
 
     var body: some View {
         if profileState.hasProfile == true {
@@ -458,6 +464,13 @@ struct ContentView: View {
                 }
             }
             .tabBarMinimizeBehavior(.automatic)
+            .workoutCompletionPopup(
+                celebration: (!appCoordinator.showingWorkouts && appCoordinator.presentedWorkout == nil)
+                    ? completionCelebration
+                    : nil
+            ) {
+                WorkoutSessionRepository.shared.dismissCompletionCelebration()
+            }
             .environment(chatCoordinator)
             .onChange(of: appCoordinator.selectedTab) {
                 appCoordinator.workoutMenuExpanded = false
@@ -471,11 +484,14 @@ struct ContentView: View {
                 WorkoutsSheet(
                     activeSession: activeSession,
                     restRemainingSeconds: restRemainingSeconds,
-                    restTotalSeconds: Int(activeRestTimer?.durationSeconds ?? WorkoutSessionFormStateKt.REST_TIMER_DURATION_SECONDS)
+                    restTotalSeconds: Int(activeRestTimer?.durationSeconds ?? WorkoutSessionFormStateKt.REST_TIMER_DURATION_SECONDS),
+                    completionCelebration: completionCelebration
                 )
+                .environment(chatCoordinator)
             }
             .sheet(item: $appCoordinator.presentedWorkout) { target in
                 WorkoutSessionSheet(target: target)
+                    .environment(chatCoordinator)
             }
             .sheet(item: $chatCoordinator.activeSheet, onDismiss: {
                 if pendingShowWorkouts {
@@ -529,6 +545,11 @@ struct ContentView: View {
             .task {
                 for await session in WorkoutSessionRepository.shared.activeSession {
                     activeSession = session
+                }
+            }
+            .task {
+                for await celebration in WorkoutSessionRepository.shared.completionCelebration {
+                    completionCelebration = celebration
                 }
             }
             .task {

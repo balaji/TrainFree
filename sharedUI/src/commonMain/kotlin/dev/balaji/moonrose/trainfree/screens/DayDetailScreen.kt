@@ -1,9 +1,7 @@
 package dev.balaji.moonrose.trainfree.screens
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -18,11 +16,9 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.AlertDialog
@@ -33,7 +29,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedCard
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -48,8 +43,6 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import dev.balaji.moonrose.trainfree.chat.ChatSeedContext
@@ -67,26 +60,21 @@ import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.stringResource
 import dev.balaji.moonrose.trainfree.sharedui.resources.*
 
-private val JournalAccentColor = Color(0xFF8E24AA)
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DayDetailScreen(
     route: DayDetailRoute,
     onGoBack: () -> Unit,
-    onOpenChat: ((ChatSeedContext) -> Unit)? = null,
+    @Suppress("UNUSED_PARAMETER") onOpenChat: ((ChatSeedContext) -> Unit)? = null,
     onLogWorkout: () -> Unit = {},
     onEditSession: (Long) -> Unit = {},
-    onEditJournal: () -> Unit = {},
 ) {
     val title = formatDayTitle(route.epochDay)
     if (LocalUseNativeNavigation.current) {
         DayDetailContent(
             route = route,
-            onOpenChat = onOpenChat,
             onLogWorkout = onLogWorkout,
             onEditSession = onEditSession,
-            onEditJournal = onEditJournal,
             modifier = Modifier.padding(WindowInsets.safeDrawing.asPaddingValues()),
         )
     } else {
@@ -104,10 +92,8 @@ fun DayDetailScreen(
         ) { padding ->
             DayDetailContent(
                 route = route,
-                onOpenChat = onOpenChat,
                 onLogWorkout = onLogWorkout,
                 onEditSession = onEditSession,
-                onEditJournal = onEditJournal,
                 modifier = Modifier.padding(padding),
             )
         }
@@ -117,10 +103,8 @@ fun DayDetailScreen(
 @Composable
 private fun DayDetailContent(
     route: DayDetailRoute,
-    onOpenChat: ((ChatSeedContext) -> Unit)?,
     onLogWorkout: () -> Unit,
     onEditSession: (Long) -> Unit,
-    onEditJournal: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val state = remember(route.epochDay) { DayDetailState(route.epochDay) }
@@ -145,47 +129,27 @@ private fun DayDetailContent(
         ),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        if (onOpenChat != null && uiState.sessions.isNotEmpty()) {
-            item(key = "ask_coach") {
+        if (!uiState.isFuture) {
+            item(key = "log_workout") {
                 OutlinedButton(
-                    onClick = {
-                        onOpenChat(ChatSeedContext(kind = "day", epochDay = route.epochDay))
-                    },
+                    onClick = onLogWorkout,
                     modifier = Modifier.fillMaxWidth(),
                 ) {
-                    Icon(
-                        imageVector = Icons.Default.AutoAwesome,
-                        contentDescription = null,
-                        modifier = Modifier.size(18.dp),
-                    )
+                    Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(18.dp))
                     Spacer(Modifier.width(8.dp))
-                    Text(stringResource(Res.string.chat_ask_workout))
+                    Text(stringResource(Res.string.log_completed_workout))
                 }
             }
         }
 
         if (uiState.sessions.isEmpty()) {
             item(key = "empty_workouts") {
-                Column(
+                Text(
+                    stringResource(Res.string.no_workouts_this_day),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    Text(
-                        stringResource(Res.string.no_workouts_this_day),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    if (!uiState.isFuture) {
-                        OutlinedButton(
-                            onClick = onLogWorkout,
-                            modifier = Modifier.fillMaxWidth(),
-                        ) {
-                            Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(18.dp))
-                            Spacer(Modifier.width(8.dp))
-                            Text(stringResource(Res.string.log_completed_workout))
-                        }
-                    }
-                }
+                )
             }
         } else {
             items(uiState.sessions, key = { it.id }) { session ->
@@ -200,25 +164,6 @@ private fun DayDetailContent(
                     onDelete = { sessionPendingDelete = session },
                 )
             }
-            if (!uiState.isFuture) {
-                item(key = "add_another_workout") {
-                    OutlinedButton(
-                        onClick = onLogWorkout,
-                        modifier = Modifier.fillMaxWidth(),
-                    ) {
-                        Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(18.dp))
-                        Spacer(Modifier.width(8.dp))
-                        Text(stringResource(Res.string.log_completed_workout))
-                    }
-                }
-            }
-        }
-
-        item(key = "journal_section") {
-            JournalSummaryCard(
-                content = uiState.journalContent,
-                onEditJournal = onEditJournal,
-            )
         }
     }
 
@@ -283,51 +228,6 @@ private fun DayDetailContent(
 }
 
 @Composable
-private fun JournalSummaryCard(
-    content: String?,
-    onEditJournal: () -> Unit,
-) {
-    OutlinedCard(modifier = Modifier.fillMaxWidth()) {
-        Column(
-            modifier = Modifier.fillMaxWidth().padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Box(
-                    Modifier
-                        .size(8.dp)
-                        .clip(CircleShape)
-                        .background(JournalAccentColor),
-                )
-                Spacer(Modifier.width(8.dp))
-                Text(
-                    stringResource(Res.string.journal),
-                    style = MaterialTheme.typography.titleMedium,
-                    modifier = Modifier.weight(1f),
-                )
-                TextButton(onClick = onEditJournal) {
-                    Text(
-                        stringResource(
-                            if (content != null) Res.string.edit_journal else Res.string.write_journal,
-                        ),
-                    )
-                }
-            }
-            if (content != null) {
-                MarkdownText(
-                    markdown = content,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    modifier = Modifier.fillMaxWidth(),
-                )
-            }
-        }
-    }
-}
-
-@Composable
 private fun SessionSummaryCard(
     session: DaySession,
     weightUnit: WeightUnit,
@@ -371,9 +271,13 @@ private fun SessionSummaryCard(
 }
 
 @Composable
-private fun ExerciseSummaryRow(exercise: DaySessionExercise, weightUnit: WeightUnit) {
+internal fun ExerciseSummaryRow(exercise: DaySessionExercise, weightUnit: WeightUnit) {
     Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-        Text(exercise.name, style = MaterialTheme.typography.bodyLarge)
+        Text(
+            exercise.name,
+            style = MaterialTheme.typography.bodyLarge,
+            color = MaterialTheme.colorScheme.onSurface,
+        )
         var workingSetNumber = 0
         exercise.sets.forEach { set ->
             if (set.setType == SetType.NORMAL) workingSetNumber++

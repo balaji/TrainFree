@@ -62,6 +62,7 @@ enum L10n {
     }
     static let restOverTitle = String(localized: "rest_over_title", defaultValue: "Rest is over")
     static let restOverMessage = String(localized: "rest_over_message", defaultValue: "Time for your next set.")
+    static let workoutCompleteTitle = String(localized: "workout_complete_title", defaultValue: "Workout Complete!")
 
     // MARK: - Workout session / routine editor
     static let addExercise = String(localized: "add_exercise_cd", defaultValue: "Add Exercise")
@@ -125,7 +126,9 @@ enum L10n {
     }
     static let copyToMyPrograms = String(localized: "copy_to_my_programs", defaultValue: "Copy to my programs")
     static func exerciseCount(_ count: Int) -> String {
-        String(localized: "exercise_count", defaultValue: "\(count) exercises")
+        count == 1
+            ? String(localized: "exercise_count_one", defaultValue: "1 exercise")
+            : String(localized: "exercise_count", defaultValue: "\(count) exercises")
     }
 
     // MARK: - Sample programs (ids from sharedLogic's SampleProgram)
@@ -174,6 +177,7 @@ enum L10n {
     }
     static let exerciseHistorySection = String(localized: "exercise_history_section", defaultValue: "Recent history")
     static let exerciseHistoryNoData = String(localized: "exercise_history_no_data", defaultValue: "Log some sets to see history here.")
+    static let exerciseHistoryNeedTwoWeeks = String(localized: "exercise_history_need_two_weeks", defaultValue: "Need at least 2 weeks of data.")
     static let exerciseHistoryMetric1rm = String(localized: "exercise_history_metric_1rm", defaultValue: "1RM")
     static let exerciseHistoryMetricVolume = String(localized: "exercise_history_metric_volume", defaultValue: "Volume")
     static let exerciseHistoryMetricDuration = String(localized: "exercise_history_metric_duration", defaultValue: "Duration")
@@ -215,7 +219,6 @@ enum L10n {
     static let genderMale = String(localized: "gender_male", defaultValue: "Male")
     static let genderFemale = String(localized: "gender_female", defaultValue: "Female")
     static let genderOther = String(localized: "gender_other", defaultValue: "Other")
-    static let genderPreferNotToSay = String(localized: "gender_prefer_not_to_say", defaultValue: "Prefer not to say")
     /// Display label for a language-neutral gender key stored in
     /// profile.gender (GENDER_KEYS in the shared ProfileFormState); mirrors
     /// sharedUI's genderLabel. Unknown values are shown verbatim.
@@ -224,7 +227,6 @@ enum L10n {
         case "male": return genderMale
         case "female": return genderFemale
         case "other": return genderOther
-        case "prefer_not_to_say": return genderPreferNotToSay
         default: return key
         }
     }
@@ -587,6 +589,7 @@ enum L10n {
 
     // MARK: - On-device chat assistant
     static let chatTitle = String(localized: "chat_title", defaultValue: "Ask Coach")
+    static let chatFormTipsTitle = String(localized: "chat_form_tips_title", defaultValue: "Form tips")
     static let chatNewChat = String(localized: "chat_new_chat", defaultValue: "New chat")
     static let chatInputPlaceholder = String(localized: "chat_input_placeholder", defaultValue: "Ask about your workouts...")
     static let chatSend = String(localized: "chat_send", defaultValue: "Send")
@@ -606,6 +609,10 @@ enum L10n {
     static let chatScrollToBottom = String(localized: "chat_scroll_to_bottom", defaultValue: "Scroll to bottom")
     static let chatAddAsProgram = String(localized: "chat_add_as_program", defaultValue: "Add it as a program")
 
+    static func chatFormTipsForExercise(_ exerciseName: String) -> String {
+        String(localized: "chat_prompt_exercise_form", defaultValue: "Form tips for \(exerciseName)")
+    }
+
     static func chatSuggestedPrompt(_ prompt: ChatSuggestedPrompt) -> String {
         switch prompt.key {
         case ChatSuggestedPrompt.companion.KEY_SUMMARY:
@@ -623,7 +630,7 @@ enum L10n {
         case ChatSuggestedPrompt.companion.KEY_EXERCISE_PROGRESSION:
             return String(localized: "chat_prompt_exercise_progression", defaultValue: "How is my \(prompt.arg) progressing?")
         case ChatSuggestedPrompt.companion.KEY_EXERCISE_FORM:
-            return String(localized: "chat_prompt_exercise_form", defaultValue: "Form tips for \(prompt.arg)")
+            return chatFormTipsForExercise(prompt.arg)
         case ChatSuggestedPrompt.companion.KEY_EXERCISE_SUBSTITUTES:
             return String(localized: "chat_prompt_exercise_substitutes", defaultValue: "Good substitutes for \(prompt.arg)")
         case ChatSuggestedPrompt.companion.KEY_DAY_SUMMARY:

@@ -171,4 +171,58 @@ class ProfileFormStateTest {
         assertNull(savedUnit)
         assertNull(savedProfile)
     }
+
+    @Test
+    fun genderKeysExcludePreferNotToSay() {
+        assertEquals(listOf("male", "female", "other"), GENDER_KEYS)
+    }
+
+    @Test
+    fun updatingGenderWithBlankOrNullClearsSelectionAndSavesNull() {
+        val form = newForm()
+        form.updateGender("female")
+        assertEquals("female", form.uiState.value.gender)
+
+        form.updateGender("")
+        assertNull(form.uiState.value.gender)
+
+        form.updateGender("male")
+        form.updateGender("   ")
+        assertNull(form.uiState.value.gender)
+
+        form.updateGender("other")
+        form.updateGender(null)
+        assertNull(form.uiState.value.gender)
+
+        form.save {}
+        assertNull(savedProfile?.gender)
+    }
+
+    @Test
+    fun prefillingLegacyPreferNotToSayOrBlankGenderNormalizesToNull() {
+        val legacyForm = newForm(
+            initial = Profile(id = 1L, age = 30, gender = "prefer_not_to_say", weight = null, height = null),
+        )
+        assertNull(legacyForm.uiState.value.gender)
+        legacyForm.save {}
+        assertNull(savedProfile?.gender)
+
+        val blankForm = newForm(
+            initial = Profile(id = 1L, age = 30, gender = "", weight = null, height = null),
+        )
+        assertNull(blankForm.uiState.value.gender)
+        blankForm.save {}
+        assertNull(savedProfile?.gender)
+    }
+
+    @Test
+    fun normalizeGenderPreservesValidKeysAndMapsBlankOrLegacyToNull() {
+        assertEquals("male", normalizeGender("male"))
+        assertEquals("female", normalizeGender("female"))
+        assertEquals("other", normalizeGender("other"))
+        assertNull(normalizeGender(null))
+        assertNull(normalizeGender(""))
+        assertNull(normalizeGender("   "))
+        assertNull(normalizeGender("prefer_not_to_say"))
+    }
 }

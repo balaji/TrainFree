@@ -26,6 +26,7 @@ struct ExerciseDetailView: View {
     @State private var historyState: ExerciseHistoryState
     @State private var historyUiState: ExerciseHistoryUiState
     @State private var editing = false
+    @State private var showingFormTips = false
     @State private var selectedMetric: HistoryMetric = .oneRm
     /// true = most recent weeks (`HistoryWindow.recentWeeks`); false = all history.
     @State private var zoomedIn = true
@@ -83,15 +84,26 @@ struct ExerciseDetailView: View {
             if uiState.loading {
                 ProgressView()
             } else if editing {
-                ExerciseEditForm(uiState: uiState, formState: formState, onDone: { editing = false })
+                ExerciseEditForm(
+                    uiState: uiState,
+                    formState: formState,
+                    onDone: { editing = false },
+                    onOpenFormTips: chatCoordinator.isEntryVisible ? {
+                        let trimmed = uiState.name.trimmingCharacters(in: .whitespacesAndNewlines)
+                        if !trimmed.isEmpty {
+                            openFormTips(name: trimmed)
+                        }
+                    } : nil
+                )
             } else {
                 List {
-                    if chatCoordinator.isEntryVisible && !uiState.name.isEmpty {
+                    let trimmedName = uiState.name.trimmingCharacters(in: .whitespacesAndNewlines)
+                    if chatCoordinator.isEntryVisible && !trimmedName.isEmpty {
                         Section {
                             Button {
-                                chatCoordinator.openForExercise(id: exerciseId, name: uiState.name)
+                                openFormTips(name: trimmedName)
                             } label: {
-                                Label(L10n.chatAskExercise, systemImage: "sparkles")
+                                Label(L10n.chatFormTipsForExercise(trimmedName), systemImage: "sparkles")
                             }
                         }
                     }
@@ -180,7 +192,7 @@ struct ExerciseDetailView: View {
                                     }
                                     .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
                                 } else {
-                                    Text(L10n.exerciseHistoryNoData)
+                                    Text(L10n.exerciseHistoryNeedTwoWeeks)
                                         .font(.subheadline)
                                         .foregroundStyle(.secondary)
                                 }
@@ -213,6 +225,15 @@ struct ExerciseDetailView: View {
                 }
             }
         }
+        .sheet(isPresented: $showingFormTips) {
+            ChatSheetView(chatState: chatCoordinator.chatState) { _ in }
+                .modifier(SheetAppearanceModifier())
+        }
+    }
+
+    private func openFormTips(name: String) {
+        chatCoordinator.prepareFormTips(id: exerciseId, name: name)
+        showingFormTips = true
     }
 
     /// `MMM-dd` (e.g. `Nov-14`), or `MMM yy` (e.g. `Nov 26`) when the chart spans a year or more;

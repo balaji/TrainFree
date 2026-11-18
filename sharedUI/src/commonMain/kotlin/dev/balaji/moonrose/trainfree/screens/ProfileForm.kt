@@ -102,6 +102,13 @@ fun ProfileForm(
                 expanded = genderExpanded,
                 onDismissRequest = { genderExpanded = false },
             ) {
+                DropdownMenuItem(
+                    text = { Text("—") },
+                    onClick = {
+                        formState.updateGender(null)
+                        genderExpanded = false
+                    },
+                )
                 GENDER_KEYS.forEach { key ->
                     DropdownMenuItem(
                         text = { Text(genderLabel(key)) },

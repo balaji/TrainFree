@@ -2,6 +2,7 @@ package dev.balaji.moonrose.trainfree.db
 
 import dev.balaji.moonrose.trainfree.journal.MAX_JOURNAL_WORDS
 import dev.balaji.moonrose.trainfree.journal.countJournalWords
+import dev.balaji.moonrose.trainfree.model.WeightUnit
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -21,13 +22,21 @@ data class JournalEditorUiState(
     val saving: Boolean = false,
     val saved: Boolean = false,
     val deleted: Boolean = false,
+    val workouts: List<DaySession> = emptyList(),
+    val weightUnit: WeightUnit = WeightUnit.METRIC,
 ) {
     val isOverWordLimit: Boolean get() = wordCount > maxWords
     val canSave: Boolean get() = !loading && !saving && hasUnsavedChanges && !isOverWordLimit
 }
 
+internal data class JournalDayWorkouts(
+    val sessions: List<DaySession> = emptyList(),
+    val weightUnit: WeightUnit = WeightUnit.METRIC,
+)
+
 internal interface JournalStore {
     suspend fun getForDay(epochDay: Long): String?
+    suspend fun getWorkoutsForDay(epochDay: Long): JournalDayWorkouts = JournalDayWorkouts()
     suspend fun save(epochDay: Long, content: String)
     suspend fun delete(epochDay: Long)
 }
@@ -35,6 +44,14 @@ internal interface JournalStore {
 private object RoomJournalStore : JournalStore {
     override suspend fun getForDay(epochDay: Long): String? =
         JournalRepository.getForDay(epochDay)
+
+    override suspend fun getWorkoutsForDay(epochDay: Long): JournalDayWorkouts {
+        val weightUnit = WeightUnit.fromValue(AppDb.db.userSettingDao().find(SETTING_WEIGHT_UNIT)?.value)
+        return JournalDayWorkouts(
+            sessions = loadDaySessions(epochDay, weightUnit),
+            weightUnit = weightUnit,
+        )
+    }
 
     override suspend fun save(epochDay: Long, content: String) =
         JournalRepository.save(epochDay, content)
@@ -65,6 +82,7 @@ class JournalEditorState internal constructor(
     init {
         scope.launch {
             val loaded = store.getForDay(epochDay)
+            val dayWorkouts = store.getWorkoutsForDay(epochDay)
             initialText = loaded.orEmpty()
             hasExistingEntry = loaded != null && loaded.isNotBlank()
             _uiState.value = JournalEditorUiState(
@@ -74,6 +92,8 @@ class JournalEditorState internal constructor(
                 wordCount = countJournalWords(initialText),
                 hasExistingEntry = hasExistingEntry,
                 hasUnsavedChanges = false,
+                workouts = dayWorkouts.sessions,
+                weightUnit = dayWorkouts.weightUnit,
             )
         }
     }

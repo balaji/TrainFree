@@ -1,5 +1,7 @@
 package dev.balaji.moonrose.trainfree.screens
 
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -11,11 +13,14 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.FitnessCenter
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -23,7 +28,6 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
@@ -31,6 +35,8 @@ import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.TextField
+import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -41,16 +47,22 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.TextFieldValue
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
+import dev.balaji.moonrose.trainfree.db.DaySession
 import dev.balaji.moonrose.trainfree.db.JournalEditorState
 import dev.balaji.moonrose.trainfree.journal.MarkdownEditResult
 import dev.balaji.moonrose.trainfree.journal.MarkdownFormatHelper
+import dev.balaji.moonrose.trainfree.model.WeightUnit
 import dev.balaji.moonrose.trainfree.navigation.JournalEditorRoute
 import dev.balaji.moonrose.trainfree.navigation.PlatformBackHandler
 import org.jetbrains.compose.resources.stringResource
@@ -80,6 +92,7 @@ fun JournalEditorScreen(
     var previewMode by remember { mutableStateOf(false) }
     var showDiscardConfirm by remember { mutableStateOf(false) }
     var showDeleteConfirm by remember { mutableStateOf(false) }
+    var selectedWorkout by remember { mutableStateOf<DaySession?>(null) }
 
     val attemptBack = {
         if (uiState.hasUnsavedChanges) showDiscardConfirm = true else onGoBack()
@@ -181,6 +194,42 @@ fun JournalEditorScreen(
                 )
             }
 
+            if (uiState.workouts.isNotEmpty()) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .horizontalScroll(rememberScrollState())
+                        .padding(start = 16.dp, end = 16.dp, bottom = 8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    uiState.workouts.forEach { workout ->
+                        Row(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(6.dp))
+                                .clickable(role = Role.Button) { selectedWorkout = workout }
+                                .padding(horizontal = 4.dp, vertical = 4.dp),
+                            horizontalArrangement = Arrangement.spacedBy(4.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.FitnessCenter,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(16.dp),
+                            )
+                            Text(
+                                text = workout.title,
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.primary,
+                                textDecoration = TextDecoration.Underline,
+                                maxLines = 1,
+                            )
+                        }
+                    }
+                }
+            }
+
             if (!previewMode) {
                 Surface(tonalElevation = 1.dp) {
                     Row(
@@ -221,7 +270,7 @@ fun JournalEditorScreen(
                     }
                 }
                 HorizontalDivider()
-                OutlinedTextField(
+                TextField(
                     value = fieldValue,
                     onValueChange = { next ->
                         fieldValue = next
@@ -230,10 +279,19 @@ fun JournalEditorScreen(
                         }
                     },
                     placeholder = { Text(stringResource(Res.string.journal_editor_placeholder)) },
+                    colors = TextFieldDefaults.colors(
+                        focusedContainerColor = Color.Transparent,
+                        unfocusedContainerColor = Color.Transparent,
+                        disabledContainerColor = Color.Transparent,
+                        errorContainerColor = Color.Transparent,
+                        focusedIndicatorColor = Color.Transparent,
+                        unfocusedIndicatorColor = Color.Transparent,
+                        disabledIndicatorColor = Color.Transparent,
+                        errorIndicatorColor = Color.Transparent,
+                    ),
                     modifier = Modifier
                         .fillMaxWidth()
-                        .weight(1f)
-                        .padding(16.dp),
+                        .weight(1f),
                 )
             } else {
                 HorizontalDivider()
@@ -306,4 +364,52 @@ fun JournalEditorScreen(
             },
         )
     }
+
+    selectedWorkout?.let { workout ->
+        WorkoutSetDetailsDialog(
+            session = workout,
+            weightUnit = uiState.weightUnit,
+            onDismiss = { selectedWorkout = null },
+        )
+    }
+}
+
+@Composable
+private fun WorkoutSetDetailsDialog(
+    session: DaySession,
+    weightUnit: WeightUnit,
+    onDismiss: () -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(session.title) },
+        text = {
+            if (session.exercises.isEmpty()) {
+                Text(
+                    text = "—",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            } else {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    session.exercises.forEachIndexed { index, exercise ->
+                        if (index > 0) {
+                            HorizontalDivider()
+                        }
+                        ExerciseSummaryRow(exercise, weightUnit)
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) {
+                Text(stringResource(Res.string.close))
+            }
+        },
+    )
 }

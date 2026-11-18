@@ -328,4 +328,103 @@ class ChatStateTest {
         noTools.complete("Day 1 Push: 3 sets x 8 reps. Would you like me to add it as a program?")
         assertFalse(noToolsState.uiState.value.messages.last().suggestsAddAsProgram)
     }
+
+    @Test
+    fun `read-only form tips seed auto-dispatches once, disables tools, and omits chips or sources`() {
+        val provider = FakeChatProvider(toolCalling = true)
+        val state = newState(provider)
+        val benchSeed = ChatSeedContext(
+            kind = "exercise",
+            exerciseId = 1L,
+            exerciseName = "Barbell Bench Press",
+            autoPrompt = "Form tips for Barbell Bench Press",
+            readOnly = true,
+        )
+
+        state.openWithSeed(benchSeed)
+        assertTrue(state.uiState.value.suggestedPrompts.isEmpty())
+        assertTrue(state.uiState.value.isGenerating)
+        assertEquals(0, provider.prewarms)
+        assertEquals(1, provider.requests.size)
+        assertFalse(provider.requests.single().allowTools)
+        assertEquals("Form tips for Barbell Bench Press", provider.requests.single().userMessage)
+
+        val ref = ChatSourceRef("exercise", "Barbell Bench Press", exerciseId = 1L)
+        provider.complete(
+            "Retract shoulder blades and plant your feet.\nWould you like me to add it as a program?",
+            listOf(ref),
+        )
+
+        val completedMsg = state.uiState.value.messages.last()
+        assertFalse(state.uiState.value.isGenerating)
+        assertEquals(ChatMessage.STATUS_COMPLETE, completedMsg.status)
+        assertTrue(completedMsg.sources.isEmpty())
+        assertFalse(completedMsg.suggestsAddAsProgram)
+
+        // Re-opening the same read-only seed while a completed reply exists does not re-generate.
+        state.openWithSeed(benchSeed)
+        assertEquals(1, provider.requests.size)
+        assertEquals(2, state.uiState.value.messages.size)
+
+        // Opening a different exercise resets and starts a fresh read-only inference.
+        val squatSeed = benchSeed.copy(exerciseId = 2L, exerciseName = "Squat", autoPrompt = "Form tips for Squat")
+        state.openWithSeed(squatSeed)
+        assertEquals(2, provider.requests.size)
+        assertTrue(state.uiState.value.isGenerating)
+
+        // Cancelling and re-opening the same read-only seed automatically retries.
+        state.cancelGeneration()
+        assertFalse(state.uiState.value.isGenerating)
+        state.openWithSeed(squatSeed)
+        assertEquals(3, provider.requests.size)
+        assertTrue(state.uiState.value.isGenerating)
+
+        // Failing and re-opening the same read-only seed also resets and retries.
+        provider.fail(ChatMessage.ERROR_GENERATION_FAILED)
+        assertEquals(ChatMessage.STATUS_ERROR, state.uiState.value.messages.last().status)
+        state.openWithSeed(squatSeed)
+        assertEquals(4, provider.requests.size)
+        assertTrue(state.uiState.value.isGenerating)
+
+        // Opening when unavailable does not emit an error bubble or call generate().
+        provider.availability = "apple_intelligence_disabled"
+        val unavailableSeed = squatSeed.copy(exerciseId = 3L, exerciseName = "Deadlift", autoPrompt = "Form tips for Deadlift")
+        state.openWithSeed(unavailableSeed)
+        assertEquals(4, provider.requests.size)
+        assertTrue(state.uiState.value.messages.isEmpty())
+        assertFalse(state.uiState.value.isGenerating)
+    }
+
+    @Test
+    fun `prompt builder uses focused read-only form tips instructions without tool or follow-up clauses`() {
+        val enInstructions = ChatPromptBuilder.buildInstructions(
+            seedContext = ChatSeedContext(
+                kind = "exercise",
+                exerciseId = 1L,
+                exerciseName = "Barbell Bench Press",
+                autoPrompt = "Form tips for Barbell Bench Press",
+                readOnly = true,
+            ),
+            supportsToolCalling = false,
+            languageTag = "en",
+        )
+        assertTrue(enInstructions.contains("Barbell Bench Press"))
+        assertTrue(enInstructions.contains("Do not invoke tools, do not ask follow-up questions"))
+        assertTrue(enInstructions.contains("Respond in English."))
+        assertFalse(enInstructions.contains("Today's date is"))
+
+        val svInstructions = ChatPromptBuilder.buildInstructions(
+            seedContext = ChatSeedContext(
+                kind = "exercise",
+                exerciseId = 1L,
+                exerciseName = "Knäböj",
+                autoPrompt = "Tekniktips för Knäböj",
+                readOnly = true,
+            ),
+            supportsToolCalling = false,
+            languageTag = "sv",
+        )
+        assertTrue(svInstructions.contains("Knäböj"))
+        assertTrue(svInstructions.contains("Respond in Swedish."))
+    }
 }

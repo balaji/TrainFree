@@ -325,7 +325,7 @@ internal suspend fun AppDatabase.exportBackup(exportedAt: Long = nowMillis()): T
     val profile = profileDao().get()?.let {
         BackupProfile(
             age = it.age,
-            gender = it.gender,
+            gender = normalizeGender(it.gender),
             weight = it.weight,
             height = it.height,
             createdAt = it.createdAt,
@@ -487,7 +487,7 @@ internal suspend fun AppDatabase.importBackup(backup: TrainFreeBackup) {
                 ProfileEntity(
                     id = PROFILE_ID,
                     age = profile.age,
-                    gender = profile.gender,
+                    gender = normalizeGender(profile.gender),
                     weight = profile.weight,
                     height = profile.height,
                     createdAt = profile.createdAt,

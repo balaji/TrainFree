@@ -326,7 +326,9 @@ internal class ChatContextRouter(
             !wantsBodyMetrics &&
             !wantsSummary &&
             !wantsProgressReview
-        val wantsForm = containsAny(padded, FORM_KEYWORDS) || asksExerciseExplanation
+        val wantsForm = (seedContext.kind == "exercise" && seedContext.readOnly) ||
+            containsAny(padded, FORM_KEYWORDS) ||
+            asksExerciseExplanation
 
         return RoutedPlan(
             exerciseQuery = matchedExercise,

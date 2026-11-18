@@ -74,7 +74,7 @@ class AndroidHealthSyncProvider(
                 startZoneOffset = zoneOffsetAt(start),
                 endTime = end,
                 endZoneOffset = zoneOffsetAt(end),
-                metadata = Metadata.manualEntry(clientRecordId = "trainfree_session_$sessionId"),
+                metadata = Metadata.manualEntry(clientRecordId = workoutClientRecordId(sessionId)),
                 exerciseType = ExerciseSessionRecord.EXERCISE_TYPE_STRENGTH_TRAINING,
                 title = title,
             )
@@ -84,6 +84,23 @@ class AndroidHealthSyncProvider(
             false
         }
     }
+
+    override suspend fun deleteStrengthWorkout(sessionId: Long): Boolean {
+        val hc = client ?: return false
+        if (!hasWorkoutWritePermission()) return false
+        return try {
+            hc.deleteRecords(
+                recordType = ExerciseSessionRecord::class,
+                recordIdsList = emptyList(),
+                clientRecordIdsList = listOf(workoutClientRecordId(sessionId)),
+            )
+            true
+        } catch (_: Throwable) {
+            false
+        }
+    }
+
+    private fun workoutClientRecordId(sessionId: Long): String = "trainfree_session_$sessionId"
 
     override suspend fun writeBodyWeight(
         metricId: Long,

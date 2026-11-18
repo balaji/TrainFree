@@ -27,9 +27,22 @@ struct ExerciseEditForm: View {
     let uiState: ExerciseFormUiState
     let formState: ExerciseFormState
     let onDone: () -> Void
+    var onOpenFormTips: (() -> Void)? = nil
+
+    private var trimmedName: String {
+        uiState.name.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
 
     var body: some View {
         Form {
+            if let onOpenFormTips, !trimmedName.isEmpty {
+                Section {
+                    Button(action: onOpenFormTips) {
+                        Label(L10n.chatFormTipsForExercise(trimmedName), systemImage: "sparkles")
+                    }
+                }
+            }
+
             Section {
                 TextField(L10n.name, text: Binding(
                     get: { uiState.name },

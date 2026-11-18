@@ -6,7 +6,6 @@ import Charts
 /// the on-device model when Apple Intelligence is available, plus body-weight
 /// logging. Named to avoid clashing with SwiftUI's own `ProgressView`.
 struct ProgressTabView: View {
-    @Environment(ChatCoordinator.self) private var chatCoordinator
     @State private var state = ProgressScreenState()
     @State private var narrationState = InsightNarrationState(
         provider: FoundationModelInsightProvider()
@@ -49,17 +48,6 @@ struct ProgressTabView: View {
             for await value in narrationState.narrations {
                 withAnimation(.easeIn(duration: 0.3)) {
                     narrations = value
-                }
-            }
-        }
-        .toolbar {
-            if chatCoordinator.isEntryVisible {
-                ToolbarItem(placement: .primaryAction) {
-                    Button {
-                        chatCoordinator.open()
-                    } label: {
-                        Label(L10n.chatTitle, systemImage: "sparkles")
-                    }
                 }
             }
         }

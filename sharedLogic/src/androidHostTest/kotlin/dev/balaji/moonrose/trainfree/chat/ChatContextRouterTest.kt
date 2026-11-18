@@ -207,4 +207,20 @@ class ChatContextRouterTest {
         router(tbYesterday).route("What did I do yesterday?")
         assertEquals(listOf("day:$yesterday"), tbYesterday.calls)
     }
+
+    @Test
+    fun `read-only exercise form seed routes non-English prompts to form metadata only`() = runBlocking {
+        val tb = RecordingToolbox()
+        router(tb).route(
+            "Tekniktips för Barbell Bench Press",
+            ChatSeedContext(
+                kind = "exercise",
+                exerciseId = 1L,
+                exerciseName = "Barbell Bench Press",
+                autoPrompt = "Tekniktips för Barbell Bench Press",
+                readOnly = true,
+            ),
+        )
+        assertEquals(listOf("search:q=Barbell Bench Press,bp=,eq="), tb.calls)
+    }
 }

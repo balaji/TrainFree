@@ -25,7 +25,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Assignment
 import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.CalendarMonth
-import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.FitnessCenter
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
@@ -85,7 +84,6 @@ private fun weekdayLabels(weekStartsMonday: Boolean): List<String> {
 @Composable
 fun CalendarScreen(
     onDayClick: (epochDay: Long) -> Unit = {},
-    onLogWorkout: (epochDay: Long) -> Unit = {},
     onEditJournal: (epochDay: Long) -> Unit = {},
 ) {
     // Local state, not a route: toggling between the calendar grid and the
@@ -97,7 +95,6 @@ fun CalendarScreen(
         CalendarContent(
             modifier = Modifier.padding(WindowInsets.safeDrawing.asPaddingValues()),
             onDayClick = onDayClick,
-            onLogWorkout = onLogWorkout,
             onEditJournal = onEditJournal,
         )
     } else {
@@ -122,7 +119,6 @@ fun CalendarScreen(
                 CalendarContent(
                     modifier = Modifier.padding(padding),
                     onDayClick = onDayClick,
-                    onLogWorkout = onLogWorkout,
                     onEditJournal = onEditJournal,
                 )
             }
@@ -135,7 +131,6 @@ fun CalendarScreen(
 private fun CalendarContent(
     modifier: Modifier,
     onDayClick: (Long) -> Unit,
-    onLogWorkout: (Long) -> Unit,
     onEditJournal: (Long) -> Unit,
 ) {
     val model by CalendarRepository.calendar.collectAsState(initial = null)
@@ -167,11 +162,7 @@ private fun CalendarContent(
         DayActionSheet(
             day = day,
             onDismiss = { selectedDay = null },
-            onLogWorkout = {
-                selectedDay = null
-                onLogWorkout(day.epochDay)
-            },
-            onEditExistingWorkout = {
+            onOpenWorkouts = {
                 selectedDay = null
                 onDayClick(day.epochDay)
             },
@@ -188,8 +179,7 @@ private fun CalendarContent(
 private fun DayActionSheet(
     day: CalendarDay,
     onDismiss: () -> Unit,
-    onLogWorkout: () -> Unit,
-    onEditExistingWorkout: () -> Unit,
+    onOpenWorkouts: () -> Unit,
     onWriteJournal: () -> Unit,
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
@@ -207,7 +197,7 @@ private fun DayActionSheet(
             Spacer(Modifier.height(4.dp))
             if (!day.isFuture) {
                 ListItem(
-                    headlineContent = { Text(stringResource(Res.string.log_workout_title)) },
+                    headlineContent = { Text(stringResource(Res.string.tab_workouts)) },
                     leadingContent = {
                         Icon(
                             Icons.Filled.FitnessCenter,
@@ -215,21 +205,8 @@ private fun DayActionSheet(
                             tint = MaterialTheme.colorScheme.primary,
                         )
                     },
-                    modifier = Modifier.clickable(onClick = onLogWorkout),
+                    modifier = Modifier.clickable(onClick = onOpenWorkouts),
                 )
-                if (day.hasCompletedWorkout) {
-                    ListItem(
-                        headlineContent = { Text(stringResource(Res.string.edit_workout_title)) },
-                        leadingContent = {
-                            Icon(
-                                Icons.Filled.Edit,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.primary,
-                            )
-                        },
-                        modifier = Modifier.clickable(onClick = onEditExistingWorkout),
-                    )
-                }
             }
             ListItem(
                 headlineContent = { Text(stringResource(Res.string.journal)) },

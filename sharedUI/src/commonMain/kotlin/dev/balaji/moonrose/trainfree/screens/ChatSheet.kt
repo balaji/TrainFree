@@ -106,6 +106,12 @@ fun ChatSheet(
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     var inputText by remember { mutableStateOf("") }
     val addAsProgramPrompt = stringResource(Res.string.chat_add_as_program)
+    val readOnly = uiState.seedContext.readOnly
+    val title = if (readOnly && uiState.seedContext.kind == "exercise") {
+        stringResource(Res.string.chat_form_tips_title)
+    } else {
+        stringResource(Res.string.chat_title)
+    }
 
     ModalBottomSheet(
         onDismissRequest = {
@@ -122,7 +128,8 @@ fun ChatSheet(
                 .imePadding(),
         ) {
             ChatHeader(
-                hasMessages = uiState.messages.isNotEmpty(),
+                title = title,
+                showNewChat = !readOnly && uiState.messages.isNotEmpty(),
                 onNewChat = chatState::clearConversation,
                 onDismiss = {
                     chatState.cancelGeneration()
@@ -152,15 +159,18 @@ fun ChatSheet(
                     .fillMaxWidth(),
             ) {
                 if (uiState.messages.isEmpty()) {
-                    ChatEmptyState(
-                        uiState = uiState,
-                        enabled = uiState.availability == "available",
-                        onPromptClick = { promptText -> chatState.sendMessage(promptText) },
-                    )
+                    if (!readOnly) {
+                        ChatEmptyState(
+                            uiState = uiState,
+                            enabled = uiState.availability == "available",
+                            onPromptClick = { promptText -> chatState.sendMessage(promptText) },
+                        )
+                    }
                 } else {
                     ChatMessageList(
                         messages = uiState.messages,
                         isGenerating = uiState.isGenerating,
+                        readOnly = readOnly,
                         onRetry = chatState::retryLast,
                         onSourceClick = onSourceClick,
                         onAddAsProgram = { chatState.sendMessage(addAsProgramPrompt) },
@@ -168,28 +178,31 @@ fun ChatSheet(
                 }
             }
 
-            HorizontalDivider()
-            ChatComposer(
-                text = inputText,
-                onTextChange = { inputText = it },
-                isGenerating = uiState.isGenerating,
-                enabled = uiState.availability == "available",
-                onSend = {
-                    val trimmed = inputText.trim()
-                    if (trimmed.isNotEmpty()) {
-                        inputText = ""
-                        chatState.sendMessage(trimmed)
-                    }
-                },
-                onStop = chatState::cancelGeneration,
-            )
+            if (!readOnly) {
+                HorizontalDivider()
+                ChatComposer(
+                    text = inputText,
+                    onTextChange = { inputText = it },
+                    isGenerating = uiState.isGenerating,
+                    enabled = uiState.availability == "available",
+                    onSend = {
+                        val trimmed = inputText.trim()
+                        if (trimmed.isNotEmpty()) {
+                            inputText = ""
+                            chatState.sendMessage(trimmed)
+                        }
+                    },
+                    onStop = chatState::cancelGeneration,
+                )
+            }
         }
     }
 }
 
 @Composable
 private fun ChatHeader(
-    hasMessages: Boolean,
+    title: String,
+    showNewChat: Boolean,
     onNewChat: () -> Unit,
     onDismiss: () -> Unit,
 ) {
@@ -206,13 +219,13 @@ private fun ChatHeader(
             modifier = Modifier.size(20.dp),
         )
         Text(
-            text = stringResource(Res.string.chat_title),
+            text = title,
             style = MaterialTheme.typography.titleMedium,
             modifier = Modifier
                 .weight(1f)
                 .padding(start = 8.dp),
         )
-        if (hasMessages) {
+        if (showNewChat) {
             TextButton(onClick = onNewChat) {
                 Text(stringResource(Res.string.chat_new_chat))
             }
@@ -266,6 +279,7 @@ private const val BOTTOM_ANCHOR_KEY = "__chat_bottom_anchor__"
 private fun ChatMessageList(
     messages: List<ChatMessage>,
     isGenerating: Boolean,
+    readOnly: Boolean,
     onRetry: () -> Unit,
     onSourceClick: (ChatSourceRef) -> Unit,
     onAddAsProgram: () -> Unit,
@@ -426,6 +440,7 @@ private fun ChatMessageList(
                 ChatMessageBubble(
                     message = message,
                     isGenerating = isGenerating,
+                    readOnly = readOnly,
                     onRetry = onRetry,
                     onSourceClick = onSourceClick,
                     onAddAsProgram = onAddAsProgram,
@@ -438,7 +453,7 @@ private fun ChatMessageList(
         }
 
         AnimatedVisibility(
-            visible = showScrollToBottomBadge,
+            visible = !readOnly && showScrollToBottomBadge,
             enter = fadeIn() + scaleIn(initialScale = 0.9f),
             exit = fadeOut() + scaleOut(targetScale = 0.9f),
             modifier = Modifier
@@ -544,6 +559,7 @@ private suspend fun settleAtBottom(
 private fun ChatMessageBubble(
     message: ChatMessage,
     isGenerating: Boolean,
+    readOnly: Boolean,
     onRetry: () -> Unit,
     onSourceClick: (ChatSourceRef) -> Unit,
     onAddAsProgram: () -> Unit,
@@ -613,21 +629,25 @@ private fun ChatMessageBubble(
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.error,
                     )
-                    TextButton(
-                        onClick = onRetry,
-                        contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp),
-                    ) {
-                        Text(stringResource(Res.string.chat_retry))
+                    if (!readOnly) {
+                        TextButton(
+                            onClick = onRetry,
+                            contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp),
+                        ) {
+                            Text(stringResource(Res.string.chat_retry))
+                        }
                     }
                 }
             }
         }
 
-        val showAddAction = !isUser &&
+        val showAddAction = !readOnly &&
+            !isUser &&
             !isGenerating &&
             message.status == ChatMessage.STATUS_COMPLETE &&
             message.suggestsAddAsProgram
-        val showSources = !isUser &&
+        val showSources = !readOnly &&
+            !isUser &&
             message.sources.isNotEmpty() &&
             message.status == ChatMessage.STATUS_COMPLETE
         if (showAddAction || showSources) {

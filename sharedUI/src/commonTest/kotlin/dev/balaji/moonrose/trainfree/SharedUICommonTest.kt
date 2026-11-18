@@ -1,13 +1,16 @@
 package dev.balaji.moonrose.trainfree
 
+import dev.balaji.moonrose.trainfree.model.Profile
 import dev.balaji.moonrose.trainfree.screens.formatCountdown
 import dev.balaji.moonrose.trainfree.screens.formatMonthDay
 import dev.balaji.moonrose.trainfree.screens.formatMonthYear
+import dev.balaji.moonrose.trainfree.screens.initialBmiInputs
 import dev.balaji.moonrose.trainfree.screens.progressionYAxisBounds
 import dev.balaji.moonrose.trainfree.screens.remainingSecondsUntil
 import dev.balaji.moonrose.trainfree.screens.yAxisBounds
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class SharedUICommonTest {
@@ -59,5 +62,23 @@ class SharedUICommonTest {
         val (lo, hi) = progressionYAxisBounds(-1.2, 0.3)
         assertTrue(lo <= -1.2 && hi >= 0.3 && hi - lo >= 2.0)
         assertEquals(-15.0 to 20.0, progressionYAxisBounds(-15.0, 20.0))
+    }
+
+    @Test
+    fun initialBmiInputsReturnsInputsOnlyWhenWeightAndHeightArePositiveFinite() {
+        val complete = Profile(id = 1L, age = 30, gender = null, weight = 99.0, height = 183.0)
+        assertEquals(99.0 to 183.0, initialBmiInputs(complete))
+
+        assertNull(initialBmiInputs(null))
+        assertNull(initialBmiInputs(complete.copy(weight = null)))
+        assertNull(initialBmiInputs(complete.copy(height = null)))
+        assertNull(initialBmiInputs(complete.copy(weight = 0.0)))
+        assertNull(initialBmiInputs(complete.copy(weight = -1.0)))
+        assertNull(initialBmiInputs(complete.copy(weight = Double.NaN)))
+        assertNull(initialBmiInputs(complete.copy(weight = Double.POSITIVE_INFINITY)))
+        assertNull(initialBmiInputs(complete.copy(height = 0.0)))
+        assertNull(initialBmiInputs(complete.copy(height = -1.0)))
+        assertNull(initialBmiInputs(complete.copy(height = Double.NaN)))
+        assertNull(initialBmiInputs(complete.copy(height = Double.POSITIVE_INFINITY)))
     }
 }

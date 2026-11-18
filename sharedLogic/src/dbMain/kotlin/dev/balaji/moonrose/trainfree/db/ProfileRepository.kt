@@ -24,7 +24,7 @@ object ProfileRepository {
             ProfileEntity(
                 id = PROFILE_ID,
                 age = age,
-                gender = gender,
+                gender = normalizeGender(gender),
                 weight = weight,
                 height = height,
                 createdAt = existing?.createdAt ?: now,
@@ -38,7 +38,7 @@ private fun ProfileEntity.toDomain() =
     Profile(
         id = id,
         age = age,
-        gender = gender,
+        gender = normalizeGender(gender),
         weight = weight,
         height = height,
     )

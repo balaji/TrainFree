@@ -24,6 +24,7 @@ private final class ChatTaskHandle: ChatStreamHandle {
 final class FoundationModelChatProvider: ChatGenerationProvider {
     @MainActor private var session: LanguageModelSession?
     @MainActor private var lastInstructions: String = ""
+    @MainActor private var lastAllowTools: Bool = true
     private let sourceCollector = ChatSourceCollector()
 
     func availability() -> String {
@@ -59,14 +60,20 @@ final class FoundationModelChatProvider: ChatGenerationProvider {
             let needsFreshSession =
                 session == nil ||
                 request.resetSession ||
-                lastInstructions != request.instructions
+                lastInstructions != request.instructions ||
+                lastAllowTools != request.allowTools
 
             if needsFreshSession {
-                session = LanguageModelSession(
-                    tools: makeFoundationChatTools(collector: sourceCollector),
-                    instructions: request.instructions
-                )
+                session = if request.allowTools {
+                    LanguageModelSession(
+                        tools: makeFoundationChatTools(collector: sourceCollector),
+                        instructions: request.instructions
+                    )
+                } else {
+                    LanguageModelSession(instructions: request.instructions)
+                }
                 lastInstructions = request.instructions
+                lastAllowTools = request.allowTools
             }
 
             guard let activeSession = session else { return }

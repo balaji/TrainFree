@@ -7,8 +7,10 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.width
@@ -131,7 +133,10 @@ fun ProfileScreen() {
             ProfileContent(
                 editing = editing,
                 onEditingChange = { editing = it },
-                modifier = Modifier.padding(padding),
+                modifier = Modifier
+                    .padding(padding)
+                    .consumeWindowInsets(padding)
+                    .imePadding(),
             )
         }
     }
@@ -186,7 +191,7 @@ private fun ProfileDetails(profile: Profile, onEdit: () -> Unit) {
         TextButton(onClick = onEdit, modifier = Modifier.align(Alignment.End)) {
             Text(stringResource(Res.string.edit))
         }
-        ToolsSection()
+        ToolsSection(profile = profile)
         SettingsSection()
         HealthSyncSection()
         BackupSection()
@@ -428,9 +433,8 @@ private fun HealthSyncSection() {
  * today, with room for more (e.g. macro or plate-math calculators) later.
  */
 @Composable
-private fun ToolsSection() {
+private fun ToolsSection(profile: Profile) {
     val settings by UserSettingsRepository.settings.collectAsState(initial = null)
-    val profile by ProfileRepository.profile.collectAsState(initial = null)
     var showOneRmCalculator by remember { mutableStateOf(false) }
     var showBmiCalculator by remember { mutableStateOf(false) }
     val currentSettings = settings ?: return

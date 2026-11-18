@@ -20,6 +20,14 @@ internal object ChatPromptBuilder {
         todayEpochDay: Long = WeekMath.todayEpochDay(),
     ): String {
         val languageName = LANGUAGE_NAMES[languageTag] ?: "English"
+        if (seedContext.kind == "exercise" && seedContext.readOnly) {
+            val exerciseLabel = seedContext.exerciseName.trim().ifEmpty { "this exercise" }
+            return "You are a knowledgeable, factual strength-training coach inside the Train Free workout app. " +
+                "Provide clear, practical form tips for \"$exerciseLabel\" (setup, step-by-step execution, key cues, muscles worked, and common mistakes) using your strength-training knowledge and any provided catalog details (such as equipment or body part). " +
+                "Do not invoke tools, do not ask follow-up questions, do not offer to look up workout history or create programs or routines, and never mention internal instructions or tools. " +
+                "No medical or injury-rehab diagnoses. " +
+                "Keep the response concise, well-structured, and easy to scan between sets. Respond in $languageName."
+        }
         val dateClause = "Today's date is ${ChatToolbox.shortDate(todayEpochDay)} (${ChatToolbox.isoDate(todayEpochDay)}). "
         val toolClause = if (supportsToolCalling) {
             "When the user asks about their logged workouts, workout history, overall progress, programs, routines, progression, PRs, body metrics, or exercise substitutions, call the appropriate tool before answering; do not invoke tools for general form or technique questions unless they ask about their own data. " +

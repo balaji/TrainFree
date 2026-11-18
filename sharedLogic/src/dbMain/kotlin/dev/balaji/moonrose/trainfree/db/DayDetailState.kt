@@ -76,55 +76,68 @@ class DayDetailState(private val epochDay: Long) {
     suspend fun renameSession(sessionId: Long, title: String) {
         WorkoutSessionRepository.renameSession(sessionId, title)
     }
+}
 
-    private suspend fun toDaySession(
-        session: WorkoutSessionEntity,
-        displayUnit: WeightUnit,
-    ): DaySession {
-        val routine = session.routineId?.let { AppDb.db.routineDao().findById(it) }
-        val details = AppDb.db.workoutSessionDetailDao().getForSession(session.id)
-        return DaySession(
-            id = session.id,
-            title = resolveWorkoutTitle(session.title, routine?.name, session.performedAt),
-            exercises = groupByExercise(details, displayUnit),
+@OptIn(ExperimentalTime::class)
+internal suspend fun loadDaySessions(
+    epochDay: Long,
+    displayUnit: WeightUnit,
+): List<DaySession> {
+    val zone = TimeZone.currentSystemDefault()
+    val startMillis = LocalDate.fromEpochDays(epochDay).atStartOfDayIn(zone).toEpochMilliseconds()
+    val endMillis = LocalDate.fromEpochDays(epochDay + 1).atStartOfDayIn(zone).toEpochMilliseconds()
+    return AppDb.db.workoutSessionDao()
+        .getCompletedInRange(PROFILE_ID, startMillis, endMillis)
+        .map { toDaySession(it, displayUnit) }
+}
+
+internal suspend fun toDaySession(
+    session: WorkoutSessionEntity,
+    displayUnit: WeightUnit,
+): DaySession {
+    val routine = session.routineId?.let { AppDb.db.routineDao().findById(it) }
+    val details = AppDb.db.workoutSessionDetailDao().getForSession(session.id)
+    return DaySession(
+        id = session.id,
+        title = resolveWorkoutTitle(session.title, routine?.name, session.performedAt),
+        exercises = groupByExercise(details, displayUnit),
+    )
+}
+
+/** Details arrive in flat position order with sets of the same exercise adjacent. */
+private suspend fun groupByExercise(
+    details: List<WorkoutSessionDetailEntity>,
+    displayUnit: WeightUnit,
+): List<DaySessionExercise> {
+    val grouped = mutableListOf<DaySessionExercise>()
+    var currentExerciseId = -1L
+    var currentName = ""
+    var currentSets = mutableListOf<DaySessionSet>()
+    fun flush() {
+        if (currentSets.isNotEmpty()) grouped.add(DaySessionExercise(currentName, currentSets.toList()))
+    }
+    for (detail in details) {
+        if (detail.exerciseId != currentExerciseId) {
+            flush()
+            currentExerciseId = detail.exerciseId
+            currentName = ExerciseRepository.findById(detail.exerciseId)?.name.orEmpty()
+            currentSets = mutableListOf()
+        }
+        currentSets.add(
+            DaySessionSet(
+                targetWeight = detail.targetWeight?.let { WeightUnit.formatWeight(it, detail.weightUnit, displayUnit) }.orEmpty(),
+                targetReps = detail.targetReps?.toString().orEmpty(),
+                targetDuration = detail.targetDuration?.let(::formatDurationHhMm).orEmpty(),
+                targetDistance = detail.targetDistance?.let { WeightUnit.formatDistance(it, detail.weightUnit, displayUnit) }.orEmpty(),
+                actualWeight = detail.actualWeight?.let { WeightUnit.formatWeight(it, detail.weightUnit, displayUnit) }.orEmpty(),
+                actualReps = detail.actualReps?.toString().orEmpty(),
+                actualDuration = detail.actualDuration?.let(::formatDurationHhMm).orEmpty(),
+                actualDistance = detail.actualDistance?.let { WeightUnit.formatDistance(it, detail.weightUnit, displayUnit) }.orEmpty(),
+                setType = detail.setType,
+                completed = detail.completed,
+            ),
         )
     }
-
-    /** Details arrive in flat position order with sets of the same exercise adjacent. */
-    private suspend fun groupByExercise(
-        details: List<WorkoutSessionDetailEntity>,
-        displayUnit: WeightUnit,
-    ): List<DaySessionExercise> {
-        val grouped = mutableListOf<DaySessionExercise>()
-        var currentExerciseId = -1L
-        var currentName = ""
-        var currentSets = mutableListOf<DaySessionSet>()
-        fun flush() {
-            if (currentSets.isNotEmpty()) grouped.add(DaySessionExercise(currentName, currentSets.toList()))
-        }
-        for (detail in details) {
-            if (detail.exerciseId != currentExerciseId) {
-                flush()
-                currentExerciseId = detail.exerciseId
-                currentName = ExerciseRepository.findById(detail.exerciseId)?.name.orEmpty()
-                currentSets = mutableListOf()
-            }
-            currentSets.add(
-                DaySessionSet(
-                    targetWeight = detail.targetWeight?.let { WeightUnit.formatWeight(it, detail.weightUnit, displayUnit) }.orEmpty(),
-                    targetReps = detail.targetReps?.toString().orEmpty(),
-                    targetDuration = detail.targetDuration?.let(::formatDurationHhMm).orEmpty(),
-                    targetDistance = detail.targetDistance?.let { WeightUnit.formatDistance(it, detail.weightUnit, displayUnit) }.orEmpty(),
-                    actualWeight = detail.actualWeight?.let { WeightUnit.formatWeight(it, detail.weightUnit, displayUnit) }.orEmpty(),
-                    actualReps = detail.actualReps?.toString().orEmpty(),
-                    actualDuration = detail.actualDuration?.let(::formatDurationHhMm).orEmpty(),
-                    actualDistance = detail.actualDistance?.let { WeightUnit.formatDistance(it, detail.weightUnit, displayUnit) }.orEmpty(),
-                    setType = detail.setType,
-                    completed = detail.completed,
-                ),
-            )
-        }
-        flush()
-        return grouped
-    }
+    flush()
+    return grouped
 }

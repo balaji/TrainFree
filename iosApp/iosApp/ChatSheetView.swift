@@ -37,18 +37,41 @@ final class ChatCoordinator {
         availability = provider.availability()
     }
 
-    func open(seed: ChatSeedContext = ChatSeedContext(kind: "general", exerciseId: 0, exerciseName: "", epochDay: 0)) {
+    func open(seed: ChatSeedContext = ChatSeedContext(kind: "general", exerciseId: 0, exerciseName: "", epochDay: 0, autoPrompt: "", readOnly: false)) {
         refreshAvailability()
         chatState.openWithSeed(seed: seed)
         activeSheet = .chat
     }
 
     func openForExercise(id: Int64, name: String) {
-        open(seed: ChatSeedContext(kind: "exercise", exerciseId: id, exerciseName: name, epochDay: 0))
+        open(
+            seed: ChatSeedContext(
+                kind: "exercise",
+                exerciseId: id,
+                exerciseName: name,
+                epochDay: 0,
+                autoPrompt: L10n.chatFormTipsForExercise(name),
+                readOnly: true
+            )
+        )
+    }
+
+    func prepareFormTips(id: Int64, name: String) {
+        refreshAvailability()
+        chatState.openWithSeed(
+            seed: ChatSeedContext(
+                kind: "exercise",
+                exerciseId: id,
+                exerciseName: name,
+                epochDay: 0,
+                autoPrompt: L10n.chatFormTipsForExercise(name),
+                readOnly: true
+            )
+        )
     }
 
     func openForDay(epochDay: Int64) {
-        open(seed: ChatSeedContext(kind: "day", exerciseId: 0, exerciseName: "", epochDay: epochDay))
+        open(seed: ChatSeedContext(kind: "day", exerciseId: 0, exerciseName: "", epochDay: epochDay, autoPrompt: "", readOnly: false))
     }
 }
 
@@ -74,14 +97,14 @@ struct ChatSheetView: View {
     let onSourceTap: (ChatSourceRef) -> Void
 
     @Environment(\.dismiss) private var dismiss
-    @State private var uiState = ChatUiState(
-        availability: "device_not_eligible",
-        messages: [],
-        isGenerating: false,
-        seedContext: ChatSeedContext(kind: "general", exerciseId: 0, exerciseName: "", epochDay: 0),
-        suggestedPrompts: []
-    )
+    @State private var uiState: ChatUiState
     @State private var inputText = ""
+
+    init(chatState: ChatState, onSourceTap: @escaping (ChatSourceRef) -> Void) {
+        self.chatState = chatState
+        self.onSourceTap = onSourceTap
+        _uiState = State(initialValue: chatState.uiState.value)
+    }
     @State private var scrollController = ChatAutoScrollController(
         throttleIntervalMillis: ChatAutoScrollController.companion.DEFAULT_THROTTLE_INTERVAL_MS
     )
@@ -107,6 +130,14 @@ struct ChatSheetView: View {
         )
     }
 
+    private var isReadOnly: Bool {
+        uiState.seedContext.readOnly
+    }
+
+    private var sheetTitle: String {
+        isReadOnly && uiState.seedContext.kind == "exercise" ? L10n.chatFormTipsTitle : L10n.chatTitle
+    }
+
     var body: some View {
         NavigationStack {
             VStack(spacing: 0) {
@@ -121,19 +152,25 @@ struct ChatSheetView: View {
                 }
 
                 if uiState.messages.isEmpty {
-                    emptyState
+                    if isReadOnly {
+                        Spacer(minLength: 0)
+                    } else {
+                        emptyState
+                    }
                 } else {
                     messageList
                 }
 
-                Divider()
-                composerBar
+                if !isReadOnly {
+                    Divider()
+                    composerBar
+                }
             }
-            .navigationTitle(L10n.chatTitle)
+            .navigationTitle(sheetTitle)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
-                    if !uiState.messages.isEmpty {
+                    if !isReadOnly && !uiState.messages.isEmpty {
                         Button(L10n.chatNewChat) {
                             chatState.clearConversation()
                         }
@@ -146,6 +183,9 @@ struct ChatSheetView: View {
                     }
                 }
             }
+        }
+        .onDisappear {
+            chatState.cancelGeneration()
         }
         .task {
             for await state in chatState.uiState {
@@ -199,6 +239,7 @@ struct ChatSheetView: View {
                             ChatBubbleRow(
                                 message: message,
                                 isGenerating: uiState.isGenerating,
+                                isReadOnly: isReadOnly,
                                 onRetry: { chatState.retryLast() },
                                 onAddAsProgram: { chatState.sendMessage(rawText: L10n.chatAddAsProgram) },
                                 onSourceTap: { source in
@@ -285,7 +326,7 @@ struct ChatSheetView: View {
                 )
             }
             .overlay(alignment: .bottom) {
-                if showScrollToBottomBadge {
+                if !isReadOnly && showScrollToBottomBadge {
                     Button {
                         lastUserScrollDirectionDown = false
                         applyScrollDecision(
@@ -409,6 +450,7 @@ struct ChatSheetView: View {
 private struct ChatBubbleRow: View {
     let message: ChatMessage
     let isGenerating: Bool
+    let isReadOnly: Bool
     let onRetry: () -> Void
     let onAddAsProgram: () -> Void
     let onSourceTap: (ChatSourceRef) -> Void
@@ -451,10 +493,12 @@ private struct ChatBubbleRow: View {
                         Text(L10n.chatErrorLabel(message.errorKey))
                             .font(.footnote)
                             .foregroundStyle(.red)
-                        Button(L10n.chatRetry) {
-                            onRetry()
+                        if !isReadOnly {
+                            Button(L10n.chatRetry) {
+                                onRetry()
+                            }
+                            .font(.footnote.weight(.medium))
                         }
-                        .font(.footnote.weight(.medium))
                     }
                 }
                 .padding(.horizontal, 14)
@@ -467,11 +511,13 @@ private struct ChatBubbleRow: View {
                 if !isUser { Spacer(minLength: 48) }
             }
 
-            let showAddAction = !isUser &&
+            let showAddAction = !isReadOnly &&
+                !isUser &&
                 !isGenerating &&
                 message.status == ChatMessage.companion.STATUS_COMPLETE &&
                 message.suggestsAddAsProgram
-            let showSources = !isUser &&
+            let showSources = !isReadOnly &&
+                !isUser &&
                 !message.sources.isEmpty &&
                 message.status == ChatMessage.companion.STATUS_COMPLETE
             if showAddAction || showSources {

@@ -41,6 +41,7 @@
     <string name="rest_over_title">Vilan är slut</string>
     <string name="rest_over_message">Dags för nästa set.</string>
     <string name="rest_timer_channel_name">Vilotimer</string>
+    <string name="workout_complete_title">Träningspass klart!</string>
 
     <!-- Workout session / routine editor -->
     <string name="add_exercise_caps">LÄGG TILL ÖVNING</string>
@@ -131,6 +132,7 @@
     <!-- Exercise detail — Recent history chart -->
     <string name="exercise_history_section">Senaste historik</string>
     <string name="exercise_history_no_data">Logga några set för att se historik här.</string>
+    <string name="exercise_history_need_two_weeks">Behöver minst 2 veckors data.</string>
     <string name="exercise_history_metric_1rm">1RM</string>
     <string name="exercise_history_metric_volume">Volym</string>
     <string name="exercise_history_metric_duration">Tid</string>
@@ -157,7 +159,6 @@
     <string name="gender_male">Man</string>
     <string name="gender_female">Kvinna</string>
     <string name="gender_other">Annat</string>
-    <string name="gender_prefer_not_to_say">Vill inte uppge</string>
     <string name="create_a_profile">Skapa en profil</string>
     <string name="create_profile">Skapa profil</string>
 
@@ -412,6 +413,7 @@
 
     <!-- On-device chat assistant -->
     <string name="chat_title">Fråga coachen</string>
+    <string name="chat_form_tips_title">Tekniktips</string>
     <string name="chat_new_chat">Ny chatt</string>
     <string name="chat_input_placeholder">Fråga om din träning...</string>
     <string name="chat_send">Skicka</string>

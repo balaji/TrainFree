@@ -3,7 +3,7 @@ import SharedUI
 
 // Language-neutral keys persisted in profile.gender; matches GENDER_KEYS in
 // the shared ProfileFormState. L10n.genderLabel maps them for display.
-private let genderOptions = ["male", "female", "other", "prefer_not_to_say"]
+private let genderOptions = ["male", "female", "other"]
 
 private enum ProfileFormField: Hashable {
     case age, weight, height
@@ -60,7 +60,7 @@ struct ProfileFormView: View {
                     get: { uiState.gender ?? "" },
                     set: { formState.updateGender(value: $0) }
                 )) {
-                    Text(L10n.select).tag("")
+                    Text("—").tag("")
                     ForEach(genderOptions, id: \.self) { option in
                         Text(L10n.genderLabel(option)).tag(option)
                     }

@@ -6,9 +6,11 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.clickable
@@ -110,7 +112,10 @@ fun ExerciseDetailScreen(
             ExerciseDetailContent(
                 route = route,
                 onOpenChat = onOpenChat,
-                modifier = Modifier.padding(padding),
+                modifier = Modifier
+                    .padding(padding)
+                    .consumeWindowInsets(padding)
+                    .imePadding(),
             )
         }
     }
@@ -137,7 +142,13 @@ fun ExerciseCreateScreen(onGoBack: () -> Unit) {
                 )
             },
         ) { padding ->
-            ExerciseCreateContent(onSaved = onGoBack, modifier = Modifier.padding(padding))
+            ExerciseCreateContent(
+                onSaved = onGoBack,
+                modifier = Modifier
+                    .padding(padding)
+                    .consumeWindowInsets(padding)
+                    .imePadding(),
+            )
         }
     }
 }
@@ -192,14 +203,38 @@ private fun ExerciseDetailContent(
         verticalArrangement = Arrangement.spacedBy(16.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
+        val exerciseName = uiState.name.trim()
+        if (onOpenChat != null && exerciseName.isNotEmpty()) {
+            val formTipsPrompt = stringResource(Res.string.chat_prompt_exercise_form, exerciseName)
+            OutlinedButton(
+                onClick = {
+                    onOpenChat(
+                        ChatSeedContext(
+                            kind = "exercise",
+                            exerciseId = route.exerciseId,
+                            exerciseName = exerciseName,
+                            autoPrompt = formTipsPrompt,
+                            readOnly = true,
+                        ),
+                    )
+                },
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Icon(
+                    imageVector = Icons.Default.AutoAwesome,
+                    contentDescription = null,
+                    modifier = Modifier.size(18.dp),
+                )
+                Spacer(Modifier.width(8.dp))
+                Text(formTipsPrompt)
+            }
+        }
         if (editing) {
             ExerciseEditForm(uiState = uiState, formState = formState, onDone = { editing = false })
         } else {
             ExerciseReadOnlyDetails(
-                exerciseId = route.exerciseId,
                 uiState = uiState,
                 onEdit = { editing = true },
-                onOpenChat = onOpenChat,
             )
             if (!historyUiState.loading) {
                 if (!uiState.builtin) {
@@ -216,36 +251,12 @@ private fun ExerciseDetailContent(
 
 @Composable
 private fun ExerciseReadOnlyDetails(
-    exerciseId: Long,
     uiState: ExerciseFormUiState,
     onEdit: () -> Unit,
-    onOpenChat: ((ChatSeedContext) -> Unit)?,
 ) {
     val uriHandler = LocalUriHandler.current
     val searchQuery = stringResource(Res.string.describe_exercise_query, uiState.name)
     Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        if (onOpenChat != null && uiState.name.isNotBlank()) {
-            OutlinedButton(
-                onClick = {
-                    onOpenChat(
-                        ChatSeedContext(
-                            kind = "exercise",
-                            exerciseId = exerciseId,
-                            exerciseName = uiState.name,
-                        ),
-                    )
-                },
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                Icon(
-                    imageVector = Icons.Default.AutoAwesome,
-                    contentDescription = null,
-                    modifier = Modifier.size(18.dp),
-                )
-                Spacer(Modifier.width(8.dp))
-                Text(stringResource(Res.string.chat_ask_exercise))
-            }
-        }
         Text(
             stringResource(Res.string.search_in_google),
             style = MaterialTheme.typography.bodyLarge,
@@ -528,7 +539,7 @@ private fun ExerciseHistorySection(
                 )
             } else {
                 Text(
-                    stringResource(Res.string.exercise_history_no_data),
+                    stringResource(Res.string.exercise_history_need_two_weeks),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
