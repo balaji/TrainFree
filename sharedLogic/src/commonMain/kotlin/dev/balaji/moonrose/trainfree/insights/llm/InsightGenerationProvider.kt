@@ -43,6 +43,7 @@ data class CardNarration(
     /** "loading" | "ready" | "failed". */
     val status: String,
     val text: String,
+    val canRefresh: Boolean = false,
 )
 
 /** A fully-assembled one-shot generation request for one card. */
@@ -52,4 +53,5 @@ data class CardNarrationRequest(
     val prompt: String,
     /** Cache key: hash of instructions + prompt + prompt version. */
     val statsHash: String,
+    val canRefresh: Boolean = false,
 )

@@ -32,6 +32,7 @@ import androidx.compose.material.icons.automirrored.filled.TrendingFlat
 import androidx.compose.material.icons.automirrored.filled.TrendingUp
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.DropdownMenuItem
@@ -188,7 +189,12 @@ private fun ProgressContent(
                             onRemove = { state.removeProgressionCard(slot) },
                         )
                     } else {
-                        InsightCardRow(card, unitLabel, narration)
+                        InsightCardRow(
+                            card = card,
+                            unitLabel = unitLabel,
+                            narration = narration,
+                            onRefreshNarration = { narrationState.refresh(card.id) },
+                        )
                     }
                 }
                 if (index == lastProgressionIndex && uiState.progressionConfigs.size < 3) {
@@ -267,6 +273,7 @@ private fun InsightCardRow(
     card: InsightCard,
     unitLabel: String,
     narration: CardNarration?,
+    onRefreshNarration: () -> Unit,
 ) {
     OutlinedCard(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(16.dp)) {
@@ -279,7 +286,7 @@ private fun InsightCardRow(
                 Spacer(Modifier.weight(1f))
                 TrendIcon(card.trend)
             }
-            Text(insightHeadline(card, unitLabel), style = MaterialTheme.typography.titleLarge)
+            Text(insightHeadline(card, unitLabel), style = MaterialTheme.typography.titleMedium)
             Text(
                 insightDetail(card, unitLabel),
                 style = MaterialTheme.typography.bodyMedium,
@@ -290,6 +297,12 @@ private fun InsightCardRow(
                     card.spark,
                     Modifier.fillMaxWidth().height(48.dp).padding(top = 12.dp),
                 )
+            } else if (card.kind == "volume" && card.spark.isNotEmpty()) {
+                WeeklyVolumeBars(
+                    points = card.spark,
+                    referenceValue = card.referenceValue,
+                    modifier = Modifier.fillMaxWidth().height(116.dp).padding(top = 12.dp),
+                )
             } else if (card.spark.size >= 2) {
                 Sparkline(
                     card.spark,
@@ -299,6 +312,7 @@ private fun InsightCardRow(
             if (narration != null && narration.status != "failed") {
                 InsightNarrationRow(
                     narration = narration,
+                    onRefresh = onRefreshNarration,
                     modifier = Modifier.padding(top = 12.dp),
                 )
             }
@@ -377,7 +391,7 @@ private fun ProgressionCard(
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
                         insightHeadline(card, unitLabel),
-                        style = MaterialTheme.typography.titleLarge,
+                        style = MaterialTheme.typography.titleMedium,
                         modifier = Modifier.weight(1f),
                     )
                     TrendIcon(card.trend)
@@ -426,6 +440,7 @@ private fun ProgressionCard(
 private fun InsightNarrationRow(
     narration: CardNarration,
     modifier: Modifier = Modifier,
+    onRefresh: (() -> Unit)? = null,
 ) {
     Row(
         modifier = modifier.fillMaxWidth(),
@@ -452,14 +467,28 @@ private fun InsightNarrationRow(
                 text = stringResource(Res.string.insight_narration_loading),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.alpha(alpha),
+                modifier = Modifier.weight(1f).alpha(alpha),
             )
         } else {
             Text(
                 text = narration.text,
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.weight(1f),
             )
+            if (narration.canRefresh && onRefresh != null) {
+                IconButton(
+                    onClick = onRefresh,
+                    modifier = Modifier.size(24.dp),
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Refresh,
+                        contentDescription = stringResource(Res.string.insight_narration_refresh),
+                        modifier = Modifier.size(16.dp),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
         }
     }
 }
