@@ -41,6 +41,7 @@ object ExerciseRepository {
         exerciseType: String?,
         bodyPart: String?,
         equipment: String?,
+        otherBodyParts: List<String>? = null,
     ): ExerciseUpdateError? {
         return try {
             val now = nowMillis()
@@ -49,7 +50,7 @@ object ExerciseRepository {
                     name = name,
                     exerciseType = exerciseType,
                     bodyPart = bodyPart,
-                    otherBodyParts = null,
+                    otherBodyParts = otherBodyParts?.takeIf { it.isNotEmpty() },
                     equipment = equipment,
                     createdAt = now,
                     updatedAt = now,

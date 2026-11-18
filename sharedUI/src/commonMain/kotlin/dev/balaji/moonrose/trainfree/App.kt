@@ -420,6 +420,19 @@ private fun MainTabs() {
                         workoutsStack.popToRoot()
                         showWorkouts = true
                     }
+                    "routine" -> {
+                        workoutMenuExpanded = false
+                        workoutsStack.popToRoot()
+                        if (ref.routineId > 0L) {
+                            workoutsStack.push(
+                                dev.balaji.moonrose.trainfree.navigation.RoutineDetailRoute(
+                                    routineId = ref.routineId,
+                                    title = ref.label,
+                                ),
+                            )
+                        }
+                        showWorkouts = true
+                    }
                     "progress" -> {
                         workoutMenuExpanded = false
                         currentTab = ProgressRoute

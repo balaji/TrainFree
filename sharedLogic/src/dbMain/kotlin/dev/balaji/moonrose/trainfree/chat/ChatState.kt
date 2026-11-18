@@ -120,10 +120,13 @@ class ChatState internal constructor(
             text = "",
             status = ChatMessage.STATUS_STREAMING,
         )
-        _uiState.update {
-            it.copy(
+        _uiState.update { current ->
+            val clearedOlderOffers = current.messages.map {
+                if (it.suggestsAddAsProgram) it.copy(suggestsAddAsProgram = false) else it
+            }
+            current.copy(
                 availability = availability,
-                messages = it.messages + userMsg + placeholder,
+                messages = clearedOlderOffers + userMsg + placeholder,
                 isGenerating = true,
             )
         }
@@ -184,7 +187,7 @@ class ChatState internal constructor(
                 if (generationId != activeGenerationId) return@generate
                 activeHandle = null
                 val mergedSources = (toolSources + preloaded?.sources.orEmpty())
-                    .distinctBy { Triple(it.kind, it.exerciseId, it.epochDay) to it.label }
+                    .distinctBy { listOf(it.kind, it.exerciseId, it.epochDay, it.programId, it.routineId, it.label) }
                 val trimmed = finalText.trim()
                 if (trimmed.isEmpty()) {
                     updateMessage(assistantId) {
@@ -195,11 +198,16 @@ class ChatState internal constructor(
                         )
                     }
                 } else {
+                    val wroteProgram = toolSources.any { it.programId > 0L }
+                    val offerAddAsProgram = provider.supportsToolCalling() &&
+                        !wroteProgram &&
+                        shouldOfferAddAsProgram(userMessage, trimmed)
                     updateMessage(assistantId) {
                         it.copy(
                             text = trimmed,
                             status = ChatMessage.STATUS_COMPLETE,
                             sources = mergedSources,
+                            suggestsAddAsProgram = offerAddAsProgram,
                         )
                     }
                 }
@@ -306,6 +314,7 @@ class ChatState internal constructor(
         }
         else -> buildList {
             add(ChatSuggestedPrompt(ChatSuggestedPrompt.KEY_SUMMARY))
+            add(ChatSuggestedPrompt(ChatSuggestedPrompt.KEY_REVIEW_PROGRESS))
             add(ChatSuggestedPrompt(ChatSuggestedPrompt.KEY_PRS))
             if (!topExercise.isNullOrBlank()) {
                 add(ChatSuggestedPrompt(ChatSuggestedPrompt.KEY_EXERCISE_PROGRESSION, topExercise))
@@ -313,6 +322,52 @@ class ChatState internal constructor(
                 add(ChatSuggestedPrompt(ChatSuggestedPrompt.KEY_LAST_WORKOUT))
             }
             add(ChatSuggestedPrompt(ChatSuggestedPrompt.KEY_NEXT_ROUTINE))
+            add(ChatSuggestedPrompt(ChatSuggestedPrompt.KEY_SUGGEST_ROUTINE))
+        }
+    }
+
+    internal companion object {
+        private val EXPLICIT_OFFER_PHRASES = listOf(
+            "add it as a program",
+            "add this as a program",
+            "save it as a program",
+            "save this as a program",
+            "add it to your programs",
+            "add this to your programs",
+            "create this program",
+            "save this program",
+            "would you like me to add",
+            "would you like me to save",
+            "want me to add",
+            "want me to save",
+            "shall i add",
+            "shall i save",
+            "should i add",
+            "should i save",
+        )
+
+        private val ROUTINE_REQUEST_NOUNS = listOf(
+            "routine", "program", "split", "workout plan", "weekly plan", "training plan",
+        )
+
+        private val ROUTINE_SUGGEST_VERBS = listOf(
+            "suggest", "recommend", "design", "build", "plan", "give me", "make me", "propose",
+        )
+
+        fun shouldOfferAddAsProgram(userMessage: String, assistantReply: String): Boolean {
+            val replyLower = assistantReply.lowercase()
+            if (EXPLICIT_OFFER_PHRASES.any { it in replyLower }) return true
+
+            val userLower = userMessage.lowercase()
+            val askedForSuggestion = ROUTINE_REQUEST_NOUNS.any { it in userLower } &&
+                ROUTINE_SUGGEST_VERBS.any { it in userLower }
+            if (!askedForSuggestion) return false
+
+            val looksLikePlan = ("sets" in replyLower || "reps" in replyLower || "×" in replyLower) &&
+                ("day " in replyLower || "push" in replyLower || "pull" in replyLower ||
+                    "upper" in replyLower || "lower" in replyLower || "full body" in replyLower ||
+                    "routine" in replyLower)
+            return looksLikePlan
         }
     }
 }

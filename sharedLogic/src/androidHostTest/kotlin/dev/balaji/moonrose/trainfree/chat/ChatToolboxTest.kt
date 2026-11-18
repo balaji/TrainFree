@@ -1,6 +1,12 @@
 package dev.balaji.moonrose.trainfree.chat
 
 import dev.balaji.moonrose.trainfree.calendar.WeekStart
+import dev.balaji.moonrose.trainfree.db.AiCreateExerciseResult
+import dev.balaji.moonrose.trainfree.db.AiCreateProgramResult
+import dev.balaji.moonrose.trainfree.db.AiRoutineAddResult
+import dev.balaji.moonrose.trainfree.db.AiRoutineUpdateResult
+import dev.balaji.moonrose.trainfree.db.CreatedRoutineSummary
+import dev.balaji.moonrose.trainfree.db.JournalEntryEntity
 import dev.balaji.moonrose.trainfree.db.RecentCompletedSessionRow
 import dev.balaji.moonrose.trainfree.db.RoutineLastPerformedRow
 import dev.balaji.moonrose.trainfree.db.SessionDetailWithExerciseRow
@@ -248,5 +254,130 @@ class ChatToolboxTest {
 
         val profileOnly = ChatToolbox.bodyMetricsAndProfileFrom(profile, null, settings)
         assertTrue(profileOnly.summary.contains("BMI (standard, who): 24.7 (normal)"))
+    }
+
+    @Test
+    fun `write tool outputs format created exercises, programs, and routine updates with source pills`() {
+        val customEx = Exercise(
+            id = 55L,
+            name = "Bulgarian Split Squat",
+            exerciseType = "strength",
+            bodyPart = "thighs",
+            equipment = "dumbbell",
+            builtin = false,
+            otherBodyParts = listOf("glutes"),
+        )
+        val exOut = ChatToolbox.createExerciseResultToOutput(AiCreateExerciseResult.Created(customEx))
+        assertTrue(exOut.summary.contains("Created exercise \"Bulgarian Split Squat\""))
+        assertTrue(exOut.summary.contains("primary: thighs"))
+        assertEquals(55L, exOut.sources.single().exerciseId)
+
+        val prog = Program(id = 7L, name = "Lower Focus")
+        val routine = Routine(id = 12L, name = "Day 1", programId = 7L, position = 1)
+        val detail = WorkSetDetailEntity(1L, 10L, 1, null, 10, null, null, SetType.NORMAL, WeightUnit.METRIC, 0L, 0L)
+        val progOut = ChatToolbox.createProgramResultToOutput(
+            AiCreateProgramResult.Created(
+                program = prog,
+                routines = listOf(CreatedRoutineSummary(routine, listOf(customEx to listOf(detail)))),
+                createdExercises = listOf(customEx),
+            ),
+            WeightUnit.METRIC,
+        )
+        assertTrue(progOut.summary.contains("Created program \"Lower Focus\" with 1 routines"))
+        assertTrue(progOut.summary.contains("Bulgarian Split Squat (1x 10r)"))
+        assertTrue(progOut.summary.contains("New exercises added to catalog: Bulgarian Split Squat"))
+        assertEquals(7L, progOut.sources.first().programId)
+        assertEquals(55L, progOut.sources.last().exerciseId)
+
+        val updOut = ChatToolbox.routineUpdateResultToOutput(
+            AiRoutineUpdateResult.Updated(
+                program = prog,
+                routine = routine,
+                renamedFromTo = null,
+                replaced = listOf("Barbell Back Squat" to "Bulgarian Split Squat"),
+                updated = emptyList(),
+                removed = emptyList(),
+                added = emptyList(),
+                notFoundInRoutine = emptyList(),
+                createdExercises = listOf(customEx),
+                finalExercises = listOf(customEx to listOf(detail)),
+            ),
+            WeightUnit.METRIC,
+        )
+        assertTrue(updOut.summary.contains("replaced Barbell Back Squat -> Bulgarian Split Squat"))
+        assertEquals(12L, updOut.sources.first().routineId)
+    }
+
+    @Test
+    fun `progress review compares windows, identifies progressing vs plateaued lifts, untrained muscles, and journal notes`() {
+        val zone = TimeZone.UTC
+        val today = LocalDate(2026, 11, 17).toEpochDays()
+        fun millisAt(day: Long) = LocalDate.fromEpochDays(day).atStartOfDayIn(zone).toEpochMilliseconds()
+
+        val sets = listOf(
+            // Prior window (more than 30 days ago)
+            SetPoint(today - 40, millisAt(today - 40), 1L, "Barbell Bench Press", "chest", 80.0, 5, 0, 0.0),
+            // Current 30-day window: bench trending up, OHP flat (plateau)
+            SetPoint(today - 20, millisAt(today - 20), 1L, "Barbell Bench Press", "chest", 85.0, 5, 0, 0.0),
+            SetPoint(today - 10, millisAt(today - 10), 1L, "Barbell Bench Press", "chest", 90.0, 5, 0, 0.0),
+            SetPoint(today - 2, millisAt(today - 2), 1L, "Barbell Bench Press", "chest", 95.0, 5, 0, 0.0),
+            SetPoint(today - 20, millisAt(today - 20), 2L, "Barbell Overhead Press", "shoulders", 50.0, 5, 0, 0.0),
+            SetPoint(today - 10, millisAt(today - 10), 2L, "Barbell Overhead Press", "shoulders", 50.0, 5, 0, 0.0),
+            SetPoint(today - 2, millisAt(today - 2), 2L, "Barbell Overhead Press", "shoulders", 50.0, 5, 0, 0.0),
+        )
+        val sessions = listOf(
+            RecentCompletedSessionRow(1L, null, "Push", "", millisAt(today - 40), millisAt(today - 40) + 40 * 60_000L),
+            RecentCompletedSessionRow(2L, null, "Push", "", millisAt(today - 20), millisAt(today - 20) + 50 * 60_000L),
+            RecentCompletedSessionRow(3L, null, "Push", "", millisAt(today - 10), millisAt(today - 10) + 50 * 60_000L),
+            RecentCompletedSessionRow(4L, null, "Push", "", millisAt(today - 2), millisAt(today - 2) + 50 * 60_000L),
+        )
+        val journal = listOf(
+            JournalEntryEntity(1L, 1L, today - 2, "Bench felt super crisp today!", 0L, 0L),
+        )
+
+        val out = ChatToolbox.progressReviewFrom(
+            sets = sets,
+            sessions = sessions,
+            journalEntries = journal,
+            days = 30,
+            todayEpochDay = today,
+            settings = UserSettings(weightUnit = WeightUnit.METRIC),
+            zone = zone,
+        )
+
+        assertTrue(out.summary.contains("Progress review (last 30 days vs prior 30 days):"))
+        assertTrue(out.summary.contains("3 sessions (vs 1 (+200%))"))
+        assertTrue(out.summary.contains("avg 50 min/workout"))
+        assertTrue(out.summary.contains("Progressing lifts: Barbell Bench Press"))
+        assertTrue(out.summary.contains("Plateaued/dipping lifts: Barbell Overhead Press (plateau"))
+        assertTrue(out.summary.contains("Muscle sets (last 30 days): chest: 3, shoulders: 3."))
+        assertTrue(out.summary.contains("Untrained primary muscles in window:"))
+        assertTrue(out.summary.contains("calves"))
+        assertTrue(out.summary.contains("Recent journal notes:"))
+        assertTrue(out.summary.contains("Bench felt super crisp today!"))
+        assertEquals("progress", out.sources.first().kind)
+        assertTrue(out.sources.any { it.exerciseId == 1L })
+        assertTrue(out.sources.any { it.exerciseId == 2L })
+    }
+
+    @Test
+    fun `parses human and iso dates and attaches journal notes to recent workouts`() {
+        val today = LocalDate(2026, 11, 17).toEpochDays()
+        assertEquals(today, ChatToolbox.parseDateEpochDay("today", today))
+        assertEquals(today - 1, ChatToolbox.parseDateEpochDay("yesterday", today))
+        assertEquals(LocalDate(2026, 11, 10).toEpochDays(), ChatToolbox.parseDateEpochDay("2026-11-10", today))
+        assertEquals(null, ChatToolbox.parseDateEpochDay("not-a-date", today))
+
+        val zone = TimeZone.UTC
+        val day = LocalDate(2026, 11, 10).toEpochDays()
+        val startMillis = LocalDate(2026, 11, 10).atStartOfDayIn(zone).toEpochMilliseconds()
+        val out = ChatToolbox.recentWorkoutsFrom(
+            sessions = listOf(RecentCompletedSessionRow(10L, null, "Push", "", startMillis, startMillis + 45 * 60_000L)),
+            details = emptyList(),
+            zone = zone,
+            unit = WeightUnit.METRIC,
+            journalByDay = mapOf(day to "Slept 8 hours, felt great"),
+        )
+        assertTrue(out.summary.contains("Note: \"Slept 8 hours, felt great\""))
     }
 }

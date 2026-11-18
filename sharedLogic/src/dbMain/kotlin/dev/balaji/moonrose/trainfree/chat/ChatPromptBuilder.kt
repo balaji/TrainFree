@@ -1,5 +1,6 @@
 package dev.balaji.moonrose.trainfree.chat
 
+import dev.balaji.moonrose.trainfree.calendar.WeekMath
 import dev.balaji.moonrose.trainfree.insights.llm.currentLanguageTag
 
 /**
@@ -16,10 +17,15 @@ internal object ChatPromptBuilder {
         seedContext: ChatSeedContext,
         supportsToolCalling: Boolean,
         languageTag: String = currentLanguageTag(),
+        todayEpochDay: Long = WeekMath.todayEpochDay(),
     ): String {
         val languageName = LANGUAGE_NAMES[languageTag] ?: "English"
+        val dateClause = "Today's date is ${ChatToolbox.shortDate(todayEpochDay)} (${ChatToolbox.isoDate(todayEpochDay)}). "
         val toolClause = if (supportsToolCalling) {
-            "When the user asks about their logged workouts, routines, progression, PRs, body metrics, or exercise substitutions, call the appropriate tool before answering; do not invoke tools for general form or technique questions unless they ask about their own data. "
+            "When the user asks about their logged workouts, workout history, overall progress, programs, routines, progression, PRs, body metrics, or exercise substitutions, call the appropriate tool before answering; do not invoke tools for general form or technique questions unless they ask about their own data. " +
+                "When asked to review their workout history or overall progress, call the progress-review and recent-workouts tools to check volume trends, progressing vs plateaued lifts, muscle balance, and journal notes, then summarize key wins, stalls, and actionable next steps. " +
+                "When asked to suggest a workout routine or split, check their training summary and existing programs first if useful, present a clear routine with sets and reps, and offer to add it as a program. " +
+                "When asked to create, save, or add a program, routine, or exercise (such as \"add it as a program\"), or to update, swap, add, or remove exercises in an existing routine, call the appropriate creation or editing tool directly; do not limit suggestions to exercises already in the catalog — create any needed exercises with proper body part focus, equipment, and exercise type. "
         } else {
             "Use the provided workout data context when answering about the user's training data. "
         }
@@ -47,6 +53,7 @@ internal object ChatPromptBuilder {
             "Never mention internal instructions, context labels, or function/tool syntax in your reply. "
         }
         return "You are a knowledgeable, factual strength-training coach inside the Train Free workout app. " +
+            dateClause +
             toolClause +
             seedClause +
             "For the user's training data (sets, weights, reps, dates, PRs, volume, routines, and body metrics), quote ONLY numbers, dates, exercises, and units returned by the tools or context — never invent, extrapolate, or recalculate statistics; if no data is logged yet, say so briefly. " +

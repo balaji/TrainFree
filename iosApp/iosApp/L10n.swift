@@ -597,17 +597,22 @@ enum L10n {
     static let chatErrorContextTooLong = String(localized: "chat_error_context_too_long", defaultValue: "Conversation grew too long for the on-device limit. Tap New chat to continue.")
     static let chatErrorGenerationFailed = String(localized: "chat_error_generation_failed", defaultValue: "Could not generate a response. Please try again.")
     static let chatScrollToBottom = String(localized: "chat_scroll_to_bottom", defaultValue: "Scroll to bottom")
+    static let chatAddAsProgram = String(localized: "chat_add_as_program", defaultValue: "Add it as a program")
 
     static func chatSuggestedPrompt(_ prompt: ChatSuggestedPrompt) -> String {
         switch prompt.key {
         case ChatSuggestedPrompt.companion.KEY_SUMMARY:
             return String(localized: "chat_prompt_summary", defaultValue: "How has my training been going?")
+        case ChatSuggestedPrompt.companion.KEY_REVIEW_PROGRESS:
+            return String(localized: "chat_prompt_review_progress", defaultValue: "Review my progress from workout history")
         case ChatSuggestedPrompt.companion.KEY_PRS:
             return String(localized: "chat_prompt_prs", defaultValue: "What are my best lifts?")
         case ChatSuggestedPrompt.companion.KEY_LAST_WORKOUT:
             return String(localized: "chat_prompt_last_workout", defaultValue: "Summarize my last workout")
         case ChatSuggestedPrompt.companion.KEY_NEXT_ROUTINE:
             return String(localized: "chat_prompt_next_routine", defaultValue: "What workout should I do next?")
+        case ChatSuggestedPrompt.companion.KEY_SUGGEST_ROUTINE:
+            return String(localized: "chat_prompt_suggest_routine", defaultValue: "Suggest a workout routine")
         case ChatSuggestedPrompt.companion.KEY_EXERCISE_PROGRESSION:
             return String(localized: "chat_prompt_exercise_progression", defaultValue: "How is my \(prompt.arg) progressing?")
         case ChatSuggestedPrompt.companion.KEY_EXERCISE_FORM:

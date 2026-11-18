@@ -105,6 +105,7 @@ fun ChatSheet(
     val uiState by chatState.uiState.collectAsState()
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     var inputText by remember { mutableStateOf("") }
+    val addAsProgramPrompt = stringResource(Res.string.chat_add_as_program)
 
     ModalBottomSheet(
         onDismissRequest = {
@@ -162,6 +163,7 @@ fun ChatSheet(
                         isGenerating = uiState.isGenerating,
                         onRetry = chatState::retryLast,
                         onSourceClick = onSourceClick,
+                        onAddAsProgram = { chatState.sendMessage(addAsProgramPrompt) },
                     )
                 }
             }
@@ -266,6 +268,7 @@ private fun ChatMessageList(
     isGenerating: Boolean,
     onRetry: () -> Unit,
     onSourceClick: (ChatSourceRef) -> Unit,
+    onAddAsProgram: () -> Unit,
 ) {
     val listState = rememberLazyListState()
     val coroutineScope = rememberCoroutineScope()
@@ -422,8 +425,10 @@ private fun ChatMessageList(
             itemsIndexed(messages, key = { _, message -> message.id }) { index, message ->
                 ChatMessageBubble(
                     message = message,
+                    isGenerating = isGenerating,
                     onRetry = onRetry,
                     onSourceClick = onSourceClick,
+                    onAddAsProgram = onAddAsProgram,
                     modifier = Modifier.padding(bottom = if (index < messages.lastIndex) 12.dp else 0.dp),
                 )
             }
@@ -538,8 +543,10 @@ private suspend fun settleAtBottom(
 @Composable
 private fun ChatMessageBubble(
     message: ChatMessage,
+    isGenerating: Boolean,
     onRetry: () -> Unit,
     onSourceClick: (ChatSourceRef) -> Unit,
+    onAddAsProgram: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val isUser = message.role == ChatMessage.ROLE_USER
@@ -616,22 +623,42 @@ private fun ChatMessageBubble(
             }
         }
 
-        if (!isUser && message.sources.isNotEmpty() && message.status == ChatMessage.STATUS_COMPLETE) {
+        val showAddAction = !isUser &&
+            !isGenerating &&
+            message.status == ChatMessage.STATUS_COMPLETE &&
+            message.suggestsAddAsProgram
+        val showSources = !isUser &&
+            message.sources.isNotEmpty() &&
+            message.status == ChatMessage.STATUS_COMPLETE
+        if (showAddAction || showSources) {
             Spacer(Modifier.size(4.dp))
             FlowRow(
                 horizontalArrangement = Arrangement.spacedBy(6.dp),
                 verticalArrangement = Arrangement.spacedBy(4.dp),
             ) {
-                message.sources.forEach { source ->
-                    AssistChip(
-                        onClick = { onSourceClick(source) },
+                if (showAddAction) {
+                    SuggestionChip(
+                        onClick = onAddAsProgram,
                         label = {
                             Text(
-                                text = source.label,
+                                text = stringResource(Res.string.chat_add_as_program),
                                 style = MaterialTheme.typography.labelSmall,
                             )
                         },
                     )
+                }
+                if (showSources) {
+                    message.sources.forEach { source ->
+                        AssistChip(
+                            onClick = { onSourceClick(source) },
+                            label = {
+                                Text(
+                                    text = source.label,
+                                    style = MaterialTheme.typography.labelSmall,
+                                )
+                            },
+                        )
+                    }
                 }
             }
         }

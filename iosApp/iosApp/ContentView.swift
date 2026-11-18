@@ -492,7 +492,7 @@ struct ContentView: View {
                                 chatCoordinator.activeSheet = .verifiedExercise(source.exerciseId)
                             case "day" where source.epochDay > 0:
                                 chatCoordinator.activeSheet = .verifiedDay(source.epochDay)
-                            case "program":
+                            case "program", "routine":
                                 pendingShowWorkouts = true
                                 chatCoordinator.activeSheet = nil
                             case "progress":

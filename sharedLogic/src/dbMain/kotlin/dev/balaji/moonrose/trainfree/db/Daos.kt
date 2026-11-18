@@ -597,6 +597,17 @@ interface JournalEntryDao {
     @Query("SELECT * FROM journal_entries WHERE profile_id = :profileId AND epoch_day = :epochDay")
     suspend fun findForDay(profileId: Long, epochDay: Long): JournalEntryEntity?
 
+    @Query(
+        "SELECT * FROM journal_entries WHERE profile_id = :profileId " +
+            "AND epoch_day >= :startEpochDay AND epoch_day <= :endEpochDay " +
+            "ORDER BY epoch_day DESC",
+    )
+    suspend fun getInRange(
+        profileId: Long,
+        startEpochDay: Long,
+        endEpochDay: Long,
+    ): List<JournalEntryEntity>
+
     @Insert
     suspend fun insert(entry: JournalEntryEntity): Long
 

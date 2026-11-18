@@ -6,11 +6,13 @@ package dev.balaji.moonrose.trainfree.chat
  * without parsing text. Primitive-typed for SKIE compatibility.
  */
 data class ChatSourceRef(
-    /** "exercise" | "day" | "program" | "progress". */
+    /** "exercise" | "day" | "program" | "routine" | "progress". */
     val kind: String,
     val label: String,
     val exerciseId: Long = 0L,
     val epochDay: Long = 0L,
+    val programId: Long = 0L,
+    val routineId: Long = 0L,
 )
 
 /**
@@ -48,6 +50,7 @@ data class ChatMessage(
     /** Language-neutral error key when [status] == "error": "unavailable" | "context_too_long" | "generation_failed" | "". */
     val errorKey: String = "",
     val sources: List<ChatSourceRef> = emptyList(),
+    val suggestsAddAsProgram: Boolean = false,
 ) {
     companion object {
         const val ROLE_USER = "user"
@@ -74,9 +77,11 @@ data class ChatSuggestedPrompt(
 ) {
     companion object {
         const val KEY_SUMMARY = "summary"
+        const val KEY_REVIEW_PROGRESS = "review_progress"
         const val KEY_PRS = "prs"
         const val KEY_LAST_WORKOUT = "last_workout"
         const val KEY_NEXT_ROUTINE = "next_routine"
+        const val KEY_SUGGEST_ROUTINE = "suggest_routine"
         const val KEY_EXERCISE_PROGRESSION = "exercise_progression"
         const val KEY_EXERCISE_FORM = "exercise_form"
         const val KEY_EXERCISE_SUBSTITUTES = "exercise_substitutes"
@@ -111,4 +116,45 @@ data class ChatUiState(
     val isGenerating: Boolean = false,
     val seedContext: ChatSeedContext = ChatSeedContext(),
     val suggestedPrompts: List<ChatSuggestedPrompt> = emptyList(),
+)
+
+/**
+ * Structured exercise entry supplied by an AI tool call when creating or
+ * updating a routine. When [exerciseName] is not yet in the catalog, the
+ * optional metadata fields ([bodyPart], [otherBodyParts], [equipment],
+ * [exerciseType]) are used to create the custom exercise automatically.
+ */
+data class AiExerciseInput(
+    val exerciseName: String,
+    val sets: Int = 3,
+    val reps: Int? = null,
+    val weight: Double? = null,
+    val durationSeconds: Int? = null,
+    val distance: Double? = null,
+    val warmupSets: Int = 0,
+    val bodyPart: String? = null,
+    val otherBodyParts: List<String> = emptyList(),
+    val equipment: String? = null,
+    val exerciseType: String? = null,
+)
+
+/** Structured workout day / split supplied by an AI tool call for [create_program]. */
+data class AiRoutineInput(
+    val name: String,
+    val exercises: List<AiExerciseInput>,
+)
+
+/** Structured replacement entry supplied by an AI tool call for [update_routine]. */
+data class AiReplaceExerciseInput(
+    val targetExerciseName: String,
+    val newExerciseName: String,
+    val sets: Int? = null,
+    val reps: Int? = null,
+    val weight: Double? = null,
+    val durationSeconds: Int? = null,
+    val distance: Double? = null,
+    val bodyPart: String? = null,
+    val otherBodyParts: List<String> = emptyList(),
+    val equipment: String? = null,
+    val exerciseType: String? = null,
 )

@@ -278,7 +278,7 @@ class GeminiNanoChatProvider internal constructor(
         const val AVAILABILITY_AVAILABLE = "available"
         const val AVAILABILITY_DOWNLOADING = "model_downloading"
         const val AVAILABILITY_NOT_ELIGIBLE = "device_not_eligible"
-        internal const val MAX_TOOL_ROUNDS = 4
+        internal const val MAX_TOOL_ROUNDS = 6
 
         private val instance by lazy { GeminiNanoChatProvider(LiveGeminiNanoClient()) }
 

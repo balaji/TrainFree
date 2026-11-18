@@ -68,22 +68,54 @@ class ChatStateTest {
         toolbox = object : ChatToolboxPort {
             override suspend fun getTrainingSummary(weeks: Int) =
                 ToolOutput("Volume: 4000 kg", listOf(ChatSourceRef("progress", "Progress overview")))
+            override suspend fun getProgressReview(days: Int) =
+                ToolOutput("Progress review", listOf(ChatSourceRef("progress", "Progress overview")))
             override suspend fun getPersonalRecords(exerciseQuery: String?, limit: Int) =
                 ToolOutput("PR: 100 kg x 5", listOf(ChatSourceRef("exercise", "Barbell Bench Press", 1L)))
             override suspend fun getExerciseProgression(exerciseQuery: String, weeks: Int) =
                 ToolOutput("Progression: +2 kg/wk", listOf(ChatSourceRef("exercise", "Barbell Bench Press", 1L)))
-            override suspend fun getRecentWorkouts(limit: Int, routineQuery: String?, days: Int?) =
-                ToolOutput("Recent workout", listOf(ChatSourceRef("day", "Nov 10", epochDay = 20_000L)))
-            override suspend fun getWorkoutsForDay(epochDay: Long) =
-                ToolOutput("Day $epochDay workout", listOf(ChatSourceRef("day", "Nov 10", epochDay = epochDay)))
-            override suspend fun getProgramsAndRoutines(routineQuery: String?) = ToolOutput("PPL")
+            override suspend fun getRecentWorkouts(
+                limit: Int,
+                routineQuery: String?,
+                days: Int?,
+                exerciseQuery: String?,
+                startDate: String?,
+                endDate: String?,
+            ) = ToolOutput("Recent workout", listOf(ChatSourceRef("day", "Nov 10", epochDay = 20_000L)))
+            override suspend fun getWorkoutsForDay(epochDay: Long?, date: String?) =
+                ToolOutput("Day ${epochDay ?: date} workout", listOf(ChatSourceRef("day", "Nov 10", epochDay = epochDay ?: 20_000L)))
+            override suspend fun getProgramsAndRoutines(routineQuery: String?, programQuery: String?) = ToolOutput("PPL")
             override suspend fun searchExercises(query: String?, bodyPart: String?, equipment: String?, limit: Int) =
                 ToolOutput("Search")
             override suspend fun getBodyMetricsAndProfile(days: Int) = ToolOutput("Body")
+            override suspend fun createExercise(
+                name: String,
+                bodyPart: String,
+                equipment: String?,
+                exerciseType: String?,
+                otherBodyParts: List<String>,
+            ) = ToolOutput("Created $name")
+            override suspend fun createProgram(programName: String, routines: List<AiRoutineInput>) =
+                ToolOutput("Created $programName")
+            override suspend fun addRoutineToProgram(
+                routineName: String,
+                exercises: List<AiExerciseInput>,
+                programName: String?,
+            ) = ToolOutput("Added $routineName")
+            override suspend fun updateRoutine(
+                routineName: String,
+                programName: String?,
+                newRoutineName: String?,
+                addExercises: List<AiExerciseInput>,
+                replaceExercises: List<AiReplaceExerciseInput>,
+                updateExercises: List<AiExerciseInput>,
+                removeExercises: List<String>,
+            ) = ToolOutput("Updated $routineName")
         },
         loadExercises = { listOf(bench) },
         loadTrainedCounts = { mapOf(1L to 20) },
         loadRoutineNames = { emptyList() },
+        loadProgramNames = { emptyList() },
     )
 
     @AfterTest
@@ -237,8 +269,10 @@ class ChatStateTest {
             seedContext = ChatSeedContext(kind = "exercise", exerciseName = "Squat"),
             supportsToolCalling = true,
             languageTag = "sv",
+            todayEpochDay = 20_774L,
         )
         assertTrue(svInstructions.contains("Respond in Swedish."))
+        assertTrue(svInstructions.contains("Today's date is "))
         assertTrue(svInstructions.contains("Squat"))
         assertTrue(svInstructions.contains("No medical"))
         assertTrue(svInstructions.contains("use your own strength-training knowledge"))
@@ -259,5 +293,39 @@ class ChatStateTest {
         }
         val windowed = ChatPromptBuilder.windowHistory(messages, maxTurns = 3, maxChars = 100)
         assertEquals(listOf("Turn 4 text", "Turn 5 text", "Turn 6 text"), windowed.map { it.text })
+    }
+
+    @Test
+    fun `offers add-as-program action on routine suggestions and clears after saving`() {
+        val provider = FakeChatProvider(toolCalling = true)
+        val state = newState(provider)
+        state.openWithSeed(ChatSeedContext())
+        assertTrue(state.uiState.value.suggestedPrompts.any { it.key == ChatSuggestedPrompt.KEY_SUGGEST_ROUTINE })
+        assertTrue(state.uiState.value.suggestedPrompts.any { it.key == ChatSuggestedPrompt.KEY_REVIEW_PROGRESS })
+
+        state.sendMessage("Suggest me a workout routine")
+        provider.complete(
+            "Here is a 3-day Push/Pull/Legs routine:\n" +
+                "Day 1 (Push): Bench Press 3 sets x 8 reps.\n" +
+                "Would you like me to add it as a program?",
+        )
+        val suggestionMsg = state.uiState.value.messages.last()
+        assertTrue(suggestionMsg.suggestsAddAsProgram)
+
+        // Tapping "Add it as a program" clears the offer on the prior message and creates the program.
+        state.sendMessage("Add it as a program")
+        assertFalse(state.uiState.value.messages.first { it.id == suggestionMsg.id }.suggestsAddAsProgram)
+        provider.complete(
+            "Created the Push/Pull/Legs program.",
+            listOf(ChatSourceRef(kind = "program", label = "Push/Pull/Legs", programId = 12L)),
+        )
+        assertFalse(state.uiState.value.messages.last().suggestsAddAsProgram)
+
+        // Non-tool-calling providers never offer the one-tap add-as-program action.
+        val noTools = FakeChatProvider(toolCalling = false)
+        val noToolsState = newState(noTools)
+        noToolsState.sendMessage("Suggest me a workout routine")
+        noTools.complete("Day 1 Push: 3 sets x 8 reps. Would you like me to add it as a program?")
+        assertFalse(noToolsState.uiState.value.messages.last().suggestsAddAsProgram)
     }
 }

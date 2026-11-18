@@ -1,5 +1,6 @@
 package dev.balaji.moonrose.trainfree.chat
 
+import dev.balaji.moonrose.trainfree.calendar.WeekMath
 import dev.balaji.moonrose.trainfree.model.Exercise
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -16,6 +17,11 @@ private class RecordingToolbox : ChatToolboxPort {
         return ToolOutput("Summary block", listOf(ChatSourceRef("progress", "Progress overview")))
     }
 
+    override suspend fun getProgressReview(days: Int): ToolOutput {
+        calls += "review:$days"
+        return ToolOutput("Progress review block", listOf(ChatSourceRef("progress", "Progress overview")))
+    }
+
     override suspend fun getPersonalRecords(exerciseQuery: String?, limit: Int): ToolOutput {
         calls += "prs:${exerciseQuery.orEmpty()}"
         return ToolOutput("PR block for ${exerciseQuery ?: "all"}", listOf(ChatSourceRef("exercise", exerciseQuery ?: "All", 1L)))
@@ -26,18 +32,25 @@ private class RecordingToolbox : ChatToolboxPort {
         return ToolOutput("Progression block for $exerciseQuery", listOf(ChatSourceRef("exercise", exerciseQuery, 1L)))
     }
 
-    override suspend fun getRecentWorkouts(limit: Int, routineQuery: String?, days: Int?): ToolOutput {
+    override suspend fun getRecentWorkouts(
+        limit: Int,
+        routineQuery: String?,
+        days: Int?,
+        exerciseQuery: String?,
+        startDate: String?,
+        endDate: String?,
+    ): ToolOutput {
         calls += "recent:${routineQuery.orEmpty()}"
         return ToolOutput("Recent workouts block", listOf(ChatSourceRef("day", "Nov 10", epochDay = 20_000L)))
     }
 
-    override suspend fun getWorkoutsForDay(epochDay: Long): ToolOutput {
-        calls += "day:$epochDay"
-        return ToolOutput("Day $epochDay block", listOf(ChatSourceRef("day", "Day", epochDay = epochDay)))
+    override suspend fun getWorkoutsForDay(epochDay: Long?, date: String?): ToolOutput {
+        calls += "day:${epochDay ?: date}"
+        return ToolOutput("Day ${epochDay ?: date} block", listOf(ChatSourceRef("day", "Day", epochDay = epochDay ?: 20_000L)))
     }
 
-    override suspend fun getProgramsAndRoutines(routineQuery: String?): ToolOutput {
-        calls += "programs:${routineQuery.orEmpty()}"
+    override suspend fun getProgramsAndRoutines(routineQuery: String?, programQuery: String?): ToolOutput {
+        calls += "programs:${programQuery.orEmpty()}:${routineQuery.orEmpty()}"
         return ToolOutput("Programs block", listOf(ChatSourceRef("program", "PPL")))
     }
 
@@ -55,6 +68,33 @@ private class RecordingToolbox : ChatToolboxPort {
         calls += "body:$days"
         return ToolOutput("Body metrics block")
     }
+
+    override suspend fun createExercise(
+        name: String,
+        bodyPart: String,
+        equipment: String?,
+        exerciseType: String?,
+        otherBodyParts: List<String>,
+    ): ToolOutput = ToolOutput("Created $name")
+
+    override suspend fun createProgram(programName: String, routines: List<AiRoutineInput>): ToolOutput =
+        ToolOutput("Created $programName")
+
+    override suspend fun addRoutineToProgram(
+        routineName: String,
+        exercises: List<AiExerciseInput>,
+        programName: String?,
+    ): ToolOutput = ToolOutput("Added $routineName")
+
+    override suspend fun updateRoutine(
+        routineName: String,
+        programName: String?,
+        newRoutineName: String?,
+        addExercises: List<AiExerciseInput>,
+        replaceExercises: List<AiReplaceExerciseInput>,
+        updateExercises: List<AiExerciseInput>,
+        removeExercises: List<String>,
+    ): ToolOutput = ToolOutput("Updated $routineName")
 }
 
 class ChatContextRouterTest {
@@ -69,6 +109,7 @@ class ChatContextRouterTest {
         loadExercises = { catalog },
         loadTrainedCounts = { trained },
         loadRoutineNames = { listOf("Push Day", "Pull Day") },
+        loadProgramNames = { listOf("PPL Split") },
     )
 
     @Test
@@ -139,5 +180,31 @@ class ChatContextRouterTest {
         val out = router(tbFallback).route("Hey coach", maxContextChars = 20)
         assertEquals(listOf("summary:8", "recent:"), tbFallback.calls)
         assertTrue(out.summary.length <= 20)
+    }
+
+    @Test
+    fun `routes program name mention and routine suggestion prompt without misrouting to substitutes`() = runBlocking {
+        val tbProgram = RecordingToolbox()
+        router(tbProgram).route("What is in my PPL Split program?")
+        assertEquals(listOf("programs:PPL Split:"), tbProgram.calls)
+
+        val tbSuggest = RecordingToolbox()
+        router(tbSuggest).route("Suggest me a workout routine")
+        assertTrue("programs::" in tbSuggest.calls)
+        assertTrue("summary:8" in tbSuggest.calls)
+        assertFalse(tbSuggest.calls.any { it.startsWith("search:") })
+    }
+
+    @Test
+    fun `routes workout history progress review and yesterday query`() = runBlocking {
+        val tbReview = RecordingToolbox()
+        router(tbReview).route("Review my progress from my workout history")
+        assertTrue("review:30" in tbReview.calls)
+        assertTrue("recent:" in tbReview.calls)
+
+        val tbYesterday = RecordingToolbox()
+        val yesterday = WeekMath.todayEpochDay() - 1L
+        router(tbYesterday).route("What did I do yesterday?")
+        assertEquals(listOf("day:$yesterday"), tbYesterday.calls)
     }
 }

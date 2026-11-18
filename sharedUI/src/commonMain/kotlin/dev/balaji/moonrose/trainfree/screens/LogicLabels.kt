@@ -362,9 +362,11 @@ internal fun exerciseCatalogLabel(key: String): String = when (key) {
 @Composable
 internal fun chatSuggestedPromptLabel(prompt: ChatSuggestedPrompt): String = when (prompt.key) {
     ChatSuggestedPrompt.KEY_SUMMARY -> stringResource(Res.string.chat_prompt_summary)
+    ChatSuggestedPrompt.KEY_REVIEW_PROGRESS -> stringResource(Res.string.chat_prompt_review_progress)
     ChatSuggestedPrompt.KEY_PRS -> stringResource(Res.string.chat_prompt_prs)
     ChatSuggestedPrompt.KEY_LAST_WORKOUT -> stringResource(Res.string.chat_prompt_last_workout)
     ChatSuggestedPrompt.KEY_NEXT_ROUTINE -> stringResource(Res.string.chat_prompt_next_routine)
+    ChatSuggestedPrompt.KEY_SUGGEST_ROUTINE -> stringResource(Res.string.chat_prompt_suggest_routine)
     ChatSuggestedPrompt.KEY_EXERCISE_PROGRESSION ->
         stringResource(Res.string.chat_prompt_exercise_progression, prompt.arg)
     ChatSuggestedPrompt.KEY_EXERCISE_FORM ->

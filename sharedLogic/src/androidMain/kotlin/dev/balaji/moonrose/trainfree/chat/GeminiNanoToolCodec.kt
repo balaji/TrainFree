@@ -18,6 +18,7 @@ import com.google.mlkit.genai.schema.tools.FunctionType
 internal object GeminiNanoToolCodec {
 
     const val TOOL_TRAINING_SUMMARY = "get_training_summary"
+    const val TOOL_PROGRESS_REVIEW = "get_progress_review"
     const val TOOL_PERSONAL_RECORDS = "get_personal_records"
     const val TOOL_EXERCISE_PROGRESSION = "get_exercise_progression"
     const val TOOL_RECENT_WORKOUTS = "get_recent_workouts"
@@ -25,15 +26,31 @@ internal object GeminiNanoToolCodec {
     const val TOOL_PROGRAMS_AND_ROUTINES = "get_programs_and_routines"
     const val TOOL_SEARCH_EXERCISES = "search_exercises"
     const val TOOL_BODY_METRICS = "get_body_metrics_and_profile"
+    const val TOOL_CREATE_EXERCISE = "create_exercise"
+    const val TOOL_CREATE_PROGRAM = "create_program"
+    const val TOOL_ADD_ROUTINE = "add_routine_to_program"
+    const val TOOL_UPDATE_ROUTINE = "update_routine"
 
-    private fun stringSchema(description: String) = FunctionSchema(
+    private fun stringSchema(description: String, enumValues: List<String>? = null) = FunctionSchema(
         type = FunctionType.STRING,
         description = description,
+        enum = enumValues,
     )
 
     private fun intSchema(description: String) = FunctionSchema(
         type = FunctionType.INTEGER,
         description = description,
+    )
+
+    private fun numberSchema(description: String) = FunctionSchema(
+        type = FunctionType.NUMBER,
+        description = description,
+    )
+
+    private fun arraySchema(description: String, items: FunctionSchema) = FunctionSchema(
+        type = FunctionType.ARRAY,
+        description = description,
+        items = items,
     )
 
     private fun objectSchema(
@@ -45,6 +62,22 @@ internal object GeminiNanoToolCodec {
         required = required.ifEmpty { null },
     )
 
+    private fun exerciseEntrySchema() = objectSchema(
+        properties = mapOf(
+            "exercise_name" to stringSchema("Exercise name (existing or new)."),
+            "sets" to intSchema("Working sets count. Defaults to 3."),
+            "reps" to intSchema("Target reps per set."),
+            "weight" to numberSchema("Optional target weight in user units."),
+            "duration_seconds" to intSchema("Target duration in seconds for timed exercises."),
+            "distance" to numberSchema("Target distance in user units."),
+            "body_part" to stringSchema("Primary muscle if creating a new exercise."),
+            "equipment" to stringSchema("Equipment if disambiguating or creating."),
+            "exercise_type" to stringSchema("Type: strength, duration, distance, reps_duration, distance_duration, reps_distance."),
+            "other_body_parts" to arraySchema("Optional secondary muscles.", stringSchema("Muscle name.")),
+        ),
+        required = listOf("exercise_name"),
+    )
+
     /** Dynamic tool schemas exposed when Gemini Nano supports `Feature.FUNCTION_CALLING`. */
     fun toolDeclarations(): List<FunctionDeclaration> = listOf(
         FunctionDeclaration(
@@ -52,6 +85,13 @@ internal object GeminiNanoToolCodec {
             description = "Weekly volume trend, workout frequency/streaks, and body-part breakdown.",
             parameters = objectSchema(
                 mapOf("weeks" to intSchema("Lookback weeks, 1 to 12. Defaults to 8.")),
+            ),
+        ),
+        FunctionDeclaration(
+            name = TOOL_PROGRESS_REVIEW,
+            description = "Review workout history: period volume/session deltas, progressing vs plateaued lifts, untrained muscles, and journal notes.",
+            parameters = objectSchema(
+                mapOf("days" to intSchema("Lookback window in days, 7 to 180. Defaults to 30.")),
             ),
         ),
         FunctionDeclaration(
@@ -77,28 +117,36 @@ internal object GeminiNanoToolCodec {
         ),
         FunctionDeclaration(
             name = TOOL_RECENT_WORKOUTS,
-            description = "Recent completed workouts with sets, weights, reps, and duration.",
+            description = "Recent completed workouts with sets, weights, reps, duration, and journal notes. Filterable by routine, exercise, or date range.",
             parameters = objectSchema(
                 mapOf(
-                    "limit" to intSchema("Max workouts, 1 to 10. Defaults to 5."),
+                    "limit" to intSchema("Max workouts, 1 to 15. Defaults to 5."),
                     "routine_query" to stringSchema("Optional routine name filter."),
                     "days" to intSchema("Optional lookback window in days."),
+                    "exercise_query" to stringSchema("Optional exercise name filter."),
+                    "start_date" to stringSchema("Optional start date YYYY-MM-DD."),
+                    "end_date" to stringSchema("Optional end date YYYY-MM-DD."),
                 ),
             ),
         ),
         FunctionDeclaration(
             name = TOOL_WORKOUTS_FOR_DAY,
-            description = "Completed workouts performed on one specific epoch day.",
+            description = "Completed workouts and journal note for one specific date.",
             parameters = objectSchema(
-                properties = mapOf("epoch_day" to intSchema("Days since 1970-01-01.")),
-                required = listOf("epoch_day"),
+                properties = mapOf(
+                    "date" to stringSchema("Date as YYYY-MM-DD, \"today\", or \"yesterday\"."),
+                    "epoch_day" to intSchema("Optional days since 1970-01-01."),
+                ),
             ),
         ),
         FunctionDeclaration(
             name = TOOL_PROGRAMS_AND_ROUTINES,
             description = "Saved programs, routines in split order, target sets, and last performed dates.",
             parameters = objectSchema(
-                mapOf("routine_query" to stringSchema("Optional routine name filter.")),
+                mapOf(
+                    "routine_query" to stringSchema("Optional routine name filter."),
+                    "program_query" to stringSchema("Optional program name filter."),
+                ),
             ),
         ),
         FunctionDeclaration(
@@ -120,6 +168,86 @@ internal object GeminiNanoToolCodec {
                 mapOf("days" to intSchema("Lookback days, 7 to 365. Defaults to 90.")),
             ),
         ),
+        FunctionDeclaration(
+            name = TOOL_CREATE_EXERCISE,
+            description = "Create a custom exercise in the catalog with body part focus, equipment, and exercise type.",
+            parameters = objectSchema(
+                properties = mapOf(
+                    "name" to stringSchema("Exercise name."),
+                    "body_part" to stringSchema("Primary muscle: back, biceps, calves, chest, core, forearms, full body, glutes, hamstrings, shoulders, thighs, triceps."),
+                    "equipment" to stringSchema("Equipment: barbell, dumbbell, cable, machine, smith machine, body weight, kettlebell, band, other."),
+                    "exercise_type" to stringSchema("Measurement type: strength, duration, distance, reps_duration, distance_duration, reps_distance."),
+                    "other_body_parts" to arraySchema("Optional secondary muscles.", stringSchema("Secondary muscle.")),
+                ),
+                required = listOf("name", "body_part"),
+            ),
+        ),
+        FunctionDeclaration(
+            name = TOOL_CREATE_PROGRAM,
+            description = "Create a workout program with one or more routines and exercises. Missing exercises are created automatically.",
+            parameters = objectSchema(
+                properties = mapOf(
+                    "program_name" to stringSchema("Program name."),
+                    "routines" to arraySchema(
+                        "Workout days/routines in split order.",
+                        objectSchema(
+                            properties = mapOf(
+                                "name" to stringSchema("Routine name (e.g. Push, Upper A)."),
+                                "exercises" to arraySchema("Exercises in this routine.", exerciseEntrySchema()),
+                            ),
+                            required = listOf("name", "exercises"),
+                        ),
+                    ),
+                ),
+                required = listOf("program_name", "routines"),
+            ),
+        ),
+        FunctionDeclaration(
+            name = TOOL_ADD_ROUTINE,
+            description = "Add a new routine to an existing program (or create the program if needed). Missing exercises are created automatically.",
+            parameters = objectSchema(
+                properties = mapOf(
+                    "routine_name" to stringSchema("Routine name."),
+                    "program_name" to stringSchema("Target program name (optional if only one program exists)."),
+                    "exercises" to arraySchema("Exercises in this routine.", exerciseEntrySchema()),
+                ),
+                required = listOf("routine_name", "exercises"),
+            ),
+        ),
+        FunctionDeclaration(
+            name = TOOL_UPDATE_ROUTINE,
+            description = "Edit an existing routine: rename, add, replace, update sets/reps/weights, or remove exercises.",
+            parameters = objectSchema(
+                properties = mapOf(
+                    "routine_name" to stringSchema("Existing routine name."),
+                    "program_name" to stringSchema("Optional program name if routine names repeat."),
+                    "new_routine_name" to stringSchema("Optional new name for the routine."),
+                    "add_exercises" to arraySchema("Exercises to append.", exerciseEntrySchema()),
+                    "update_exercises" to arraySchema("Existing exercises whose sets/reps/weight to update.", exerciseEntrySchema()),
+                    "replace_exercises" to arraySchema(
+                        "Exercises to swap in-place.",
+                        objectSchema(
+                            properties = mapOf(
+                                "target_exercise_name" to stringSchema("Existing exercise in routine to replace."),
+                                "new_exercise_name" to stringSchema("Replacement exercise name (existing or new)."),
+                                "sets" to intSchema("Optional working sets count."),
+                                "reps" to intSchema("Optional target reps."),
+                                "weight" to numberSchema("Optional target weight."),
+                                "duration_seconds" to intSchema("Optional target duration in seconds."),
+                                "distance" to numberSchema("Optional target distance."),
+                                "body_part" to stringSchema("Primary muscle if creating a new exercise."),
+                                "equipment" to stringSchema("Equipment if disambiguating or creating."),
+                                "exercise_type" to stringSchema("Measurement type if creating."),
+                                "other_body_parts" to arraySchema("Optional secondary muscles.", stringSchema("Muscle name.")),
+                            ),
+                            required = listOf("target_exercise_name", "new_exercise_name"),
+                        ),
+                    ),
+                    "remove_exercises" to arraySchema("Exercise names to remove from the routine.", stringSchema("Exercise name.")),
+                ),
+                required = listOf("routine_name"),
+            ),
+        ),
     )
 
     /** Dispatches one model [FunctionCall] onto [toolbox]. */
@@ -131,6 +259,9 @@ internal object GeminiNanoToolCodec {
         return when (call.name) {
             TOOL_TRAINING_SUMMARY -> toolbox.getTrainingSummary(
                 weeks = args.intArg("weeks") ?: 8,
+            )
+            TOOL_PROGRESS_REVIEW -> toolbox.getProgressReview(
+                days = args.intArg("days") ?: 30,
             )
             TOOL_PERSONAL_RECORDS -> toolbox.getPersonalRecords(
                 exerciseQuery = args.stringArg("exercise_query"),
@@ -144,17 +275,17 @@ internal object GeminiNanoToolCodec {
                 limit = args.intArg("limit") ?: 5,
                 routineQuery = args.stringArg("routine_query"),
                 days = args.intArg("days"),
+                exerciseQuery = args.stringArg("exercise_query"),
+                startDate = args.stringArg("start_date"),
+                endDate = args.stringArg("end_date"),
             )
-            TOOL_WORKOUTS_FOR_DAY -> {
-                val epochDay = args.longArg("epoch_day")
-                if (epochDay == null) {
-                    ToolOutput("Missing epoch_day argument.")
-                } else {
-                    toolbox.getWorkoutsForDay(epochDay)
-                }
-            }
+            TOOL_WORKOUTS_FOR_DAY -> toolbox.getWorkoutsForDay(
+                epochDay = args.longArg("epoch_day"),
+                date = args.stringArg("date"),
+            )
             TOOL_PROGRAMS_AND_ROUTINES -> toolbox.getProgramsAndRoutines(
                 routineQuery = args.stringArg("routine_query"),
+                programQuery = args.stringArg("program_query"),
             )
             TOOL_SEARCH_EXERCISES -> toolbox.searchExercises(
                 query = args.stringArg("query"),
@@ -164,6 +295,31 @@ internal object GeminiNanoToolCodec {
             )
             TOOL_BODY_METRICS -> toolbox.getBodyMetricsAndProfile(
                 days = args.intArg("days") ?: 90,
+            )
+            TOOL_CREATE_EXERCISE -> toolbox.createExercise(
+                name = args.stringArg("name").orEmpty(),
+                bodyPart = args.stringArg("body_part").orEmpty(),
+                equipment = args.stringArg("equipment"),
+                exerciseType = args.stringArg("exercise_type"),
+                otherBodyParts = args.stringListArg("other_body_parts"),
+            )
+            TOOL_CREATE_PROGRAM -> toolbox.createProgram(
+                programName = args.stringArg("program_name").orEmpty(),
+                routines = args.mapListArg("routines").mapNotNull(::decodeRoutineInput),
+            )
+            TOOL_ADD_ROUTINE -> toolbox.addRoutineToProgram(
+                routineName = args.stringArg("routine_name").orEmpty(),
+                exercises = args.mapListArg("exercises").mapNotNull(::decodeExerciseInput),
+                programName = args.stringArg("program_name"),
+            )
+            TOOL_UPDATE_ROUTINE -> toolbox.updateRoutine(
+                routineName = args.stringArg("routine_name").orEmpty(),
+                programName = args.stringArg("program_name"),
+                newRoutineName = args.stringArg("new_routine_name"),
+                addExercises = args.mapListArg("add_exercises").mapNotNull(::decodeExerciseInput),
+                replaceExercises = args.mapListArg("replace_exercises").mapNotNull(::decodeReplaceExerciseInput),
+                updateExercises = args.mapListArg("update_exercises").mapNotNull(::decodeExerciseInput),
+                removeExercises = args.stringListArg("remove_exercises"),
             )
             else -> ToolOutput("Unknown tool: ${call.name}")
         }
@@ -256,6 +412,46 @@ internal object GeminiNanoToolCodec {
     }
 }
 
+private fun decodeRoutineInput(map: Map<String, FunctionArgValue>): AiRoutineInput? {
+    val name = map.stringArg("name") ?: return null
+    val exercises = map.mapListArg("exercises").mapNotNull(::decodeExerciseInput)
+    return AiRoutineInput(name = name, exercises = exercises)
+}
+
+private fun decodeExerciseInput(map: Map<String, FunctionArgValue>): AiExerciseInput? {
+    val name = map.stringArg("exercise_name") ?: map.stringArg("name") ?: return null
+    return AiExerciseInput(
+        exerciseName = name,
+        sets = map.intArg("sets") ?: 3,
+        reps = map.intArg("reps"),
+        weight = map.doubleArg("weight"),
+        durationSeconds = map.intArg("duration_seconds"),
+        distance = map.doubleArg("distance"),
+        bodyPart = map.stringArg("body_part"),
+        otherBodyParts = map.stringListArg("other_body_parts"),
+        equipment = map.stringArg("equipment"),
+        exerciseType = map.stringArg("exercise_type"),
+    )
+}
+
+private fun decodeReplaceExerciseInput(map: Map<String, FunctionArgValue>): AiReplaceExerciseInput? {
+    val target = map.stringArg("target_exercise_name") ?: return null
+    val replacement = map.stringArg("new_exercise_name") ?: return null
+    return AiReplaceExerciseInput(
+        targetExerciseName = target,
+        newExerciseName = replacement,
+        sets = map.intArg("sets"),
+        reps = map.intArg("reps"),
+        weight = map.doubleArg("weight"),
+        durationSeconds = map.intArg("duration_seconds"),
+        distance = map.doubleArg("distance"),
+        bodyPart = map.stringArg("body_part"),
+        otherBodyParts = map.stringListArg("other_body_parts"),
+        equipment = map.stringArg("equipment"),
+        exerciseType = map.stringArg("exercise_type"),
+    )
+}
+
 private fun Map<String, FunctionArgValue>.stringArg(key: String): String? =
     when (val value = this[key]) {
         is FunctionArgValue.StringValue -> value.value.takeIf { it.isNotBlank() }
@@ -281,4 +477,32 @@ private fun Map<String, FunctionArgValue>.longArg(key: String): Long? =
         is FunctionArgValue.DoubleValue -> value.value.toLong()
         is FunctionArgValue.StringValue -> value.value.trim().toLongOrNull()
         else -> null
+    }
+
+private fun Map<String, FunctionArgValue>.doubleArg(key: String): Double? =
+    when (val value = this[key]) {
+        is FunctionArgValue.DoubleValue -> value.value
+        is FunctionArgValue.IntValue -> value.value.toDouble()
+        is FunctionArgValue.LongValue -> value.value.toDouble()
+        is FunctionArgValue.StringValue -> value.value.trim().toDoubleOrNull()
+        else -> null
+    }
+
+private fun Map<String, FunctionArgValue>.stringListArg(key: String): List<String> =
+    when (val value = this[key]) {
+        is FunctionArgValue.ListValue -> value.values.mapNotNull { item ->
+            (item as? FunctionArgValue.StringValue)?.value?.trim()?.takeIf { it.isNotEmpty() }
+        }
+        is FunctionArgValue.StringValue -> value.value.split(',')
+            .map { it.trim() }
+            .filter { it.isNotEmpty() }
+        else -> emptyList()
+    }
+
+private fun Map<String, FunctionArgValue>.mapListArg(key: String): List<Map<String, FunctionArgValue>> =
+    when (val value = this[key]) {
+        is FunctionArgValue.ListValue -> value.values.mapNotNull { item ->
+            (item as? FunctionArgValue.MapValue)?.map
+        }
+        else -> emptyList()
     }

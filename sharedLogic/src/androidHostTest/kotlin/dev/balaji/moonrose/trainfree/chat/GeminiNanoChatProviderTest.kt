@@ -34,6 +34,14 @@ private class RecordingChatToolboxPort : ChatToolboxPort {
         )
     }
 
+    override suspend fun getProgressReview(days: Int): ToolOutput {
+        calls += "review:$days"
+        return ToolOutput(
+            summary = "30-day review: +15% volume",
+            sources = listOf(ChatSourceRef(kind = "progress", label = "Progress overview")),
+        )
+    }
+
     override suspend fun getPersonalRecords(exerciseQuery: String?, limit: Int): ToolOutput {
         calls += "prs:${exerciseQuery.orEmpty()}:$limit"
         return ToolOutput(
@@ -50,18 +58,25 @@ private class RecordingChatToolboxPort : ChatToolboxPort {
         )
     }
 
-    override suspend fun getRecentWorkouts(limit: Int, routineQuery: String?, days: Int?): ToolOutput {
-        calls += "recent:$limit:${routineQuery.orEmpty()}:${days ?: -1}"
+    override suspend fun getRecentWorkouts(
+        limit: Int,
+        routineQuery: String?,
+        days: Int?,
+        exerciseQuery: String?,
+        startDate: String?,
+        endDate: String?,
+    ): ToolOutput {
+        calls += "recent:$limit:${routineQuery.orEmpty()}:${days ?: -1}:${exerciseQuery.orEmpty()}:${startDate.orEmpty()}:${endDate.orEmpty()}"
         return ToolOutput("Last workout: Push A (45 min)")
     }
 
-    override suspend fun getWorkoutsForDay(epochDay: Long): ToolOutput {
-        calls += "day:$epochDay"
-        return ToolOutput("Completed Push A on $epochDay")
+    override suspend fun getWorkoutsForDay(epochDay: Long?, date: String?): ToolOutput {
+        calls += "day:${epochDay ?: date}"
+        return ToolOutput("Completed Push A on ${epochDay ?: date}")
     }
 
-    override suspend fun getProgramsAndRoutines(routineQuery: String?): ToolOutput {
-        calls += "programs:${routineQuery.orEmpty()}"
+    override suspend fun getProgramsAndRoutines(routineQuery: String?, programQuery: String?): ToolOutput {
+        calls += "programs:${programQuery.orEmpty()}:${routineQuery.orEmpty()}"
         return ToolOutput("Upper/Lower split")
     }
 
@@ -78,6 +93,45 @@ private class RecordingChatToolboxPort : ChatToolboxPort {
     override suspend fun getBodyMetricsAndProfile(days: Int): ToolOutput {
         calls += "metrics:$days"
         return ToolOutput("Weight 78.2 kg, BMI 23.8")
+    }
+
+    override suspend fun createExercise(
+        name: String,
+        bodyPart: String,
+        equipment: String?,
+        exerciseType: String?,
+        otherBodyParts: List<String>,
+    ): ToolOutput {
+        calls += "create_ex:$name:$bodyPart:${equipment.orEmpty()}:${exerciseType.orEmpty()}:${otherBodyParts.joinToString(",")}"
+        return ToolOutput("Created $name", listOf(ChatSourceRef("exercise", name, exerciseId = 99L)))
+    }
+
+    override suspend fun createProgram(programName: String, routines: List<AiRoutineInput>): ToolOutput {
+        val routineDesc = routines.joinToString(",") { "${it.name}(${it.exercises.size})" }
+        calls += "create_prog:$programName:$routineDesc"
+        return ToolOutput("Created $programName", listOf(ChatSourceRef("program", programName, programId = 10L)))
+    }
+
+    override suspend fun addRoutineToProgram(
+        routineName: String,
+        exercises: List<AiExerciseInput>,
+        programName: String?,
+    ): ToolOutput {
+        calls += "add_routine:${programName.orEmpty()}:$routineName:${exercises.size}"
+        return ToolOutput("Added $routineName", listOf(ChatSourceRef("program", programName ?: "Program", programId = 10L, routineId = 20L)))
+    }
+
+    override suspend fun updateRoutine(
+        routineName: String,
+        programName: String?,
+        newRoutineName: String?,
+        addExercises: List<AiExerciseInput>,
+        replaceExercises: List<AiReplaceExerciseInput>,
+        updateExercises: List<AiExerciseInput>,
+        removeExercises: List<String>,
+    ): ToolOutput {
+        calls += "update_routine:${programName.orEmpty()}:$routineName:new=${newRoutineName.orEmpty()}:add=${addExercises.size}:rep=${replaceExercises.size}:upd=${updateExercises.size}:rem=${removeExercises.size}"
+        return ToolOutput("Updated $routineName", listOf(ChatSourceRef("program", programName ?: "Program", programId = 10L, routineId = 20L)))
     }
 }
 
@@ -311,11 +365,28 @@ class GeminiNanoChatProviderTest {
             toolbox,
         )
         GeminiNanoToolCodec.executeToolCall(
-            FunctionCall(GeminiNanoToolCodec.TOOL_RECENT_WORKOUTS, mapOf("limit" to FunctionArgValue.IntValue(3), "routine_query" to FunctionArgValue.StringValue("Pull"), "days" to FunctionArgValue.StringValue("14")), "4"),
+            FunctionCall(
+                GeminiNanoToolCodec.TOOL_RECENT_WORKOUTS,
+                mapOf(
+                    "limit" to FunctionArgValue.IntValue(3),
+                    "routine_query" to FunctionArgValue.StringValue("Pull"),
+                    "days" to FunctionArgValue.StringValue("14"),
+                    "exercise_query" to FunctionArgValue.StringValue("Row"),
+                ),
+                "4",
+            ),
             toolbox,
         )
         GeminiNanoToolCodec.executeToolCall(
             FunctionCall(GeminiNanoToolCodec.TOOL_WORKOUTS_FOR_DAY, mapOf("epoch_day" to FunctionArgValue.LongValue(20400L)), "5"),
+            toolbox,
+        )
+        GeminiNanoToolCodec.executeToolCall(
+            FunctionCall(GeminiNanoToolCodec.TOOL_PROGRESS_REVIEW, mapOf("days" to FunctionArgValue.IntValue(60)), "5b"),
+            toolbox,
+        )
+        GeminiNanoToolCodec.executeToolCall(
+            FunctionCall(GeminiNanoToolCodec.TOOL_WORKOUTS_FOR_DAY, mapOf("date" to FunctionArgValue.StringValue("yesterday")), "5c"),
             toolbox,
         )
         GeminiNanoToolCodec.executeToolCall(
@@ -339,20 +410,119 @@ class GeminiNanoChatProviderTest {
             FunctionCall(GeminiNanoToolCodec.TOOL_BODY_METRICS, mapOf("days" to FunctionArgValue.IntValue(30)), "8"),
             toolbox,
         )
+        GeminiNanoToolCodec.executeToolCall(
+            FunctionCall(
+                GeminiNanoToolCodec.TOOL_CREATE_EXERCISE,
+                mapOf(
+                    "name" to FunctionArgValue.StringValue("Bulgarian Split Squat"),
+                    "body_part" to FunctionArgValue.StringValue("legs"),
+                    "equipment" to FunctionArgValue.StringValue("dumbbell"),
+                    "exercise_type" to FunctionArgValue.StringValue("strength"),
+                    "other_body_parts" to FunctionArgValue.ListValue(listOf(FunctionArgValue.StringValue("glutes"))),
+                ),
+                "9",
+            ),
+            toolbox,
+        )
+        GeminiNanoToolCodec.executeToolCall(
+            FunctionCall(
+                GeminiNanoToolCodec.TOOL_CREATE_PROGRAM,
+                mapOf(
+                    "program_name" to FunctionArgValue.StringValue("3-Day PPL"),
+                    "routines" to FunctionArgValue.ListValue(
+                        listOf(
+                            FunctionArgValue.MapValue(
+                                mapOf(
+                                    "name" to FunctionArgValue.StringValue("Push"),
+                                    "exercises" to FunctionArgValue.ListValue(
+                                        listOf(
+                                            FunctionArgValue.MapValue(
+                                                mapOf(
+                                                    "exercise_name" to FunctionArgValue.StringValue("Barbell Bench Press"),
+                                                    "sets" to FunctionArgValue.IntValue(4),
+                                                    "reps" to FunctionArgValue.IntValue(6),
+                                                ),
+                                            ),
+                                        ),
+                                    ),
+                                ),
+                            ),
+                        ),
+                    ),
+                ),
+                "10",
+            ),
+            toolbox,
+        )
+        GeminiNanoToolCodec.executeToolCall(
+            FunctionCall(
+                GeminiNanoToolCodec.TOOL_ADD_ROUTINE,
+                mapOf(
+                    "program_name" to FunctionArgValue.StringValue("3-Day PPL"),
+                    "routine_name" to FunctionArgValue.StringValue("Core"),
+                    "exercises" to FunctionArgValue.ListValue(
+                        listOf(
+                            FunctionArgValue.MapValue(
+                                mapOf(
+                                    "exercise_name" to FunctionArgValue.StringValue("Plank"),
+                                    "sets" to FunctionArgValue.IntValue(3),
+                                    "duration_seconds" to FunctionArgValue.IntValue(60),
+                                    "exercise_type" to FunctionArgValue.StringValue("duration"),
+                                ),
+                            ),
+                        ),
+                    ),
+                ),
+                "11",
+            ),
+            toolbox,
+        )
+        GeminiNanoToolCodec.executeToolCall(
+            FunctionCall(
+                GeminiNanoToolCodec.TOOL_UPDATE_ROUTINE,
+                mapOf(
+                    "routine_name" to FunctionArgValue.StringValue("Push"),
+                    "program_name" to FunctionArgValue.StringValue("3-Day PPL"),
+                    "new_routine_name" to FunctionArgValue.StringValue("Heavy Push"),
+                    "remove_exercises" to FunctionArgValue.ListValue(listOf(FunctionArgValue.StringValue("Skull Crusher"))),
+                    "replace_exercises" to FunctionArgValue.ListValue(
+                        listOf(
+                            FunctionArgValue.MapValue(
+                                mapOf(
+                                    "target_exercise_name" to FunctionArgValue.StringValue("Barbell Bench Press"),
+                                    "new_exercise_name" to FunctionArgValue.StringValue("Dumbbell Bench Press"),
+                                    "sets" to FunctionArgValue.IntValue(3),
+                                    "reps" to FunctionArgValue.IntValue(10),
+                                ),
+                            ),
+                        ),
+                    ),
+                ),
+                "12",
+            ),
+            toolbox,
+        )
 
         assertEquals(
             listOf(
                 "summary:4",
                 "prs:squat:5",
                 "prog:deadlift:6",
-                "recent:3:Pull:14",
+                "recent:3:Pull:14:Row::",
                 "day:20400",
-                "programs:Upper",
+                "review:60",
+                "day:yesterday",
+                "programs::Upper",
                 "search:row:back:dumbbell:4",
                 "metrics:30",
+                "create_ex:Bulgarian Split Squat:legs:dumbbell:strength:glutes",
+                "create_prog:3-Day PPL:Push(1)",
+                "add_routine:3-Day PPL:Core:1",
+                "update_routine:3-Day PPL:Push:new=Heavy Push:add=0:rep=1:upd=0:rem=1",
             ),
             toolbox.calls,
         )
+        assertEquals(13, GeminiNanoToolCodec.toolDeclarations().size)
     }
 
     @Test

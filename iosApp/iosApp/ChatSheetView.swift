@@ -198,7 +198,9 @@ struct ChatSheetView: View {
                         ForEach(uiState.messages, id: \.id) { message in
                             ChatBubbleRow(
                                 message: message,
+                                isGenerating: uiState.isGenerating,
                                 onRetry: { chatState.retryLast() },
+                                onAddAsProgram: { chatState.sendMessage(rawText: L10n.chatAddAsProgram) },
                                 onSourceTap: { source in
                                     chatState.cancelGeneration()
                                     dismiss()
@@ -406,7 +408,9 @@ struct ChatSheetView: View {
 
 private struct ChatBubbleRow: View {
     let message: ChatMessage
+    let isGenerating: Bool
     let onRetry: () -> Void
+    let onAddAsProgram: () -> Void
     let onSourceTap: (ChatSourceRef) -> Void
 
     private var isUser: Bool {
@@ -463,20 +467,42 @@ private struct ChatBubbleRow: View {
                 if !isUser { Spacer(minLength: 48) }
             }
 
-            if !isUser && !message.sources.isEmpty && message.status == ChatMessage.companion.STATUS_COMPLETE {
+            let showAddAction = !isUser &&
+                !isGenerating &&
+                message.status == ChatMessage.companion.STATUS_COMPLETE &&
+                message.suggestsAddAsProgram
+            let showSources = !isUser &&
+                !message.sources.isEmpty &&
+                message.status == ChatMessage.companion.STATUS_COMPLETE
+            if showAddAction || showSources {
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 6) {
-                        ForEach(Array(message.sources.enumerated()), id: \.offset) { _, source in
+                        if showAddAction {
                             Button {
-                                onSourceTap(source)
+                                onAddAsProgram()
                             } label: {
-                                Text(source.label)
-                                    .font(.caption)
+                                Label(L10n.chatAddAsProgram, systemImage: "plus.circle.fill")
+                                    .font(.caption.weight(.medium))
                                     .padding(.horizontal, 10)
                                     .padding(.vertical, 5)
-                                    .background(Color(.tertiarySystemFill), in: Capsule())
+                                    .background(Color.accentColor.opacity(0.16), in: Capsule())
+                                    .foregroundStyle(Color.accentColor)
                             }
                             .buttonStyle(.plain)
+                        }
+                        if showSources {
+                            ForEach(Array(message.sources.enumerated()), id: \.offset) { _, source in
+                                Button {
+                                    onSourceTap(source)
+                                } label: {
+                                    Text(source.label)
+                                        .font(.caption)
+                                        .padding(.horizontal, 10)
+                                        .padding(.vertical, 5)
+                                        .background(Color(.tertiarySystemFill), in: Capsule())
+                                }
+                                .buttonStyle(.plain)
+                            }
                         }
                     }
                 }
