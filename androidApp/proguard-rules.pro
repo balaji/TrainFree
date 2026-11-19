@@ -14,3 +14,11 @@
 -keep,includedescriptorclasses class dev.balaji.moonrose.trainfree.db.TrainFreeBackup { *; }
 -keep,includedescriptorclasses class dev.balaji.moonrose.trainfree.db.Backup* { *; }
 -keep,includedescriptorclasses class dev.balaji.moonrose.trainfree.chat.AiContentReport { *; }
+
+# firebase-components:16.1.0 (pulled in by mlkit:common) only ships a bodyless
+# `-keep class * implements ComponentRegistrar`, which causes R8 full mode to
+# strip CommonComponentRegistrar.<init>() and break MlKitContext setup.
+-keep class * implements com.google.firebase.components.ComponentRegistrar {
+    <init>();
+    java.util.List getComponents();
+}

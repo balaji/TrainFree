@@ -1,62 +1,110 @@
-<link rel="stylesheet" href=".github/github.css">
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/balaji/TrainFree@main/.github/github.css">
-
 # Train Free
 
-*iOS & Android · Free & Open Source · 100% Offline*
+A local-first, 100% offline gym workout logger for **iOS** and **Android**. No account, no sign-in, no backend, and no subscriptions — all workout logs, routines, and body metrics stay in an on-device SQLite database.
 
-A gym workout logger that gets out of your way. Pick the exercise, punch in weight and reps between sets, and get back to the bar. No account, no sign-in, no cloud lock-in, and no subscription wall between you and your lifting history.
+> **In Development:** Train Free is not on the App Store or Google Play yet, and can be built and run locally from source.
 
-`SET 1` **Barbell Bench Press · 100 kg × 5** `✓ Saved to local SQLite`
+<table>
+  <tr>
+    <td align="center">
+      <img src="assets/screenshots/04-inprogress.png" alt="Active workout logging screen with sets, previous weights, and countdown rest timer" width="220" /><br />
+      <sub><strong>Live Workout</strong></sub>
+    </td>
+    <td align="center">
+      <img src="assets/screenshots/05-metrics.png" alt="Progress tab showing body part focus chart, weekly volume bars, and 13-week streak" width="220" /><br />
+      <sub><strong>Progress &amp; Metrics</strong></sub>
+    </td>
+    <td align="center">
+      <img src="assets/screenshots/07-form-tips.jpg" alt="Barbell Back Squat form tips generated offline by built-in Gemini Nano" width="220" /><br />
+      <sub><strong>On-device form tips</strong></sub>
+    </td>
+  </tr>
+</table>
 
-> **In Development · Not on the App Store or Google Play yet**
->
-> Train Free is currently in active development and will be released for both **iOS** and **Android**. Follow progress, read the architecture, or build it yourself on [GitHub](https://github.com/balaji/TrainFree).
+## What's inside
 
-## Built around four guarantees
+- **Fast workout logging:** Start an empty workout or launch a routine, log weight/reps/RPE with previous-set references, and use the built-in rest timer.
+- **Programs & exercise catalog:** Seeded reference exercise library with muscle/equipment filters, custom exercises, and reusable multi-day programs/routines.
+- **Progress & analytics:** Deterministic 1RM estimates (Epley, Brzycki, Lombardi, O'Conner), volume trends, muscle focus breakdown, streaks, and body metrics tracking.
+- **Calendar & workout journal:** Monthly training calendar with per-day workout history and a Markdown workout journal.
+- **On-device AI (optional):** Uses **Apple Intelligence** (`FoundationModels`) on iOS and **Gemini Nano** (ML Kit GenAI) on Android for exercise form tips and progress narration when supported by the device.
+- **Local ownership:** No `INTERNET` permission; supports Health Connect (Android) and JSON backup export/import.
 
-No compromises for monetization, growth hacks, or server dependencies.
+## Tech stack
 
-- **Native on iOS & Android**
+| Layer | Technology |
+| --- | --- |
+| **Shared logic & state** | Kotlin Multiplatform (`2.4.0`), `kotlinx-coroutines` (`StateFlow`), `kotlinx-datetime`, `kotlinx-serialization`, SKIE (exposes `StateFlow` to Swift as `AsyncSequence`) |
+| **Local database** | Room KMP (`2.8.4`) + bundled SQLite (`2.6.2`) via KSP |
+| **Android UI** | Jetpack Compose (Compose Multiplatform `1.11.1`), Material 3 Expressive (`1.11.0-alpha07`), Vico charts, Health Connect, ML Kit GenAI |
+| **iOS UI** | Native SwiftUI (iOS 26.0+ / Liquid Glass), `FoundationModels` |
 
-  Built natively for both platforms — SwiftUI with iOS 26 Liquid Glass on iPhone, and Jetpack Compose with Material 3 Expressive on Android — backed by a shared Kotlin Multiplatform engine.
+### Project structure
 
-- **Always Free & Open Source**
+- `sharedLogic/` — Platform-agnostic domain models (`commonMain`), Room database, repositories, and `StateFlow`-based form/screen state holders (`dbMain`, shared by Android and iOS).
+- `sharedUI/` — Android Compose UI screens and resources; also acts as the umbrella module that packages the `SharedUI` XCFramework for iOS.
+- `androidApp/` — Android application entry point (`dev.balaji.moonrose.trainfree`, minSdk 26, targetSdk 36).
+- `iosApp/` — Native SwiftUI Xcode project consuming `SharedUI` (`sharedLogic` state and repositories).
 
-  No subscriptions to unlock your own history, no paywalled exercise catalog, no ads, and no telemetry. Every line of code is open source on [GitHub](https://github.com/balaji/TrainFree).
+## Running locally for testing
 
-- **100% Offline & Local-First**
+### Prerequisites
 
-  The app doesn't even request the `INTERNET` permission. Your profile, routines, workout sessions, and body metrics live in a plain on-device SQLite (Room) database that you own.
+- **JDK 11+** (ensure `JAVA_HOME` points to a valid JDK)
+- **Android:** Android Studio or Android SDK (API 36) + an emulator or USB-debugging device
+- **iOS:** macOS with **Xcode 26+** (deployment target is iOS 26.0)
 
-- **On-Device AI (When Available)**
+### Android
 
-  Uses your phone's built-in language models — **Apple Intelligence** (`FoundationModels`) on iOS and **Gemini Nano** (ML Kit GenAI) on Android — to narrate progress trends and answer questions over your training log. If your device doesn't support on-device AI, every logging and analytics feature works completely without it.
+Build a debug APK:
 
-## What we refuse to compromise on
+```bash
+./gradlew :androidApp:assembleDebug
+```
 
-Opinionated rules that keep the app fast, honest, and respectful of your time.
+Install and launch on a connected device or running emulator:
 
-1. **Logging speed beats features**
+```bash
+./gradlew :androidApp:installDebug
+```
 
-   Anything on the log-a-set path must work one-handed, in seconds, mid-workout. If a feature slows down logging a set, it doesn't ship.
+Or open the repository root in Android Studio and run the `androidApp` configuration.
 
-2. **Deterministic math, local narration**
+### iOS
 
-   1RM estimates (Epley, Brzycki, Lombardi, O'Conner), volume trends, and streaks are calculated deterministically in Kotlin. The on-device model never invents statistics — it only explains the verified numbers on your phone.
+Open `iosApp/iosApp.xcodeproj` in Xcode and run the `iosApp` scheme on an iOS 26+ simulator or device.
 
-3. **Native feel over cross-platform shortcuts**
+To build from the command line:
 
-   An iPhone user gets a real iOS app (Liquid Glass chrome, system navigation transitions, swipe-back) and an Android user gets a real Material 3 Expressive app that follows their wallpaper and dark mode. Sharing business logic across platforms is an engineering strategy, never an excuse for a lowest-common-denominator UI.
+```bash
+xcodebuild -project iosApp/iosApp.xcodeproj -scheme iosApp -destination 'generic/platform=iOS Simulator' build
+```
 
-4. **Your data outlives the app**
+> If `xcodebuild`'s **Compile Kotlin Framework** phase fails with a toolchain error, export `JAVA_HOME` explicitly before running `xcodebuild`, and set `DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer` if `xcode-select` points to Command Line Tools.
 
-   Everything sits in a clean, documented SQLite schema on your device — never trapped in a proprietary store or locked behind someone else's server.
+### Running tests
 
-## Contributing & architecture
+Run the unit and migration tests for the platform you're working on:
 
-Architecture, build commands, tests, and conventions live in [AGENTS.md](https://github.com/balaji/TrainFree/blob/main/AGENTS.md) — it's written for coding agents and serves as the engineering README and local data model reference.
+```bash
+# Android host tests
+./gradlew :sharedUI:testAndroidHostTest :sharedLogic:testAndroidHostTest
+
+# iOS simulator tests (macOS)
+./gradlew :sharedUI:iosSimulatorArm64Test :sharedLogic:iosSimulatorArm64Test
+```
+
+### Resetting app state
+
+On first launch, the app shows a local profile setup gate. To wipe local data and return to a fresh install:
+
+- **Android:** `adb shell pm clear dev.balaji.moonrose.trainfree`
+- **iOS Simulator:** Delete the app from the simulator (the SQLite database is stored in the app's Documents directory).
+
+## Architecture & contributing
+
+Detailed architecture notes, database migration guidelines, and localization conventions are documented in [AGENTS.md](AGENTS.md).
 
 ---
 
-Built with Kotlin Multiplatform, SwiftUI, and Jetpack Compose · [GitHub](https://github.com/balaji/TrainFree) · [balaji.dev](https://www.balaji.dev) · [Privacy Policy](https://trainfree.balaji.dev/privacy)
+Built with Kotlin Multiplatform, SwiftUI, and Jetpack Compose · [trainfree.balaji.dev](https://trainfree.balaji.dev) · [GitHub](https://github.com/balaji/TrainFree) · [balaji.dev](https://www.balaji.dev) · [Privacy Policy](https://trainfree.balaji.dev/privacy)
