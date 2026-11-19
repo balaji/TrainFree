@@ -10,11 +10,13 @@ struct ProfileView: View {
     @State private var profile: Profile?
     @State private var settings: UserSettings?
     @State private var editing = false
+    #if DEBUG || ENABLE_TEST_DATA
     @State private var testSessionCount = 0
     @State private var showGenerateAlert = false
     @State private var showDeleteAlert = false
     @State private var generateDaysText = "90"
     @State private var working = false
+    #endif
     @State private var showOneRmCalculator = false
     @State private var showBmiCalculator = false
     @State private var showNotificationsDeniedAlert = false
@@ -22,6 +24,9 @@ struct ProfileView: View {
     @State private var syncingHealthWeight = false
     @State private var healthSyncImportedCount: Int?
     @State private var backupController = BackupTransferController()
+
+    private static let feedbackEmail = "hello@balaji.dev"
+    private static let feedbackMailtoURL = URL(string: "mailto:hello@balaji.dev?subject=Train%20Free%20Feedback")!
 
     var body: some View {
         Group {
@@ -199,14 +204,28 @@ struct ProfileView: View {
                             }
                             .disabled(backupController.uiState.working)
                         }
-                        // Test-data tooling for development. Kept in release
-                        // builds for now; generated rows carry the test_data
-                        // flag so Delete only removes what Generate created.
+                        #if DEBUG || ENABLE_TEST_DATA
+                        // Test-data tooling for development, gated behind
+                        // DEBUG || ENABLE_TEST_DATA (hidden in release builds).
+                        // Generated rows carry the test_data flag so Delete
+                        // only removes what Generate created.
                         Section(L10n.developer) {
                             Button(L10n.generateTestDataButton) { showGenerateAlert = true }
                                 .disabled(working)
                             Button(L10n.deleteTestDataTitle, role: .destructive) { showDeleteAlert = true }
                                 .disabled(working || testSessionCount == 0)
+                        }
+                        #endif
+                        Section {
+                            Link(destination: Self.feedbackMailtoURL) {
+                                LabeledContent {
+                                    Text(Self.feedbackEmail)
+                                        .foregroundStyle(.secondary)
+                                } label: {
+                                    Label(L10n.sendFeedback, systemImage: "envelope")
+                                        .foregroundStyle(Color.accentColor)
+                                }
+                            }
                         }
                     }
                     .floatingWorkoutMenuClearance()
@@ -231,6 +250,7 @@ struct ProfileView: View {
                     } message: {
                         Text(L10n.healthSyncDeniedMessage)
                     }
+                    #if DEBUG || ENABLE_TEST_DATA
                     .alert(L10n.generateTestDataTitle, isPresented: $showGenerateAlert) {
                         TextField(L10n.daysOfHistory, text: $generateDaysText)
                             .keyboardType(.numberPad)
@@ -258,6 +278,7 @@ struct ProfileView: View {
                     } message: {
                         Text(L10n.deleteTestDataMessage(testSessionCount))
                     }
+                    #endif
                     .sheet(isPresented: $showOneRmCalculator) {
                         if let settings {
                             NavigationStack {
@@ -302,11 +323,13 @@ struct ProfileView: View {
                 settings = value
             }
         }
+        #if DEBUG || ENABLE_TEST_DATA
         .task {
             for await value in TestDataRepository.shared.testSessionCount {
                 testSessionCount = value.intValue
             }
         }
+        #endif
     }
 
     /// Tappable row for standalone tools: shows the current default formula in

@@ -99,30 +99,38 @@ import dev.balaji.moonrose.trainfree.sharedui.resources.*
 private data class TabSpec(val route: TopLevelRoute, val icon: ImageVector)
 
 /**
+ * Controls visibility of developer-only tooling (test data generation/deletion).
+ * Defaults to false so release/preview builds stay clean unless explicitly enabled.
+ */
+val LocalShowDeveloperTools = staticCompositionLocalOf { false }
+
+/**
  * Full app for platforms where Compose owns navigation (Android).
  * iOS does not call this — its SwiftUI shell hosts screens individually.
  */
 @Composable
 @Preview
-fun App() {
+fun App(showDeveloperTools: Boolean = false) {
     val settings by UserSettingsRepository.settings.collectAsState(initial = UserSettings())
-    PlatformTheme(
-        appearance = settings.appearance,
-        appFont = settings.appFont,
-        appFontSize = settings.appFontSize,
-    ) {
-        val hasProfile by produceState<Boolean?>(initialValue = null) {
-            ProfileRepository.profile.collect { value = it != null }
-        }
-
-        Surface(
-            modifier = Modifier.fillMaxSize(),
-            color = MaterialTheme.colorScheme.background,
+    CompositionLocalProvider(LocalShowDeveloperTools provides showDeveloperTools) {
+        PlatformTheme(
+            appearance = settings.appearance,
+            appFont = settings.appFont,
+            appFontSize = settings.appFontSize,
         ) {
-            when (hasProfile) {
-                null -> Box(Modifier.fillMaxSize()) // first emission arrives near-instantly
-                false -> ProfileSetupFlow()
-                true -> MainTabs()
+            val hasProfile by produceState<Boolean?>(initialValue = null) {
+                ProfileRepository.profile.collect { value = it != null }
+            }
+
+            Surface(
+                modifier = Modifier.fillMaxSize(),
+                color = MaterialTheme.colorScheme.background,
+            ) {
+                when (hasProfile) {
+                    null -> Box(Modifier.fillMaxSize()) // first emission arrives near-instantly
+                    false -> ProfileSetupFlow()
+                    true -> MainTabs()
+                }
             }
         }
     }

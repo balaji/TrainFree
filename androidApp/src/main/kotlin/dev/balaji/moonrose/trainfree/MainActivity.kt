@@ -27,7 +27,7 @@ class MainActivity : ComponentActivity() {
         maybeSeedTestData()
 
         setContent {
-            App()
+            App(showDeveloperTools = BuildConfig.ENABLE_TEST_DATA)
         }
     }
 

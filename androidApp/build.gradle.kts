@@ -23,6 +23,7 @@ dependencies {
 android {
     namespace = "dev.balaji.moonrose.trainfree"
     compileSdk = libs.versions.android.compileSdk.get().toInt()
+    val enableTestDataOverride = providers.gradleProperty("enableTestData").orNull?.toBooleanStrictOrNull()
 
     defaultConfig {
         applicationId = "dev.balaji.moonrose.trainfree"
@@ -31,14 +32,21 @@ android {
         versionCode = 1
         versionName = "1.0"
     }
+    buildFeatures {
+        buildConfig = true
+    }
     packaging {
         resources {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
         }
     }
     buildTypes {
+        getByName("debug") {
+            buildConfigField("boolean", "ENABLE_TEST_DATA", "${enableTestDataOverride ?: true}")
+        }
         getByName("release") {
             isMinifyEnabled = false
+            buildConfigField("boolean", "ENABLE_TEST_DATA", "${enableTestDataOverride ?: false}")
         }
     }
     compileOptions {

@@ -23,6 +23,7 @@ import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Smartphone
 import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.LightMode
+import androidx.compose.material.icons.outlined.Email
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -59,6 +60,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import dev.balaji.moonrose.trainfree.calendar.WeekStart
@@ -92,6 +94,7 @@ import dev.balaji.moonrose.trainfree.model.REST_TIMER_STEP_SECONDS
 import dev.balaji.moonrose.trainfree.model.RestTimerSound
 import dev.balaji.moonrose.trainfree.model.WeightUnit
 import dev.balaji.moonrose.trainfree.model.clampRestTimerSeconds
+import dev.balaji.moonrose.trainfree.LocalShowDeveloperTools
 import dev.balaji.moonrose.trainfree.navigation.LocalBottomFabPadding
 import dev.balaji.moonrose.trainfree.navigation.LocalUseNativeNavigation
 import dev.balaji.moonrose.trainfree.navigation.PlatformBackHandler
@@ -195,7 +198,10 @@ private fun ProfileDetails(profile: Profile, onEdit: () -> Unit) {
         SettingsSection()
         HealthSyncSection()
         BackupSection()
-        DeveloperSection()
+        if (LocalShowDeveloperTools.current) {
+            DeveloperSection()
+        }
+        FeedbackSection()
     }
 }
 
@@ -535,9 +541,10 @@ private fun BackupSection() {
 }
 
 /**
- * Test-data tooling for development. Kept in release builds for now, tucked
- * under its own heading; generated rows carry the test_data flag so Delete
- * only ever removes what Generate created.
+ * Test-data tooling for development, gated behind [LocalShowDeveloperTools]
+ * (`BuildConfig.ENABLE_TEST_DATA` on Android: on in debug builds, hidden in
+ * release builds). Generated rows carry the test_data flag so Delete only
+ * ever removes what Generate created.
  */
 @Composable
 private fun DeveloperSection() {
@@ -647,6 +654,50 @@ private fun DeveloperSection() {
                     Text(stringResource(Res.string.cancel))
                 }
             },
+        )
+    }
+}
+
+private const val FEEDBACK_EMAIL = "hello@balaji.dev"
+private const val FEEDBACK_MAILTO_URI = "mailto:hello@balaji.dev?subject=Train%20Free%20Feedback"
+
+@Composable
+private fun FeedbackSection() {
+    val uriHandler = LocalUriHandler.current
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = 16.dp)
+            .clickable {
+                // Devices/emulators without a mail client cause AndroidUriHandler.openUri
+                // to throw IllegalArgumentException; ignore safely instead of crashing.
+                runCatching { uriHandler.openUri(FEEDBACK_MAILTO_URI) }
+            }
+            .padding(vertical = 12.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Row(
+            modifier = Modifier.weight(1f),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Icon(
+                imageVector = Icons.Outlined.Email,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+            )
+            Text(
+                stringResource(Res.string.send_feedback),
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.primary,
+            )
+        }
+        Text(
+            FEEDBACK_EMAIL,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 1,
         )
     }
 }

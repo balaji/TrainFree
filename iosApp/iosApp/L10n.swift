@@ -280,6 +280,7 @@ enum L10n {
     static let fontSizeDefault = String(localized: "font_size_default", defaultValue: "Default")
     static let fontSizeLarger = String(localized: "font_size_larger", defaultValue: "Larger")
     static let fontSizeLargest = String(localized: "font_size_largest", defaultValue: "Largest")
+    static let sendFeedback = String(localized: "send_feedback", defaultValue: "Send feedback")
     static func restTimerSoundLabel(_ sound: RestTimerSound) -> String {
         switch sound {
         case .none: return restSoundNone

@@ -200,6 +200,7 @@
     <string name="font_size_default">Standard</string>
     <string name="font_size_larger">Större</string>
     <string name="font_size_largest">Störst</string>
+    <string name="send_feedback">Skicka feedback</string>
 
     <!-- Developer tools -->
     <string name="developer">Utvecklare</string>

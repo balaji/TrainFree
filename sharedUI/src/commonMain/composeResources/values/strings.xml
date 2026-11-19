@@ -214,6 +214,7 @@
     <string name="font_size_default">Default</string>
     <string name="font_size_larger">Larger</string>
     <string name="font_size_largest">Largest</string>
+    <string name="send_feedback">Send feedback</string>
 
     <!-- Developer tools -->
     <string name="developer">Developer</string>

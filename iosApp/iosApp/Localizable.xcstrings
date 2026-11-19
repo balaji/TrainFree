@@ -4998,6 +4998,13 @@
         "sv": { "stringUnit": { "state": "translated", "value": "Behöver minst 2 veckors data." } },
         "en": { "stringUnit": { "state": "translated", "value": "Need at least 2 weeks of data." } }
       }
+    },
+    "send_feedback": {
+      "extractionState": "manual",
+      "localizations": {
+        "sv": { "stringUnit": { "state": "translated", "value": "Skicka feedback" } },
+        "en": { "stringUnit": { "state": "translated", "value": "Send feedback" } }
+      }
     }
   },
   "version": "1.0"
