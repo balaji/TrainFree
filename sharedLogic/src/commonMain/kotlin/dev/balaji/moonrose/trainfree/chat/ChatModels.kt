@@ -53,6 +53,8 @@ data class ChatMessage(
     val errorKey: String = "",
     val sources: List<ChatSourceRef> = emptyList(),
     val suggestsAddAsProgram: Boolean = false,
+    val reported: Boolean = false,
+    val reportReasonKey: String = "",
 ) {
     companion object {
         const val ROLE_USER = "user"

@@ -59,4 +59,4 @@ Architecture, build commands, tests, and conventions live in [AGENTS.md](https:/
 
 ---
 
-Built with Kotlin Multiplatform, SwiftUI, and Jetpack Compose · [GitHub](https://github.com/balaji/TrainFree) · [balaji.dev](https://www.balaji.dev)
+Built with Kotlin Multiplatform, SwiftUI, and Jetpack Compose · [GitHub](https://github.com/balaji/TrainFree) · [balaji.dev](https://www.balaji.dev) · [Privacy Policy](https://trainfree.balaji.dev/privacy)

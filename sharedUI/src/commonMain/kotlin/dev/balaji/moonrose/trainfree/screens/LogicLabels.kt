@@ -2,6 +2,7 @@ package dev.balaji.moonrose.trainfree.screens
 
 import androidx.compose.runtime.Composable
 import dev.balaji.moonrose.trainfree.calendar.WeekMath
+import dev.balaji.moonrose.trainfree.chat.AiContentReportReason
 import dev.balaji.moonrose.trainfree.chat.ChatMessage
 import dev.balaji.moonrose.trainfree.chat.ChatSuggestedPrompt
 import dev.balaji.moonrose.trainfree.db.BackupError
@@ -410,5 +411,15 @@ internal fun backupNoticeLabel(notice: BackupNotice): String = stringResource(
     when (notice) {
         BackupNotice.EXPORT_SUCCEEDED -> Res.string.backup_export_succeeded
         BackupNotice.IMPORT_SUCCEEDED -> Res.string.backup_import_succeeded
+    },
+)
+
+@Composable
+internal fun aiReportReasonLabel(reasonKey: String): String = stringResource(
+    when (reasonKey) {
+        AiContentReportReason.OFFENSIVE -> Res.string.ai_report_reason_offensive
+        AiContentReportReason.UNSAFE_ADVICE -> Res.string.ai_report_reason_unsafe_advice
+        AiContentReportReason.INACCURATE -> Res.string.ai_report_reason_inaccurate
+        else -> Res.string.ai_report_reason_other
     },
 )

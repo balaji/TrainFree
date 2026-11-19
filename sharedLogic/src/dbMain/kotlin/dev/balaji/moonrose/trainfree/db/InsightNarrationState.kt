@@ -1,5 +1,8 @@
 package dev.balaji.moonrose.trainfree.db
 
+import dev.balaji.moonrose.trainfree.chat.AiContentReport
+import dev.balaji.moonrose.trainfree.chat.AiContentReportSource
+import dev.balaji.moonrose.trainfree.chat.createAiContentReport
 import dev.balaji.moonrose.trainfree.insights.ConsistencyQuotes
 import dev.balaji.moonrose.trainfree.insights.InsightCard
 import dev.balaji.moonrose.trainfree.insights.llm.CardNarration
@@ -36,6 +39,9 @@ class InsightNarrationState internal constructor(
     private val buildRequest: suspend (InsightCard, Int) -> CardNarrationRequest?,
     private val cacheFind: suspend (String) -> AiInsightCacheEntity?,
     private val cachePut: suspend (AiInsightCacheEntity) -> Unit,
+    private val cacheDelete: suspend (String) -> Unit = {},
+    private val saveReport: suspend (AiContentReport) -> Unit = {},
+    private val clockMillis: () -> Long = { nowMillis() },
     private val scope: CoroutineScope = CoroutineScope(Dispatchers.Main),
 ) {
     constructor(provider: InsightGenerationProvider?) : this(
@@ -44,6 +50,8 @@ class InsightNarrationState internal constructor(
         buildRequest = InsightCardNarrator::buildRequest,
         cacheFind = { AppDb.db.aiInsightCacheDao().find(it) },
         cachePut = { AppDb.db.aiInsightCacheDao().upsert(it) },
+        cacheDelete = { AppDb.db.aiInsightCacheDao().delete(it) },
+        saveReport = { AiContentReportRepository.record(it) },
     )
 
     private val _narrations = MutableStateFlow<Map<String, CardNarration>>(emptyMap())
@@ -58,6 +66,7 @@ class InsightNarrationState internal constructor(
      * app launch, since this map is in-memory — retry naturally.
      */
     private val enqueued = mutableMapOf<String, String>()
+    private val lastStatsHash = mutableMapOf<String, String>()
     private val variants = mutableMapOf<String, Int>()
     private var latestCards: List<InsightCard> = emptyList()
     private var prewarmed = false
@@ -85,13 +94,43 @@ class InsightNarrationState internal constructor(
         variants[cardId] = nextVariant
         scope.launch {
             val request = buildRequest(card, nextVariant) ?: return@launch
+            lastStatsHash[cardId] = request.statsHash
             enqueued[cardId] = request.statsHash
-            update(cardId, CardNarration(cardId, "loading", "", request.canRefresh))
+            update(cardId, CardNarration(cardId, "loading", "", request.canRefresh, isAiGenerated = true))
             if (!prewarmed) {
                 prewarmed = true
                 provider.prewarm()
             }
             queue.trySend(request)
+        }
+    }
+
+    /**
+     * Flags and immediately hides an AI-generated insight narration, deletes
+     * its cached copy so it won't reappear for identical stats, and saves a
+     * local moderation record. Curated (non-AI) quotes are ignored.
+     */
+    fun report(cardId: String, reasonKey: String, note: String = "") {
+        val current = _narrations.value[cardId] ?: return
+        if (current.status != "ready" || !current.isAiGenerated || current.text.isBlank()) return
+
+        val currentHash = lastStatsHash[cardId]
+            ?: enqueued[cardId]?.removePrefix(FAILED_PREFIX)?.removePrefix(REPORTED_PREFIX)
+        if (currentHash != null) {
+            enqueued[cardId] = REPORTED_PREFIX + currentHash
+        }
+        val report = createAiContentReport(
+            source = AiContentReportSource.INSIGHT,
+            contentId = cardId,
+            reasonKey = reasonKey,
+            note = note,
+            contentText = current.text,
+            reportedAtMillis = clockMillis(),
+        )
+        update(cardId, CardNarration(cardId, "reported", "", current.canRefresh, isAiGenerated = true))
+        scope.launch {
+            runCatching { cacheDelete(cardId) }
+            runCatching { saveReport(report) }
         }
     }
 
@@ -125,17 +164,21 @@ class InsightNarrationState internal constructor(
         for (item in prepared) {
             val id = item.request.cardId
             val canRefresh = item.request.canRefresh
-            if (item.cached?.statsHash == item.request.statsHash) {
-                next[id] = CardNarration(id, "ready", item.cached.text, canRefresh)
-            } else if (enqueued[id] == item.request.statsHash) {
+            val statsHash = item.request.statsHash
+            lastStatsHash[id] = statsHash
+            if (enqueued[id] == REPORTED_PREFIX + statsHash) {
+                next[id] = CardNarration(id, "reported", "", canRefresh, isAiGenerated = true)
+            } else if (item.cached?.statsHash == statsHash) {
+                next[id] = CardNarration(id, "ready", item.cached.text, canRefresh, isAiGenerated = true)
+            } else if (enqueued[id] == statsHash) {
                 // Already queued or just finished for these exact stats; keep
                 // whatever the worker last reported (loading or ready).
-                next[id] = _narrations.value[id] ?: CardNarration(id, "loading", "", canRefresh)
-            } else if (enqueued[id] == FAILED_PREFIX + item.request.statsHash) {
-                next[id] = CardNarration(id, "failed", "", canRefresh)
+                next[id] = _narrations.value[id] ?: CardNarration(id, "loading", "", canRefresh, isAiGenerated = true)
+            } else if (enqueued[id] == FAILED_PREFIX + statsHash) {
+                next[id] = CardNarration(id, "failed", "", canRefresh, isAiGenerated = true)
             } else {
-                enqueued[id] = item.request.statsHash
-                next[id] = CardNarration(id, "loading", "", canRefresh)
+                enqueued[id] = statsHash
+                next[id] = CardNarration(id, "loading", "", canRefresh, isAiGenerated = true)
                 if (!prewarmed) {
                     prewarmed = true
                     provider?.prewarm()
@@ -158,13 +201,13 @@ class InsightNarrationState internal constructor(
                 if (enqueued[request.cardId] == request.statsHash) {
                     enqueued[request.cardId] = FAILED_PREFIX + request.statsHash
                 }
-                update(request.cardId, CardNarration(request.cardId, "failed", "", request.canRefresh))
+                update(request.cardId, CardNarration(request.cardId, "failed", "", request.canRefresh, isAiGenerated = true))
                 continue
             }
             cachePut(AiInsightCacheEntity(request.cardId, request.statsHash, text, nowMillis()))
             // Only surface the text if these stats are still the latest.
             if (enqueued[request.cardId] == request.statsHash) {
-                update(request.cardId, CardNarration(request.cardId, "ready", text, request.canRefresh))
+                update(request.cardId, CardNarration(request.cardId, "ready", text, request.canRefresh, isAiGenerated = true))
             }
         }
     }
@@ -188,6 +231,7 @@ class InsightNarrationState internal constructor(
 
     private companion object {
         const val FAILED_PREFIX = "failed:"
+        const val REPORTED_PREFIX = "reported:"
         const val FREQUENCY_KIND = "frequency"
     }
 }

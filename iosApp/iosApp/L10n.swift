@@ -610,6 +610,32 @@ enum L10n {
     static let chatScrollToBottom = String(localized: "chat_scroll_to_bottom", defaultValue: "Scroll to bottom")
     static let chatAddAsProgram = String(localized: "chat_add_as_program", defaultValue: "Add it as a program")
 
+    // MARK: - AI content reporting
+    static let aiReportAction = String(localized: "ai_report_action", defaultValue: "Report")
+    static let aiReportDialogTitle = String(localized: "ai_report_dialog_title", defaultValue: "Report AI content")
+    static let aiReportDialogSubtitle = String(localized: "ai_report_dialog_subtitle", defaultValue: "Flagged responses are hidden immediately. Train Free runs offline, so reports are saved locally on your device.")
+    static let aiReportReasonOffensive = String(localized: "ai_report_reason_offensive", defaultValue: "Offensive or harmful")
+    static let aiReportReasonUnsafeAdvice = String(localized: "ai_report_reason_unsafe_advice", defaultValue: "Unsafe training or medical advice")
+    static let aiReportReasonInaccurate = String(localized: "ai_report_reason_inaccurate", defaultValue: "Inaccurate or made-up data")
+    static let aiReportReasonOther = String(localized: "ai_report_reason_other", defaultValue: "Other")
+    static let aiReportNotePlaceholder = String(localized: "ai_report_note_placeholder", defaultValue: "Additional details (optional)")
+    static let aiReportSubmit = String(localized: "ai_report_submit", defaultValue: "Report")
+    static let aiReportMessageHidden = String(localized: "ai_report_message_hidden", defaultValue: "Response hidden and reported.")
+    static let aiReportInsightHidden = String(localized: "ai_report_insight_hidden", defaultValue: "Insight hidden and reported.")
+
+    static func aiReportReasonLabel(_ reasonKey: String) -> String {
+        switch reasonKey {
+        case AiContentReportReason.shared.OFFENSIVE:
+            return aiReportReasonOffensive
+        case AiContentReportReason.shared.UNSAFE_ADVICE:
+            return aiReportReasonUnsafeAdvice
+        case AiContentReportReason.shared.INACCURATE:
+            return aiReportReasonInaccurate
+        default:
+            return aiReportReasonOther
+        }
+    }
+
     static func chatFormTipsForExercise(_ exerciseName: String) -> String {
         String(localized: "chat_prompt_exercise_form", defaultValue: "Form tips for \(exerciseName)")
     }

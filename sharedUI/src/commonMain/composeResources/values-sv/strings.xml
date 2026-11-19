@@ -168,6 +168,7 @@
     <string name="notifications_denied_title">Aviseringar är avstängda</string>
     <string name="notifications_denied_message">Train Free har inte tillåtelse att skicka aviseringar. Tillåt aviseringar för Train Free i systeminställningarna för att slå på detta.</string>
     <string name="open_settings">Öppna inställningar</string>
+    <string name="exact_alarm_hint_message">Tillåt Larm och påminnelser i systeminställningarna för exakta vilotimeraviseringar i bakgrunden.</string>
     <string name="week_starts_on">Veckan börjar på</string>
     <string name="appearance">Utseende</string>
     <string name="weight_units">Viktenheter</string>
@@ -440,6 +441,19 @@
     <string name="chat_prompt_exercise_substitutes">Bra alternativ till %1$s</string>
     <string name="chat_prompt_day_summary">Hur stod sig det här passet?</string>
     <string name="chat_scroll_to_bottom">Rulla längst ner</string>
+
+    <!-- AI content reporting -->
+    <string name="ai_report_action">Rapportera</string>
+    <string name="ai_report_dialog_title">Rapportera AI-innehåll</string>
+    <string name="ai_report_dialog_subtitle">Flaggade svar döljs direkt. Train Free körs offline, så rapporter sparas lokalt på din enhet.</string>
+    <string name="ai_report_reason_offensive">Stötande eller skadligt</string>
+    <string name="ai_report_reason_unsafe_advice">Osäkra tränings- eller medicinska råd</string>
+    <string name="ai_report_reason_inaccurate">Felaktig eller påhittad data</string>
+    <string name="ai_report_reason_other">Annat</string>
+    <string name="ai_report_note_placeholder">Ytterligare detaljer (valfritt)</string>
+    <string name="ai_report_submit">Rapportera</string>
+    <string name="ai_report_message_hidden">Svaret har dolts och rapporterats.</string>
+    <string name="ai_report_insight_hidden">Insikten har dolts och rapporterats.</string>
     <string name="workout_title">Passets titel</string>
     <string name="rename_workout">Byt namn på pass</string>
 

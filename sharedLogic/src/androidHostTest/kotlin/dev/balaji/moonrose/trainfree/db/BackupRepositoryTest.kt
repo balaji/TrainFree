@@ -285,4 +285,14 @@ class BackupRepositoryTest {
         assertEquals(BackupError.IMPORT_FAILED, state.uiState.value.error)
         assertNull(state.uiState.value.notice)
     }
+
+    @Test
+    fun backupExportExcludesLocalAiContentReportsSetting() {
+        val entities = listOf(
+            UserSettingEntity(SETTING_WEIGHT_UNIT, "metric", 1_000L, 1_000L),
+            UserSettingEntity(SETTING_AI_CONTENT_REPORTS, "[{\"source\":\"chat\"}]", 2_000L, 2_000L),
+        )
+        val exported = entities.toBackupUserSettings()
+        assertEquals(listOf(SETTING_WEIGHT_UNIT), exported.map { it.key })
+    }
 }

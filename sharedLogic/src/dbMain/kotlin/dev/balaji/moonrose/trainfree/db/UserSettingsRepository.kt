@@ -32,6 +32,7 @@ internal const val SETTING_BMI_FORMULA = "bmi_formula"
 internal const val SETTING_BMI_CLASSIFICATION = "bmi_classification"
 internal const val SETTING_PROGRESSION_CARDS = "progression_cards"
 internal const val SETTING_BARBELL_BAR_WEIGHTS = "barbell_bar_weights"
+internal const val SETTING_AI_CONTENT_REPORTS = "ai_content_reports"
 
 internal const val MAX_PROGRESSION_CARDS = 3
 internal const val MAX_PROGRESSION_EXERCISES = 3

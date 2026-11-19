@@ -1,5 +1,8 @@
 package dev.balaji.moonrose.trainfree.db
 
+import dev.balaji.moonrose.trainfree.chat.AiContentReport
+import dev.balaji.moonrose.trainfree.chat.AiContentReportReason
+import dev.balaji.moonrose.trainfree.chat.AiContentReportSource
 import dev.balaji.moonrose.trainfree.insights.InsightCard
 import dev.balaji.moonrose.trainfree.insights.llm.CardNarrationRequest
 import dev.balaji.moonrose.trainfree.insights.llm.InsightGenerationProvider
@@ -81,12 +84,20 @@ class InsightNarrationStateTest {
         canRefresh = card.kind == "volume",
     )
 
-    private fun state(provider: InsightGenerationProvider? = this.provider) = InsightNarrationState(
+    private fun state(
+        provider: InsightGenerationProvider? = this.provider,
+        cacheDelete: suspend (String) -> Unit = { cache.remove(it) },
+        saveReport: suspend (AiContentReport) -> Unit = {},
+        clockMillis: () -> Long = { 5_000L },
+    ) = InsightNarrationState(
         provider = provider,
         cards = cardsFlow,
         buildRequest = { card, variant -> requestFor(card, variant) },
         cacheFind = { cache[it] },
         cachePut = { cache[it.cardId] = it },
+        cacheDelete = cacheDelete,
+        saveReport = saveReport,
+        clockMillis = clockMillis,
         scope = scope,
     )
 
@@ -269,5 +280,89 @@ class InsightNarrationStateTest {
         assertEquals("ready", second.status)
         assertTrue(second.canRefresh)
         assertTrue(second.text != first.text)
+        assertTrue(!second.isAiGenerated)
+    }
+
+    @Test
+    fun `reporting AI insight hides it, clears cache, suppresses same-stats retry, and allows refresh`() {
+        val reports = mutableListOf<AiContentReport>()
+        val deleted = mutableListOf<String>()
+        cache["volume"] = AiInsightCacheEntity("volume", "hash:v1:0", "Cached AI insight.", 0)
+        val state = state(
+            cacheDelete = {
+                deleted += it
+                cache.remove(it)
+            },
+            saveReport = { reports += it },
+            clockMillis = { 7_777L },
+        )
+        cardsFlow.value = listOf(card("volume", "v1"))
+
+        val initial = state.narrations.value.getValue("volume")
+        assertEquals("ready", initial.status)
+        assertTrue(initial.isAiGenerated)
+
+        state.report("volume", AiContentReportReason.INACCURATE, "  Wrong number  ")
+
+        val reported = state.narrations.value.getValue("volume")
+        assertEquals("reported", reported.status)
+        assertEquals("", reported.text)
+        assertTrue(reported.isAiGenerated)
+        assertEquals(listOf("volume"), deleted)
+        assertNull(cache["volume"])
+        assertEquals(1, reports.size)
+        assertEquals(AiContentReportSource.INSIGHT, reports.single().source)
+        assertEquals("volume", reports.single().contentId)
+        assertEquals(AiContentReportReason.INACCURATE, reports.single().reasonKey)
+        assertEquals("Wrong number", reports.single().note)
+        assertEquals("Cached AI insight.", reports.single().contentExcerpt)
+        assertEquals(7_777L, reports.single().reportedAtMillis)
+
+        // Identical stats re-emission stays reported without re-calling the LLM.
+        cardsFlow.value = emptyList()
+        cardsFlow.value = listOf(card("volume", "v1"))
+        assertEquals("reported", state.narrations.value.getValue("volume").status)
+        assertTrue(provider.calls.isEmpty())
+
+        // Refreshing generates a fresh variant.
+        state.refresh("volume")
+        assertEquals("loading", state.narrations.value.getValue("volume").status)
+        provider.complete("Fresh variant insight.")
+        assertEquals("ready", state.narrations.value.getValue("volume").status)
+        assertEquals("Fresh variant insight.", state.narrations.value.getValue("volume").text)
+
+        // Changing stats also generates normally after a report.
+        state.report("volume", AiContentReportReason.OFFENSIVE)
+        assertEquals("reported", state.narrations.value.getValue("volume").status)
+        cardsFlow.value = listOf(card("volume", "v2"))
+        assertEquals("loading", state.narrations.value.getValue("volume").status)
+        provider.complete("Updated stats insight.")
+        assertEquals("ready", state.narrations.value.getValue("volume").status)
+    }
+
+    @Test
+    fun `reporting ignores curated frequency quotes, loading cards, failed cards, and unknown ids`() {
+        val reports = mutableListOf<AiContentReport>()
+        val state = state(saveReport = { reports += it })
+        val freqCard = InsightCard(
+            id = "frequency", kind = "frequency", exerciseName = null,
+            headlineKey = "", headlineArgs = emptyList(),
+            detailKey = "", detailArgs = emptyList(),
+            trend = "none", spark = emptyList(),
+        )
+        cardsFlow.value = listOf(freqCard, card("volume", "v1"), card("body_weight", "bw1"))
+
+        // Curated frequency quote has isAiGenerated = false and volume is still loading.
+        state.report("frequency", AiContentReportReason.OFFENSIVE)
+        state.report("volume", AiContentReportReason.OFFENSIVE)
+        state.report("missing", AiContentReportReason.OFFENSIVE)
+        assertTrue(reports.isEmpty())
+        assertEquals("ready", state.narrations.value.getValue("frequency").status)
+        assertEquals("loading", state.narrations.value.getValue("volume").status)
+
+        provider.fail("boom")
+        assertEquals("failed", state.narrations.value.getValue("volume").status)
+        state.report("volume", AiContentReportReason.OTHER)
+        assertTrue(reports.isEmpty())
     }
 }

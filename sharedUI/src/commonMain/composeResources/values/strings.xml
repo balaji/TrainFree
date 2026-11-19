@@ -170,6 +170,7 @@
     <string name="notifications_denied_title">Notifications are off</string>
     <string name="notifications_denied_message">Train Free is not allowed to send notifications. Allow notifications for Train Free in system settings to turn this on.</string>
     <string name="open_settings">Open settings</string>
+    <string name="exact_alarm_hint_message">Allow Alarms &amp; reminders in system settings for exact rest timer alerts in the background.</string>
     <string name="health_sync_section">Health Connect</string>
     <string name="health_sync_workouts">Sync completed workouts</string>
     <string name="health_sync_weight">Sync body weight (two-way)</string>
@@ -460,6 +461,19 @@
     <string name="chat_prompt_exercise_substitutes">Good substitutes for %1$s</string>
     <string name="chat_prompt_day_summary">How did this workout compare?</string>
     <string name="chat_scroll_to_bottom">Scroll to bottom</string>
+
+    <!-- AI content reporting -->
+    <string name="ai_report_action">Report</string>
+    <string name="ai_report_dialog_title">Report AI content</string>
+    <string name="ai_report_dialog_subtitle">Flagged responses are hidden immediately. Train Free runs offline, so reports are saved locally on your device.</string>
+    <string name="ai_report_reason_offensive">Offensive or harmful</string>
+    <string name="ai_report_reason_unsafe_advice">Unsafe training or medical advice</string>
+    <string name="ai_report_reason_inaccurate">Inaccurate or made-up data</string>
+    <string name="ai_report_reason_other">Other</string>
+    <string name="ai_report_note_placeholder">Additional details (optional)</string>
+    <string name="ai_report_submit">Report</string>
+    <string name="ai_report_message_hidden">Response hidden and reported.</string>
+    <string name="ai_report_insight_hidden">Insight hidden and reported.</string>
     <string name="workout_title">Workout title</string>
     <string name="rename_workout">Rename workout</string>
 

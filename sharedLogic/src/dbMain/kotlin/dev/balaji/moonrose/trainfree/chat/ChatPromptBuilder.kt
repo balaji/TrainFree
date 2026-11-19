@@ -82,7 +82,7 @@ internal object ChatPromptBuilder {
         maxChars: Int = DEFAULT_MAX_HISTORY_CHARS,
     ): List<ChatTurn> {
         val completed = messages.filter {
-            it.status == ChatMessage.STATUS_COMPLETE && it.text.isNotBlank()
+            it.status == ChatMessage.STATUS_COMPLETE && !it.reported && it.text.isNotBlank()
         }
         if (completed.isEmpty() || maxTurns <= 0 || maxChars <= 0) return emptyList()
 

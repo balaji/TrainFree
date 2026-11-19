@@ -321,6 +321,17 @@ private fun hasValidReferences(backup: TrainFreeBackup): Boolean {
     return true
 }
 
+internal fun List<UserSettingEntity>.toBackupUserSettings(): List<BackupUserSetting> =
+    filterNot { it.key == SETTING_AI_CONTENT_REPORTS }
+        .map {
+            BackupUserSetting(
+                key = it.key,
+                value = it.value,
+                createdAt = it.createdAt,
+                updatedAt = it.updatedAt,
+            )
+        }
+
 internal suspend fun AppDatabase.exportBackup(exportedAt: Long = nowMillis()): TrainFreeBackup {
     val profile = profileDao().get()?.let {
         BackupProfile(
@@ -332,14 +343,7 @@ internal suspend fun AppDatabase.exportBackup(exportedAt: Long = nowMillis()): T
             updatedAt = it.updatedAt,
         )
     }
-    val settings = userSettingDao().getAll().map {
-        BackupUserSetting(
-            key = it.key,
-            value = it.value,
-            createdAt = it.createdAt,
-            updatedAt = it.updatedAt,
-        )
-    }
+    val settings = userSettingDao().getAll().toBackupUserSettings()
     val exercises = exerciseDao().getAll().map {
         BackupExercise(
             id = it.id,

@@ -1,6 +1,8 @@
 package dev.balaji.moonrose.trainfree.chat
 
+import dev.balaji.moonrose.trainfree.db.AiContentReportRepository
 import dev.balaji.moonrose.trainfree.db.InsightsRepository
+import dev.balaji.moonrose.trainfree.db.nowMillis
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -26,6 +28,8 @@ class ChatState internal constructor(
     private val provider: ChatGenerationProvider?,
     private val router: ChatContextRouter,
     private val loadTopTrainedExercise: suspend () -> String?,
+    private val saveReport: suspend (AiContentReport) -> Unit = { AiContentReportRepository.record(it) },
+    private val clockMillis: () -> Long = { nowMillis() },
     private val scope: CoroutineScope = CoroutineScope(Dispatchers.Main + SupervisorJob()),
 ) {
     constructor(provider: ChatGenerationProvider?) : this(
@@ -284,6 +288,44 @@ class ChatState internal constructor(
         cancelActiveWork()
         needsSessionReset = true
         _uiState.update { it.copy(messages = emptyList(), isGenerating = false) }
+    }
+
+    /**
+     * Flags and immediately hides an assistant reply, resets any stateful
+     * on-device session so the flagged output is dropped from future turns,
+     * and persists a bounded local moderation record.
+     */
+    fun reportMessage(messageId: String, reasonKey: String, note: String = "") {
+        val msg = _uiState.value.messages.firstOrNull { it.id == messageId } ?: return
+        if (
+            msg.role != ChatMessage.ROLE_ASSISTANT ||
+            msg.reported ||
+            msg.status == ChatMessage.STATUS_STREAMING ||
+            msg.text.isBlank()
+        ) {
+            return
+        }
+        val report = createAiContentReport(
+            source = AiContentReportSource.CHAT,
+            contentId = msg.id,
+            reasonKey = reasonKey,
+            note = note,
+            contentText = msg.text,
+            reportedAtMillis = clockMillis(),
+        )
+        needsSessionReset = true
+        updateMessage(msg.id) {
+            it.copy(
+                text = "",
+                sources = emptyList(),
+                suggestsAddAsProgram = false,
+                reported = true,
+                reportReasonKey = report.reasonKey,
+            )
+        }
+        scope.launch {
+            runCatching { saveReport(report) }
+        }
     }
 
     /** Retries the most recent failed user prompt. */

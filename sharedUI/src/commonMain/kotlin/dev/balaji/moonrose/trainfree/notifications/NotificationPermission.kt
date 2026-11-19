@@ -28,3 +28,17 @@ expect fun rememberNotificationPermissionRequester(onResult: (NotificationPermis
 /** Returns a callback that opens the app's notification settings in the OS. */
 @Composable
 expect fun rememberNotificationSettingsOpener(): () -> Unit
+
+/**
+ * Returns whether the app may schedule exact alarms for background rest timer
+ * alerts. Always true below Android 12 (API 31) and on iOS.
+ */
+@Composable
+expect fun rememberCanScheduleExactAlarms(): Boolean
+
+/**
+ * Returns a callback that opens the OS "Alarms & reminders" permission screen
+ * for this app on Android 12+ (falling back to app details if unavailable).
+ */
+@Composable
+expect fun rememberExactAlarmSettingsOpener(): () -> Unit

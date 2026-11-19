@@ -99,6 +99,8 @@ import dev.balaji.moonrose.trainfree.navigation.LocalBottomFabPadding
 import dev.balaji.moonrose.trainfree.navigation.LocalUseNativeNavigation
 import dev.balaji.moonrose.trainfree.navigation.PlatformBackHandler
 import dev.balaji.moonrose.trainfree.notifications.NotificationPermissionResult
+import dev.balaji.moonrose.trainfree.notifications.rememberCanScheduleExactAlarms
+import dev.balaji.moonrose.trainfree.notifications.rememberExactAlarmSettingsOpener
 import dev.balaji.moonrose.trainfree.notifications.rememberNotificationPermissionRequester
 import dev.balaji.moonrose.trainfree.notifications.rememberNotificationSettingsOpener
 import dev.balaji.moonrose.trainfree.notifications.rememberRestTimerNotifier
@@ -222,6 +224,8 @@ private fun SettingsSection() {
             UserSettingsRepository.setNotificationsEnabled(result == NotificationPermissionResult.Granted)
         }
     }
+    val canScheduleExactAlarms = rememberCanScheduleExactAlarms()
+    val openExactAlarmSettings = rememberExactAlarmSettingsOpener()
     val current = settings ?: return
 
     Text(
@@ -259,6 +263,9 @@ private fun SettingsSection() {
         } else {
             scope.launch { UserSettingsRepository.setNotificationsEnabled(false) }
         }
+    }
+    if (!canScheduleExactAlarms) {
+        ExactAlarmHintRow(onOpenSettings = openExactAlarmSettings)
     }
     HorizontalDivider()
     AppFontRow(current.appFont) { font ->
@@ -768,6 +775,23 @@ private fun SettingSwitchRow(
     ) {
         Text(label, style = MaterialTheme.typography.bodyLarge)
         Switch(checked = checked, onCheckedChange = onCheckedChange)
+    }
+}
+
+@Composable
+private fun ExactAlarmHintRow(onOpenSettings: () -> Unit) {
+    Column(
+        modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Text(
+            text = stringResource(Res.string.exact_alarm_hint_message),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        OutlinedButton(onClick = onOpenSettings) {
+            Text(stringResource(Res.string.open_settings))
+        }
     }
 }
 

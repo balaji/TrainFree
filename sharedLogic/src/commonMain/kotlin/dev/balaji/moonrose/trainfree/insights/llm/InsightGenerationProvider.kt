@@ -40,10 +40,11 @@ interface InsightGenerationProvider {
  */
 data class CardNarration(
     val cardId: String,
-    /** "loading" | "ready" | "failed". */
+    /** "loading" | "ready" | "failed" | "reported". */
     val status: String,
     val text: String,
     val canRefresh: Boolean = false,
+    val isAiGenerated: Boolean = false,
 )
 
 /** A fully-assembled one-shot generation request for one card. */

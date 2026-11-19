@@ -47,3 +47,9 @@ actual fun rememberNotificationSettingsOpener(): () -> Unit = {
         UIApplication.sharedApplication.openURL(url, emptyMap<Any?, Any>(), null)
     }
 }
+
+@Composable
+actual fun rememberCanScheduleExactAlarms(): Boolean = true
+
+@Composable
+actual fun rememberExactAlarmSettingsOpener(): () -> Unit = {}

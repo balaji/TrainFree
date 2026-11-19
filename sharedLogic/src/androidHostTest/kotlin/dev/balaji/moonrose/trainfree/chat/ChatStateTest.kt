@@ -126,10 +126,14 @@ class ChatStateTest {
     private fun newState(
         provider: ChatGenerationProvider?,
         topExercise: String? = "Barbell Bench Press",
+        saveReport: suspend (AiContentReport) -> Unit = {},
+        clockMillis: () -> Long = { 123_456L },
     ) = ChatState(
         provider = provider,
         router = router,
         loadTopTrainedExercise = { topExercise },
+        saveReport = saveReport,
+        clockMillis = clockMillis,
         scope = scope,
     )
 
@@ -426,5 +430,96 @@ class ChatStateTest {
         )
         assertTrue(svInstructions.contains("Knäböj"))
         assertTrue(svInstructions.contains("Respond in Swedish."))
+    }
+
+    @Test
+    fun `reportMessage scrubs reply, records local report, excludes from history, and resets session`() {
+        val recorded = mutableListOf<AiContentReport>()
+        val provider = FakeChatProvider(toolCalling = true)
+        val state = newState(
+            provider = provider,
+            saveReport = { recorded += it },
+            clockMillis = { 9_999L },
+        )
+        state.openWithSeed()
+
+        state.sendMessage("Suggest a routine")
+        provider.complete(
+            "  Day 1 Push: Bench Press 3 sets x 8 reps. Would you like me to add it as a program?  ",
+            sources = listOf(ChatSourceRef("exercise", "Bench Press", exerciseId = 1L)),
+        )
+
+        val userMsg = state.uiState.value.messages.first()
+        val assistantMsg = state.uiState.value.messages.last()
+        assertTrue(assistantMsg.suggestsAddAsProgram)
+        assertTrue(assistantMsg.sources.isNotEmpty())
+
+        // Reporting ignores user messages and unknown IDs.
+        state.reportMessage(userMsg.id, AiContentReportReason.OFFENSIVE, "ignored")
+        state.reportMessage("missing-id", AiContentReportReason.OFFENSIVE, "ignored")
+        assertTrue(recorded.isEmpty())
+
+        // Reporting the assistant reply hides content and saves a bounded local report.
+        state.reportMessage(assistantMsg.id, AiContentReportReason.UNSAFE_ADVICE, "  Bad cue  ")
+        val updated = state.uiState.value.messages.last()
+        assertTrue(updated.reported)
+        assertEquals(AiContentReportReason.UNSAFE_ADVICE, updated.reportReasonKey)
+        assertEquals("", updated.text)
+        assertTrue(updated.sources.isEmpty())
+        assertFalse(updated.suggestsAddAsProgram)
+
+        val report = recorded.single()
+        assertEquals(AiContentReportSource.CHAT, report.source)
+        assertEquals(assistantMsg.id, report.contentId)
+        assertEquals(AiContentReportReason.UNSAFE_ADVICE, report.reasonKey)
+        assertEquals("Bad cue", report.note)
+        assertTrue(report.contentExcerpt.startsWith("Day 1 Push"))
+        assertEquals(9_999L, report.reportedAtMillis)
+
+        // Duplicate reports on the same message are ignored.
+        state.reportMessage(assistantMsg.id, AiContentReportReason.OTHER, "again")
+        assertEquals(1, recorded.size)
+
+        // Flagged replies are dropped from prompt history and force a fresh session on next turn.
+        val windowed = ChatPromptBuilder.windowHistory(state.uiState.value.messages)
+        assertEquals(listOf("Suggest a routine"), windowed.map { it.text })
+        state.sendMessage("Next question")
+        assertTrue(provider.requests.last().resetSession)
+        assertEquals(1, provider.requests.last().history.size)
+        assertTrue(provider.requests.last().history.none { it.role == ChatMessage.ROLE_ASSISTANT })
+        provider.complete("Clean answer.")
+    }
+
+    @Test
+    fun `reportMessage ignores streaming replies and allows read-only form tips to regenerate on reopen`() {
+        val recorded = mutableListOf<AiContentReport>()
+        val provider = FakeChatProvider(toolCalling = true)
+        val state = newState(provider = provider, saveReport = { recorded += it })
+        val benchSeed = ChatSeedContext(
+            kind = "exercise",
+            exerciseId = 1L,
+            exerciseName = "Barbell Bench Press",
+            autoPrompt = "Form tips for Barbell Bench Press",
+            readOnly = true,
+        )
+
+        state.openWithSeed(benchSeed)
+        provider.partial("Streaming partial")
+        val streamingId = state.uiState.value.messages.last().id
+        state.reportMessage(streamingId, AiContentReportReason.OFFENSIVE)
+        assertTrue(recorded.isEmpty())
+        assertFalse(state.uiState.value.messages.last().reported)
+
+        provider.complete("Bad form tips.")
+        val completedId = state.uiState.value.messages.last().id
+        state.reportMessage(completedId, AiContentReportReason.INACCURATE)
+        assertEquals(1, recorded.size)
+        assertTrue(state.uiState.value.messages.last().reported)
+        assertEquals("", state.uiState.value.messages.last().text)
+
+        // Reopening the same read-only seed regenerates cleanly instead of keeping the empty reported shell.
+        state.openWithSeed(benchSeed)
+        assertEquals(2, provider.requests.size)
+        assertTrue(state.uiState.value.isGenerating)
     }
 }

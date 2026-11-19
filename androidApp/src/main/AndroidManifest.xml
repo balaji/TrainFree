@@ -1,12 +1,19 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
 
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
-    <uses-permission android:name="android.permission.USE_EXACT_ALARM"/>
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM"/>
     <uses-permission android:name="android.permission.VIBRATE"/>
     <uses-permission android:name="android.permission.health.WRITE_EXERCISE"/>
     <uses-permission android:name="android.permission.health.READ_WEIGHT"/>
     <uses-permission android:name="android.permission.health.WRITE_WEIGHT"/>
+    <!-- ML Kit's transitive datatransport dependency merges INTERNET/ACCESS_NETWORK_STATE
+         and Clearcut telemetry components. Train Free is strictly offline; removing both
+         the network permissions and the datatransport backend/schedulers keeps the app
+         offline and avoids an uncaught SecurityException in Uploader.isNetworkAvailable(). -->
+    <uses-permission android:name="android.permission.INTERNET" tools:node="remove"/>
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" tools:node="remove"/>
 
     <queries>
         <package android:name="com.google.android.apps.healthdata"/>
@@ -35,19 +42,33 @@
         </activity>
         <activity
                 android:exported="true"
-                android:name=".HealthPermissionsRationaleActivity"
-                android:permission="android.permission.START_VIEW_PERMISSION_USAGE">
+                android:name=".HealthPermissionsRationaleActivity">
             <intent-filter>
                 <action android:name="androidx.health.ACTION_SHOW_PERMISSIONS_RATIONALE"/>
             </intent-filter>
+        </activity>
+        <activity-alias
+                android:name=".ViewPermissionUsageActivity"
+                android:exported="true"
+                android:targetActivity=".HealthPermissionsRationaleActivity"
+                android:permission="android.permission.START_VIEW_PERMISSION_USAGE">
             <intent-filter>
                 <action android:name="android.intent.action.VIEW_PERMISSION_USAGE"/>
                 <category android:name="android.intent.category.HEALTH_PERMISSIONS"/>
             </intent-filter>
-        </activity>
+        </activity-alias>
         <receiver
                 android:name="dev.balaji.moonrose.trainfree.notifications.RestTimerAlarmReceiver"
                 android:exported="false"/>
+        <service
+                android:name="com.google.android.datatransport.runtime.backends.TransportBackendDiscovery"
+                tools:node="remove"/>
+        <service
+                android:name="com.google.android.datatransport.runtime.scheduling.jobscheduling.JobInfoSchedulerService"
+                tools:node="remove"/>
+        <receiver
+                android:name="com.google.android.datatransport.runtime.scheduling.jobscheduling.AlarmManagerSchedulerBroadcastReceiver"
+                tools:node="remove"/>
     </application>
 
 </manifest>

@@ -288,6 +288,9 @@ interface AiInsightCacheDao {
     @Upsert
     suspend fun upsert(entry: AiInsightCacheEntity)
 
+    @Query("DELETE FROM ai_insight_cache WHERE card_id = :cardId")
+    suspend fun delete(cardId: String)
+
     @Query("DELETE FROM ai_insight_cache")
     suspend fun clearAll()
 }

@@ -33,6 +33,7 @@ import androidx.compose.material.icons.automirrored.filled.TrendingUp
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.outlined.Flag
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.DropdownMenuItem
@@ -129,6 +130,7 @@ private fun ProgressContent(
     val uiState by state.uiState.collectAsState()
     val narrations by narrationState.narrations.collectAsState()
     var showLogWeight by remember { mutableStateOf(false) }
+    var reportingCardId by remember { mutableStateOf<String?>(null) }
 
     if (uiState.loading) return
 
@@ -175,6 +177,7 @@ private fun ProgressContent(
                             onSetExercises = { state.setProgressionCardExercises(slot, it) },
                             onToggleAxis = { state.toggleProgressionAxis(slot) },
                             onRemove = { state.removeProgressionCard(slot) },
+                            onReportNarration = { reportingCardId = card.id },
                         )
                     } else {
                         InsightCardRow(
@@ -182,6 +185,7 @@ private fun ProgressContent(
                             unitLabel = unitLabel,
                             narration = narration,
                             onRefreshNarration = { narrationState.refresh(card.id) },
+                            onReportNarration = { reportingCardId = card.id },
                         )
                     }
                 }
@@ -209,6 +213,16 @@ private fun ProgressContent(
                 showLogWeight = false
             },
             onDismiss = { showLogWeight = false },
+        )
+    }
+
+    reportingCardId?.let { cardId ->
+        AiContentReportDialog(
+            onSubmit = { reasonKey, note ->
+                narrationState.report(cardId, reasonKey, note)
+                reportingCardId = null
+            },
+            onDismiss = { reportingCardId = null },
         )
     }
 }
@@ -262,6 +276,7 @@ private fun InsightCardRow(
     unitLabel: String,
     narration: CardNarration?,
     onRefreshNarration: () -> Unit,
+    onReportNarration: () -> Unit,
 ) {
     OutlinedCard(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(16.dp)) {
@@ -301,6 +316,7 @@ private fun InsightCardRow(
                 InsightNarrationRow(
                     narration = narration,
                     onRefresh = onRefreshNarration,
+                    onReport = onReportNarration,
                     modifier = Modifier.padding(top = 12.dp),
                 )
             }
@@ -331,6 +347,7 @@ private fun ProgressionCard(
     onSetExercises: (List<String>) -> Unit,
     onToggleAxis: () -> Unit,
     onRemove: () -> Unit,
+    onReportNarration: () -> Unit,
 ) {
     var expanded by remember { mutableStateOf(false) }
     OutlinedCard(Modifier.fillMaxWidth()) {
@@ -417,6 +434,7 @@ private fun ProgressionCard(
             if (narration != null && narration.status != "failed") {
                 InsightNarrationRow(
                     narration = narration,
+                    onReport = onReportNarration,
                     modifier = Modifier.padding(top = 8.dp),
                 )
             }
@@ -429,6 +447,7 @@ private fun InsightNarrationRow(
     narration: CardNarration,
     modifier: Modifier = Modifier,
     onRefresh: (() -> Unit)? = null,
+    onReport: (() -> Unit)? = null,
 ) {
     Row(
         modifier = modifier.fillMaxWidth(),
@@ -457,6 +476,26 @@ private fun InsightNarrationRow(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.weight(1f).alpha(alpha),
             )
+        } else if (narration.status == "reported") {
+            Text(
+                text = stringResource(Res.string.ai_report_insight_hidden),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.weight(1f),
+            )
+            if (narration.canRefresh && onRefresh != null) {
+                IconButton(
+                    onClick = onRefresh,
+                    modifier = Modifier.size(24.dp),
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Refresh,
+                        contentDescription = stringResource(Res.string.insight_narration_refresh),
+                        modifier = Modifier.size(16.dp),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
         } else {
             Text(
                 text = narration.text,
@@ -464,6 +503,19 @@ private fun InsightNarrationRow(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.weight(1f),
             )
+            if (narration.isAiGenerated && onReport != null) {
+                IconButton(
+                    onClick = onReport,
+                    modifier = Modifier.size(24.dp),
+                ) {
+                    Icon(
+                        imageVector = Icons.Outlined.Flag,
+                        contentDescription = stringResource(Res.string.ai_report_action),
+                        modifier = Modifier.size(16.dp),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
             if (narration.canRefresh && onRefresh != null) {
                 IconButton(
                     onClick = onRefresh,

@@ -99,6 +99,7 @@ struct ChatSheetView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var uiState: ChatUiState
     @State private var inputText = ""
+    @State private var reportingTarget: AiContentReportTarget?
 
     init(chatState: ChatState, onSourceTap: @escaping (ChatSourceRef) -> Void) {
         self.chatState = chatState
@@ -201,6 +202,11 @@ struct ChatSheetView: View {
                 lastUserScrollDirectionDown = false
             }
         }
+        .sheet(item: $reportingTarget) { target in
+            AiContentReportSheet { reasonKey, note in
+                chatState.reportMessage(messageId: target.id, reasonKey: reasonKey, note: note)
+            }
+        }
     }
 
     private var emptyState: some View {
@@ -242,6 +248,7 @@ struct ChatSheetView: View {
                                 isReadOnly: isReadOnly,
                                 onRetry: { chatState.retryLast() },
                                 onAddAsProgram: { chatState.sendMessage(rawText: L10n.chatAddAsProgram) },
+                                onReport: { reportingTarget = AiContentReportTarget(id: message.id) },
                                 onSourceTap: { source in
                                     chatState.cancelGeneration()
                                     dismiss()
@@ -453,6 +460,7 @@ private struct ChatBubbleRow: View {
     let isReadOnly: Bool
     let onRetry: () -> Void
     let onAddAsProgram: () -> Void
+    let onReport: () -> Void
     let onSourceTap: (ChatSourceRef) -> Void
 
     private var isUser: Bool {
@@ -465,39 +473,45 @@ private struct ChatBubbleRow: View {
                 if isUser { Spacer(minLength: 48) }
 
                 VStack(alignment: .leading, spacing: 6) {
-                    if message.status == ChatMessage.companion.STATUS_STREAMING && message.text.isEmpty {
-                        HStack(spacing: 8) {
-                            ProgressView()
-                                .controlSize(.small)
-                            Text(L10n.chatThinking)
-                                .font(.subheadline)
+                    if message.reported {
+                        Label(L10n.aiReportMessageHidden, systemImage: "flag")
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                    } else {
+                        if message.status == ChatMessage.companion.STATUS_STREAMING && message.text.isEmpty {
+                            HStack(spacing: 8) {
+                                ProgressView()
+                                    .controlSize(.small)
+                                Text(L10n.chatThinking)
+                                    .font(.subheadline)
+                                    .foregroundStyle(.secondary)
+                            }
+                        } else if !message.text.isEmpty {
+                            if isUser {
+                                Text(message.text)
+                                    .font(.body)
+                                    .textSelection(.enabled)
+                            } else {
+                                MarkdownTextView(markdown: message.text)
+                            }
+                        }
+
+                        if message.status == ChatMessage.companion.STATUS_CANCELLED {
+                            Text(L10n.chatCancelled)
+                                .font(.caption2)
                                 .foregroundStyle(.secondary)
                         }
-                    } else if !message.text.isEmpty {
-                        if isUser {
-                            Text(message.text)
-                                .font(.body)
-                                .textSelection(.enabled)
-                        } else {
-                            MarkdownTextView(markdown: message.text)
-                        }
-                    }
 
-                    if message.status == ChatMessage.companion.STATUS_CANCELLED {
-                        Text(L10n.chatCancelled)
-                            .font(.caption2)
-                            .foregroundStyle(.secondary)
-                    }
-
-                    if message.status == ChatMessage.companion.STATUS_ERROR {
-                        Text(L10n.chatErrorLabel(message.errorKey))
-                            .font(.footnote)
-                            .foregroundStyle(.red)
-                        if !isReadOnly {
-                            Button(L10n.chatRetry) {
-                                onRetry()
+                        if message.status == ChatMessage.companion.STATUS_ERROR {
+                            Text(L10n.chatErrorLabel(message.errorKey))
+                                .font(.footnote)
+                                .foregroundStyle(.red)
+                            if !isReadOnly {
+                                Button(L10n.chatRetry) {
+                                    onRetry()
+                                }
+                                .font(.footnote.weight(.medium))
                             }
-                            .font(.footnote.weight(.medium))
                         }
                     }
                 }
@@ -514,13 +528,21 @@ private struct ChatBubbleRow: View {
             let showAddAction = !isReadOnly &&
                 !isUser &&
                 !isGenerating &&
+                !message.reported &&
                 message.status == ChatMessage.companion.STATUS_COMPLETE &&
                 message.suggestsAddAsProgram
             let showSources = !isReadOnly &&
                 !isUser &&
+                !message.reported &&
                 !message.sources.isEmpty &&
                 message.status == ChatMessage.companion.STATUS_COMPLETE
-            if showAddAction || showSources {
+            let showReportAction = !isUser &&
+                !message.reported &&
+                (
+                    message.status == ChatMessage.companion.STATUS_COMPLETE ||
+                        (message.status == ChatMessage.companion.STATUS_CANCELLED && !message.text.isEmpty)
+                )
+            if showAddAction || showSources || showReportAction {
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 6) {
                         if showAddAction {
@@ -549,6 +571,18 @@ private struct ChatBubbleRow: View {
                                 }
                                 .buttonStyle(.plain)
                             }
+                        }
+                        if showReportAction {
+                            Button {
+                                onReport()
+                            } label: {
+                                Label(L10n.aiReportAction, systemImage: "flag")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                                    .padding(.horizontal, 8)
+                                    .padding(.vertical, 5)
+                            }
+                            .buttonStyle(.plain)
                         }
                     }
                 }

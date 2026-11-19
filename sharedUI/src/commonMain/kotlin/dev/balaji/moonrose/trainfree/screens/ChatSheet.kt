@@ -40,7 +40,9 @@ import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.Stop
+import androidx.compose.material.icons.outlined.Flag
 import androidx.compose.material3.AssistChip
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledIconButton
@@ -105,6 +107,7 @@ fun ChatSheet(
     val uiState by chatState.uiState.collectAsState()
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     var inputText by remember { mutableStateOf("") }
+    var reportingMessageId by remember { mutableStateOf<String?>(null) }
     val addAsProgramPrompt = stringResource(Res.string.chat_add_as_program)
     val readOnly = uiState.seedContext.readOnly
     val title = if (readOnly && uiState.seedContext.kind == "exercise") {
@@ -174,6 +177,7 @@ fun ChatSheet(
                         onRetry = chatState::retryLast,
                         onSourceClick = onSourceClick,
                         onAddAsProgram = { chatState.sendMessage(addAsProgramPrompt) },
+                        onReportMessage = { reportingMessageId = it },
                     )
                 }
             }
@@ -196,6 +200,16 @@ fun ChatSheet(
                 )
             }
         }
+    }
+
+    reportingMessageId?.let { targetId ->
+        AiContentReportDialog(
+            onSubmit = { reasonKey, note ->
+                chatState.reportMessage(targetId, reasonKey, note)
+                reportingMessageId = null
+            },
+            onDismiss = { reportingMessageId = null },
+        )
     }
 }
 
@@ -283,6 +297,7 @@ private fun ChatMessageList(
     onRetry: () -> Unit,
     onSourceClick: (ChatSourceRef) -> Unit,
     onAddAsProgram: () -> Unit,
+    onReportMessage: (String) -> Unit,
 ) {
     val listState = rememberLazyListState()
     val coroutineScope = rememberCoroutineScope()
@@ -444,6 +459,7 @@ private fun ChatMessageList(
                     onRetry = onRetry,
                     onSourceClick = onSourceClick,
                     onAddAsProgram = onAddAsProgram,
+                    onReport = { onReportMessage(message.id) },
                     modifier = Modifier.padding(bottom = if (index < messages.lastIndex) 12.dp else 0.dp),
                 )
             }
@@ -563,6 +579,7 @@ private fun ChatMessageBubble(
     onRetry: () -> Unit,
     onSourceClick: (ChatSourceRef) -> Unit,
     onAddAsProgram: () -> Unit,
+    onReport: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val isUser = message.role == ChatMessage.ROLE_USER
@@ -583,7 +600,24 @@ private fun ChatMessageBubble(
                 modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
                 verticalArrangement = Arrangement.spacedBy(6.dp),
             ) {
-                if (message.status == ChatMessage.STATUS_STREAMING && message.text.isBlank()) {
+                if (message.reported) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    ) {
+                        Icon(
+                            imageVector = Icons.Outlined.Flag,
+                            contentDescription = null,
+                            modifier = Modifier.size(16.dp),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        Text(
+                            text = stringResource(Res.string.ai_report_message_hidden),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                } else if (message.status == ChatMessage.STATUS_STREAMING && message.text.isBlank()) {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -615,7 +649,7 @@ private fun ChatMessageBubble(
                     }
                 }
 
-                if (message.status == ChatMessage.STATUS_CANCELLED) {
+                if (!message.reported && message.status == ChatMessage.STATUS_CANCELLED) {
                     Text(
                         text = stringResource(Res.string.chat_cancelled),
                         style = MaterialTheme.typography.labelSmall,
@@ -623,7 +657,7 @@ private fun ChatMessageBubble(
                     )
                 }
 
-                if (message.status == ChatMessage.STATUS_ERROR) {
+                if (!message.reported && message.status == ChatMessage.STATUS_ERROR) {
                     Text(
                         text = chatErrorLabel(message.errorKey),
                         style = MaterialTheme.typography.bodySmall,
@@ -644,13 +678,21 @@ private fun ChatMessageBubble(
         val showAddAction = !readOnly &&
             !isUser &&
             !isGenerating &&
+            !message.reported &&
             message.status == ChatMessage.STATUS_COMPLETE &&
             message.suggestsAddAsProgram
         val showSources = !readOnly &&
             !isUser &&
+            !message.reported &&
             message.sources.isNotEmpty() &&
             message.status == ChatMessage.STATUS_COMPLETE
-        if (showAddAction || showSources) {
+        val showReportAction = !isUser &&
+            !message.reported &&
+            (
+                message.status == ChatMessage.STATUS_COMPLETE ||
+                    (message.status == ChatMessage.STATUS_CANCELLED && message.text.isNotBlank())
+                )
+        if (showAddAction || showSources || showReportAction) {
             Spacer(Modifier.size(4.dp))
             FlowRow(
                 horizontalArrangement = Arrangement.spacedBy(6.dp),
@@ -677,6 +719,26 @@ private fun ChatMessageBubble(
                                     style = MaterialTheme.typography.labelSmall,
                                 )
                             },
+                        )
+                    }
+                }
+                if (showReportAction) {
+                    TextButton(
+                        onClick = onReport,
+                        colors = ButtonDefaults.textButtonColors(
+                            contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                        ),
+                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
+                    ) {
+                        Icon(
+                            imageVector = Icons.Outlined.Flag,
+                            contentDescription = null,
+                            modifier = Modifier.size(14.dp),
+                        )
+                        Spacer(Modifier.size(4.dp))
+                        Text(
+                            text = stringResource(Res.string.ai_report_action),
+                            style = MaterialTheme.typography.labelSmall,
                         )
                     }
                 }

@@ -2,6 +2,7 @@ package dev.balaji.moonrose.trainfree.notifications
 
 import android.Manifest
 import android.app.Activity
+import android.app.AlarmManager
 import android.content.Context
 import android.content.ContextWrapper
 import android.content.Intent
@@ -11,7 +12,15 @@ import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 
 @Composable
 actual fun rememberNotificationPermissionRequester(
@@ -51,6 +60,52 @@ actual fun rememberNotificationSettingsOpener(): () -> Unit {
             Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.fromParts("package", context.packageName, null))
         }
         context.startActivity(intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+    }
+}
+
+@Composable
+actual fun rememberCanScheduleExactAlarms(): Boolean {
+    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) return true
+    val context = LocalContext.current
+    val lifecycleOwner = LocalLifecycleOwner.current
+    val alarmManager = remember(context) {
+        context.getSystemService(Context.ALARM_SERVICE) as? AlarmManager
+    }
+    var canSchedule by remember(alarmManager) {
+        mutableStateOf(alarmManager?.canScheduleExactAlarms() ?: true)
+    }
+    DisposableEffect(lifecycleOwner, alarmManager) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                canSchedule = alarmManager?.canScheduleExactAlarms() ?: true
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+    return canSchedule
+}
+
+@Composable
+actual fun rememberExactAlarmSettingsOpener(): () -> Unit {
+    val context = LocalContext.current
+    return remember(context) {
+        {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                val exactAlarmIntent = Intent(
+                    Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM,
+                    Uri.fromParts("package", context.packageName, null),
+                ).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                val opened = runCatching { context.startActivity(exactAlarmIntent) }.isSuccess
+                if (!opened) {
+                    val detailsIntent = Intent(
+                        Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                        Uri.fromParts("package", context.packageName, null),
+                    ).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    runCatching { context.startActivity(detailsIntent) }
+                }
+            }
+        }
     }
 }
 

@@ -23,6 +23,7 @@ struct ProgressTabView: View {
     @State private var narrations: [String: CardNarration] = [:]
     @State private var showLogWeight = false
     @State private var weightText = ""
+    @State private var reportingCard: AiContentReportTarget?
 
     var body: some View {
         Group {
@@ -59,6 +60,11 @@ struct ProgressTabView: View {
                 weightText = ""
             }
             Button(L10n.cancel, role: .cancel) { weightText = "" }
+        }
+        .sheet(item: $reportingCard) { target in
+            AiContentReportSheet { reasonKey, note in
+                narrationState.report(cardId: target.id, reasonKey: reasonKey, note: note)
+            }
         }
     }
 
@@ -103,7 +109,8 @@ struct ProgressTabView: View {
                         card: card,
                         unit: unitLabel(uiState.weightUnit),
                         narration: narrations[card.id],
-                        onRefreshNarration: { narrationState.refresh(cardId: card.id) }
+                        onRefreshNarration: { narrationState.refresh(cardId: card.id) },
+                        onReportNarration: { reportingCard = AiContentReportTarget(id: card.id) }
                     )
                 }
             }
@@ -119,7 +126,8 @@ struct ProgressTabView: View {
                             narration: narrations[card.id],
                             onSetExercises: { state.setProgressionCardExercises(index: Int32(slot(of: card)), exercises: $0) },
                             onToggleAxis: { state.toggleProgressionAxis(index: Int32(slot(of: card))) },
-                            onRemove: { state.removeProgressionCard(index: Int32(slot(of: card))) }
+                            onRemove: { state.removeProgressionCard(index: Int32(slot(of: card))) },
+                            onReportNarration: { reportingCard = AiContentReportTarget(id: card.id) }
                         )
                     }
                     if uiState.progressionConfigs.count < 3, let unused = firstUnusedOption {
@@ -137,7 +145,8 @@ struct ProgressTabView: View {
                         card: card,
                         unit: unitLabel(uiState.weightUnit),
                         narration: narrations[card.id],
-                        onRefreshNarration: { narrationState.refresh(cardId: card.id) }
+                        onRefreshNarration: { narrationState.refresh(cardId: card.id) },
+                        onReportNarration: { reportingCard = AiContentReportTarget(id: card.id) }
                     )
                 }
             }
@@ -339,6 +348,7 @@ private struct TrendIconView: View {
 private struct InsightNarrationView: View {
     let narration: CardNarration
     var onRefresh: (() -> Void)? = nil
+    var onReport: (() -> Void)? = nil
     @State private var pulse = false
 
     var body: some View {
@@ -357,11 +367,10 @@ private struct InsightNarrationView: View {
                         value: pulse
                     )
                     .onAppear { pulse = true }
-            } else {
-                Text(narration.text)
+            } else if narration.status == "reported" {
+                Text(L10n.aiReportInsightHidden)
                     .font(.footnote)
                     .foregroundStyle(.secondary)
-                    .transition(.opacity)
                 if narration.canRefresh, let onRefresh {
                     Spacer(minLength: 4)
                     Button(action: onRefresh) {
@@ -371,6 +380,32 @@ private struct InsightNarrationView: View {
                     }
                     .buttonStyle(.plain)
                     .accessibilityLabel(L10n.insightNarrationRefresh)
+                }
+            } else {
+                Text(narration.text)
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                    .transition(.opacity)
+                if (narration.isAiGenerated && onReport != nil) || (narration.canRefresh && onRefresh != nil) {
+                    Spacer(minLength: 4)
+                    if narration.isAiGenerated, let onReport {
+                        Button(action: onReport) {
+                            Image(systemName: "flag")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel(L10n.aiReportAction)
+                    }
+                    if narration.canRefresh, let onRefresh {
+                        Button(action: onRefresh) {
+                            Image(systemName: "arrow.clockwise")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel(L10n.insightNarrationRefresh)
+                    }
                 }
             }
         }
@@ -391,6 +426,7 @@ private struct InsightCardView: View {
     /// narration; the card then renders numbers-only.
     let narration: CardNarration?
     var onRefreshNarration: (() -> Void)? = nil
+    var onReportNarration: (() -> Void)? = nil
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
@@ -417,8 +453,12 @@ private struct InsightCardView: View {
                     .padding(.top, 8)
             }
             if let narration, narration.status != "failed" {
-                InsightNarrationView(narration: narration, onRefresh: onRefreshNarration)
-                    .padding(.top, 8)
+                InsightNarrationView(
+                    narration: narration,
+                    onRefresh: onRefreshNarration,
+                    onReport: onReportNarration
+                )
+                .padding(.top, 8)
             }
         }
         .padding(.vertical, 4)
@@ -578,6 +618,8 @@ private struct ProgressionCardView: View {
     let onSetExercises: ([String]) -> Void
     let onToggleAxis: () -> Void
     let onRemove: () -> Void
+    var onRefreshNarration: (() -> Void)? = nil
+    var onReportNarration: (() -> Void)? = nil
     @Environment(\.colorScheme) private var colorScheme
 
     private static let maxCompared = 3
@@ -616,8 +658,12 @@ private struct ProgressionCardView: View {
             }
             controls
             if let narration, narration.status != "failed" {
-                InsightNarrationView(narration: narration, onRefresh: onRefreshNarration)
-                    .padding(.top, 8)
+                InsightNarrationView(
+                    narration: narration,
+                    onRefresh: onRefreshNarration,
+                    onReport: onReportNarration
+                )
+                .padding(.top, 8)
             }
         }
         .padding(.vertical, 4)

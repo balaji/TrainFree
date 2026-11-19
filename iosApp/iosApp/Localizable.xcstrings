@@ -5005,6 +5005,83 @@
         "sv": { "stringUnit": { "state": "translated", "value": "Skicka feedback" } },
         "en": { "stringUnit": { "state": "translated", "value": "Send feedback" } }
       }
+    },
+    "ai_report_action": {
+      "extractionState": "manual",
+      "localizations": {
+        "sv": { "stringUnit": { "state": "translated", "value": "Rapportera" } },
+        "en": { "stringUnit": { "state": "translated", "value": "Report" } }
+      }
+    },
+    "ai_report_dialog_title": {
+      "extractionState": "manual",
+      "localizations": {
+        "sv": { "stringUnit": { "state": "translated", "value": "Rapportera AI-innehåll" } },
+        "en": { "stringUnit": { "state": "translated", "value": "Report AI content" } }
+      }
+    },
+    "ai_report_dialog_subtitle": {
+      "extractionState": "manual",
+      "localizations": {
+        "sv": { "stringUnit": { "state": "translated", "value": "Flaggade svar döljs direkt. Train Free körs offline, så rapporter sparas lokalt på din enhet." } },
+        "en": { "stringUnit": { "state": "translated", "value": "Flagged responses are hidden immediately. Train Free runs offline, so reports are saved locally on your device." } }
+      }
+    },
+    "ai_report_reason_offensive": {
+      "extractionState": "manual",
+      "localizations": {
+        "sv": { "stringUnit": { "state": "translated", "value": "Stötande eller skadligt" } },
+        "en": { "stringUnit": { "state": "translated", "value": "Offensive or harmful" } }
+      }
+    },
+    "ai_report_reason_unsafe_advice": {
+      "extractionState": "manual",
+      "localizations": {
+        "sv": { "stringUnit": { "state": "translated", "value": "Osäkra tränings- eller medicinska råd" } },
+        "en": { "stringUnit": { "state": "translated", "value": "Unsafe training or medical advice" } }
+      }
+    },
+    "ai_report_reason_inaccurate": {
+      "extractionState": "manual",
+      "localizations": {
+        "sv": { "stringUnit": { "state": "translated", "value": "Felaktig eller påhittad data" } },
+        "en": { "stringUnit": { "state": "translated", "value": "Inaccurate or made-up data" } }
+      }
+    },
+    "ai_report_reason_other": {
+      "extractionState": "manual",
+      "localizations": {
+        "sv": { "stringUnit": { "state": "translated", "value": "Annat" } },
+        "en": { "stringUnit": { "state": "translated", "value": "Other" } }
+      }
+    },
+    "ai_report_note_placeholder": {
+      "extractionState": "manual",
+      "localizations": {
+        "sv": { "stringUnit": { "state": "translated", "value": "Ytterligare detaljer (valfritt)" } },
+        "en": { "stringUnit": { "state": "translated", "value": "Additional details (optional)" } }
+      }
+    },
+    "ai_report_submit": {
+      "extractionState": "manual",
+      "localizations": {
+        "sv": { "stringUnit": { "state": "translated", "value": "Rapportera" } },
+        "en": { "stringUnit": { "state": "translated", "value": "Report" } }
+      }
+    },
+    "ai_report_message_hidden": {
+      "extractionState": "manual",
+      "localizations": {
+        "sv": { "stringUnit": { "state": "translated", "value": "Svaret har dolts och rapporterats." } },
+        "en": { "stringUnit": { "state": "translated", "value": "Response hidden and reported." } }
+      }
+    },
+    "ai_report_insight_hidden": {
+      "extractionState": "manual",
+      "localizations": {
+        "sv": { "stringUnit": { "state": "translated", "value": "Insikten har dolts och rapporterats." } },
+        "en": { "stringUnit": { "state": "translated", "value": "Insight hidden and reported." } }
+      }
     }
   },
   "version": "1.0"
