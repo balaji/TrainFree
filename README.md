@@ -2,7 +2,13 @@
 
 A local-first, 100% offline gym workout logger for **iOS** and **Android**. No account, no sign-in, no backend, and no subscriptions — all workout logs, routines, and body metrics stay in an on-device SQLite database.
 
-> **In Development:** Train Free is not on the App Store or Google Play yet, and can be built and run locally from source.
+<p>
+  <a href="https://play.google.com/store/apps/details?id=dev.balaji.moonrose.trainfree">
+    <img src="assets/google-play-badge.svg" alt="Get it on Google Play" height="52" />
+  </a>
+</p>
+
+> **iOS:** Not on the App Store yet — it can be built and run locally from source.
 
 <table>
   <tr>

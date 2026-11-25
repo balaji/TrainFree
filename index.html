@@ -209,7 +209,7 @@
       display: grid;
       grid-template-columns: minmax(0, 1fr) auto;
       align-items: center;
-      gap: 48px 56px;
+      gap: 48px 32px;
       padding: 52px 0 60px;
     }
 
@@ -255,7 +255,14 @@
       max-width: 46ch;
     }
 
+    .showcase-body {
+      display: flex;
+      align-items: center;
+      gap: 28px;
+    }
+
     .feature-list {
+      flex: 0 1 auto;
       margin: 0;
       padding-left: 1.25rem;
       list-style-type: disc;
@@ -273,6 +280,49 @@
 
     .feature-list li::marker {
       color: var(--accent);
+    }
+
+    .showcase-cta {
+      flex: 1 0 auto;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 14px;
+    }
+
+    .store-badge {
+      display: inline-flex;
+      border-radius: 7px;
+      line-height: 0;
+      transition: transform 0.15s ease, opacity 0.15s ease;
+    }
+
+    .store-badge img {
+      display: block;
+      height: 51px;
+      width: auto;
+    }
+
+    .store-badge:hover {
+      text-decoration: none;
+      transform: translateY(-1px);
+      opacity: 0.92;
+    }
+
+    .store-badge:focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: 4px;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .store-badge {
+        transition: none;
+      }
+
+      .store-badge:hover {
+        transform: none;
+      }
     }
 
     /* Phone screenshot frame */
@@ -612,6 +662,23 @@
       flex-wrap: wrap;
     }
 
+    @media (max-width: 920px) {
+      .showcase-body {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 28px;
+      }
+
+      .showcase-cta {
+        flex: 0 0 auto;
+        flex-direction: row;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: flex-start;
+        gap: 12px;
+      }
+    }
+
     @media (max-width: 768px) {
       .top-banner-inner {
         padding: 12px 20px;
@@ -672,6 +739,10 @@
         font-size: 0.76rem;
         padding: 5px 10px;
       }
+
+      .store-badge img {
+        height: 46px;
+      }
     }
   </style>
 </head>
@@ -711,17 +782,36 @@
             <h1 id="hero-heading">Train Free</h1>
           </div>
           <p class="showcase-subtitle">A gym workout logger that gets out of your way.</p>
-          <ul class="feature-list">
-            <li>No ads</li>
-            <li>No in-app purchases</li>
-            <li>Free</li>
-            <li>Fully offline with backup support</li>
-            <li>Unlimited routine creation</li>
-            <li>Journal your workouts</li>
-            <li>Built-in ML model for exercise description</li>
-            <li>Exercise metrics</li>
-            <li>Google Health sync</li>
-          </ul>
+          <div class="showcase-body">
+            <ul class="feature-list">
+              <li>No ads</li>
+              <li>No in-app purchases</li>
+              <li>Free</li>
+              <li>Fully offline with backup support</li>
+              <li>Unlimited routine creation</li>
+              <li>Journal your workouts</li>
+              <li>Built-in ML model for exercise description</li>
+              <li>Exercise metrics</li>
+              <li>Google Health sync</li>
+            </ul>
+
+            <div class="showcase-cta">
+              <a
+                class="store-badge"
+                href="https://play.google.com/store/apps/details?id=dev.balaji.moonrose.trainfree"
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label="Get Train Free on Google Play"
+              >
+                <img
+                  src="assets/google-play-badge.svg"
+                  alt="Get it on Google Play"
+                  width="172"
+                  height="51"
+                >
+              </a>
+            </div>
+          </div>
         </div>
 
         <div class="showcase-media">
