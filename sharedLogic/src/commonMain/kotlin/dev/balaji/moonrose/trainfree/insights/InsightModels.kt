@@ -192,6 +192,8 @@ data class ExerciseHistoryUiState(
     val loading: Boolean = true,
     /** Max estimated 1RM per week. Non-empty only for STRENGTH / REPS_DURATION / REPS_DISTANCE. */
     val weeklyOneRm: List<SparkPoint> = emptyList(),
+    /** All-time highest weekly estimated 1RM (week epochDay + value in [weightUnit]), or null if none. */
+    val allTimeBestOneRm: SparkPoint? = null,
     /** Total weight × reps per week. Non-empty only for STRENGTH / REPS_DURATION / REPS_DISTANCE. */
     val weeklyVolume: List<SparkPoint> = emptyList(),
     /** Total duration in seconds per week. Non-empty only for DURATION / REPS_DURATION / DISTANCE_DURATION. */

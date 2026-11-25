@@ -7,12 +7,17 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -31,6 +36,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
+import dev.balaji.moonrose.trainfree.model.NewOneRepMaxAchievement
+import dev.balaji.moonrose.trainfree.model.WeightUnit
 import dev.balaji.moonrose.trainfree.model.WorkoutCompletionCelebration
 import dev.balaji.moonrose.trainfree.sharedui.resources.*
 import org.jetbrains.compose.resources.pluralStringResource
@@ -106,7 +113,12 @@ internal fun WorkoutCompletionDialog(
                     )
                 }
 
-                if (celebration.exerciseCount > 0 && celebration.completedSets > 0) {
+                if (celebration.newOneRepMaxes.isNotEmpty()) {
+                    OneRepMaxHighlightCard(
+                        achievements = celebration.newOneRepMaxes,
+                        weightUnit = celebration.weightUnit,
+                    )
+                } else if (celebration.exerciseCount > 0 && celebration.completedSets > 0) {
                     val summaryParts = listOfNotNull(
                         pluralStringResource(
                             Res.plurals.exercise_count,
@@ -142,6 +154,92 @@ internal fun WorkoutCompletionDialog(
                         .padding(top = 4.dp),
                 ) {
                     Text(stringResource(Res.string.ok))
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun OneRepMaxHighlightCard(
+    achievements: List<NewOneRepMaxAchievement>,
+    weightUnit: WeightUnit,
+) {
+    val unitLabel = weightUnitLabel(weightUnit)
+    Surface(
+        shape = RoundedCornerShape(16.dp),
+        color = MaterialTheme.colorScheme.secondaryContainer,
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Column(
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Text(
+                text = pluralStringResource(
+                    Res.plurals.workout_complete_new_1rm_header,
+                    achievements.size,
+                ),
+                style = MaterialTheme.typography.labelLarge,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.primary,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth(),
+            )
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(max = 200.dp)
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                achievements.forEachIndexed { index, achievement ->
+                    if (index > 0) {
+                        HorizontalDivider(
+                            color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.14f),
+                        )
+                    }
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    ) {
+                        Text(
+                            text = achievement.exerciseName,
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.Medium,
+                            color = MaterialTheme.colorScheme.onSecondaryContainer,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f),
+                        )
+                        Column(horizontalAlignment = Alignment.End) {
+                            Text(
+                                text = when (weightUnit) {
+                                    WeightUnit.METRIC -> stringResource(
+                                        Res.string.weight_kg_value,
+                                        achievement.formattedNewOneRm,
+                                    )
+                                    WeightUnit.IMPERIAL -> stringResource(
+                                        Res.string.weight_lb_value,
+                                        achievement.formattedNewOneRm,
+                                    )
+                                },
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.primary,
+                            )
+                            Text(
+                                text = stringResource(
+                                    Res.string.workout_complete_1rm_gain,
+                                    achievement.formattedGain,
+                                    unitLabel,
+                                ),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.8f),
+                            )
+                        }
+                    }
                 }
             }
         }

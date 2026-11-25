@@ -7,6 +7,7 @@ import dev.balaji.moonrose.trainfree.screens.formatMonthYear
 import dev.balaji.moonrose.trainfree.screens.initialBmiInputs
 import dev.balaji.moonrose.trainfree.screens.progressionYAxisBounds
 import dev.balaji.moonrose.trainfree.screens.remainingSecondsUntil
+import dev.balaji.moonrose.trainfree.screens.verticalLineCanvasX
 import dev.balaji.moonrose.trainfree.screens.yAxisBounds
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -54,6 +55,64 @@ class SharedUICommonTest {
         val (lo, hi) = yAxisBounds(5.6, 7.2)
         assertTrue(lo <= 5.6 && hi >= 7.2 && hi - lo >= 2.0)
         assertEquals(80.0 to 120.0, yAxisBounds(80.0, 120.0))
+    }
+
+    @Test
+    fun verticalLineCanvasXAlignsTargetXToGrid() {
+        assertEquals(
+            20f,
+            verticalLineCanvasX(
+                targetX = 100.0,
+                minX = 100.0,
+                xStep = 7.0,
+                drawingStart = 20f,
+                xSpacing = 40f,
+                layoutDirectionMultiplier = 1,
+            ),
+        )
+        assertEquals(
+            100f,
+            verticalLineCanvasX(
+                targetX = 114.0,
+                minX = 100.0,
+                xStep = 7.0,
+                drawingStart = 20f,
+                xSpacing = 40f,
+                layoutDirectionMultiplier = 1,
+            ),
+        )
+        assertEquals(
+            140f,
+            verticalLineCanvasX(
+                targetX = 121.0,
+                minX = 100.0,
+                xStep = 7.0,
+                drawingStart = 20f,
+                xSpacing = 40f,
+                layoutDirectionMultiplier = 1,
+            ),
+        )
+        assertEquals(
+            120f,
+            verticalLineCanvasX(
+                targetX = 114.0,
+                minX = 100.0,
+                xStep = 7.0,
+                drawingStart = 200f,
+                xSpacing = 40f,
+                layoutDirectionMultiplier = -1,
+            ),
+        )
+        assertNull(
+            verticalLineCanvasX(
+                targetX = 114.0,
+                minX = 100.0,
+                xStep = 0.0,
+                drawingStart = 20f,
+                xSpacing = 40f,
+                layoutDirectionMultiplier = 1,
+            ),
+        )
     }
 
     @Test

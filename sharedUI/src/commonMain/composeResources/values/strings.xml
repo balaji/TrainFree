@@ -42,6 +42,11 @@
     <string name="rest_over_message">Time for your next set.</string>
     <string name="rest_timer_channel_name">Rest timer</string>
     <string name="workout_complete_title">Workout Complete!</string>
+    <plurals name="workout_complete_new_1rm_header">
+        <item quantity="one">New Personal Record</item>
+        <item quantity="other">New Personal Records</item>
+    </plurals>
+    <string name="workout_complete_1rm_gain">+%1$s %2$s</string>
 
     <!-- Workout session / routine editor -->
     <string name="add_exercise_caps">ADD EXERCISE</string>
@@ -133,12 +138,14 @@
     <string name="exercise_history_section">Recent history</string>
     <string name="exercise_history_no_data">Log some sets to see history here.</string>
     <string name="exercise_history_need_two_weeks">Need at least 2 weeks of data.</string>
-    <string name="exercise_history_metric_1rm">1RM</string>
+    <string name="exercise_history_metric_1rm">Est. 1RM</string>
     <string name="exercise_history_metric_volume">Volume</string>
     <string name="exercise_history_metric_duration">Duration</string>
     <string name="exercise_history_metric_distance">Distance</string>
     <string name="exercise_history_zoom_in">Zoom in to recent weeks</string>
     <string name="exercise_history_zoom_out">Zoom out to all history</string>
+    <string name="exercise_history_pr_badge">All-time PR · %1$s %2$s</string>
+    <string name="exercise_history_pr_label">PR</string>
 
     <!-- Exercise list — completed set count badge -->
     <plurals name="exercise_set_count">

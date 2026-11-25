@@ -42,6 +42,11 @@
     <string name="rest_over_message">Dags för nästa set.</string>
     <string name="rest_timer_channel_name">Vilotimer</string>
     <string name="workout_complete_title">Träningspass klart!</string>
+    <plurals name="workout_complete_new_1rm_header">
+        <item quantity="one">Nytt personbästa</item>
+        <item quantity="other">Nya personbästa</item>
+    </plurals>
+    <string name="workout_complete_1rm_gain">+%1$s %2$s</string>
 
     <!-- Workout session / routine editor -->
     <string name="add_exercise_caps">LÄGG TILL ÖVNING</string>
@@ -133,12 +138,14 @@
     <string name="exercise_history_section">Senaste historik</string>
     <string name="exercise_history_no_data">Logga några set för att se historik här.</string>
     <string name="exercise_history_need_two_weeks">Behöver minst 2 veckors data.</string>
-    <string name="exercise_history_metric_1rm">1RM</string>
+    <string name="exercise_history_metric_1rm">Ber. 1RM</string>
     <string name="exercise_history_metric_volume">Volym</string>
     <string name="exercise_history_metric_duration">Tid</string>
     <string name="exercise_history_metric_distance">Distans</string>
     <string name="exercise_history_zoom_in">Zooma in till senaste veckorna</string>
     <string name="exercise_history_zoom_out">Zooma ut till hela historiken</string>
+    <string name="exercise_history_pr_badge">Personbästa · %1$s %2$s</string>
+    <string name="exercise_history_pr_label">PB</string>
 
     <!-- Exercise list — completed set count badge -->
     <plurals name="exercise_set_count">

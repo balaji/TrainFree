@@ -25,6 +25,14 @@ data class PreviousSetRow(
     @ColumnInfo(name = "weight_unit") val weightUnit: WeightUnit,
 )
 
+/** Projection for comparing historical estimated 1RMs against a newly completed session. */
+data class ExerciseSetLoadRow(
+    @ColumnInfo(name = "exercise_id") val exerciseId: Long,
+    @ColumnInfo(name = "actual_weight") val actualWeight: Double,
+    @ColumnInfo(name = "actual_reps") val actualReps: Int,
+    @ColumnInfo(name = "weight_unit") val weightUnit: WeightUnit,
+)
+
 /** Projection for insights: one row per completed working set in a completed session. */
 data class CompletedSetRow(
     @ColumnInfo(name = "performed_at") val performedAt: Long,
@@ -578,6 +586,24 @@ interface WorkoutSessionDetailDao {
             "ORDER BY d.position",
     )
     suspend fun getLatestCompletedSets(profileId: Long, exerciseId: Long): List<PreviousSetRow>
+
+    @Query(
+        "SELECT d.exercise_id AS exercise_id, d.actual_weight AS actual_weight, " +
+            "d.actual_reps AS actual_reps, d.weight_unit AS weight_unit " +
+            "FROM workout_session_details d " +
+            "JOIN workout_sessions s ON s.id = d.workout_session_id " +
+            "WHERE s.profile_id = :profileId AND s.completed_at IS NOT NULL " +
+            "AND s.id != :excludeSessionId " +
+            "AND d.exercise_id IN (:exerciseIds) " +
+            "AND d.completed != 0 AND d.set_type != 'warmup' " +
+            "AND d.actual_weight IS NOT NULL AND d.actual_weight > 0 " +
+            "AND d.actual_reps IS NOT NULL AND d.actual_reps > 0",
+    )
+    suspend fun getPriorWeightedSetsForExercises(
+        profileId: Long,
+        excludeSessionId: Long,
+        exerciseIds: List<Long>,
+    ): List<ExerciseSetLoadRow>
 
     @Insert
     suspend fun insert(detail: WorkoutSessionDetailEntity): Long

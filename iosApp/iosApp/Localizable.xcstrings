@@ -4992,6 +4992,48 @@
         "en": { "stringUnit": { "state": "translated", "value": "Workout Complete!" } }
       }
     },
+    "workout_complete_new_1rm_header_one": {
+      "extractionState": "manual",
+      "localizations": {
+        "sv": { "stringUnit": { "state": "translated", "value": "Nytt personbästa" } },
+        "en": { "stringUnit": { "state": "translated", "value": "New Personal Record" } }
+      }
+    },
+    "workout_complete_new_1rm_header_other": {
+      "extractionState": "manual",
+      "localizations": {
+        "sv": { "stringUnit": { "state": "translated", "value": "Nya personbästa" } },
+        "en": { "stringUnit": { "state": "translated", "value": "New Personal Records" } }
+      }
+    },
+    "workout_complete_1rm_gain": {
+      "extractionState": "manual",
+      "localizations": {
+        "sv": { "stringUnit": { "state": "translated", "value": "+%1$@ %2$@" } },
+        "en": { "stringUnit": { "state": "translated", "value": "+%1$@ %2$@" } }
+      }
+    },
+    "exercise_history_metric_1rm": {
+      "extractionState": "manual",
+      "localizations": {
+        "sv": { "stringUnit": { "state": "translated", "value": "Ber. 1RM" } },
+        "en": { "stringUnit": { "state": "translated", "value": "Est. 1RM" } }
+      }
+    },
+    "exercise_history_pr_badge": {
+      "extractionState": "manual",
+      "localizations": {
+        "sv": { "stringUnit": { "state": "translated", "value": "Personbästa · %1$@ %2$@" } },
+        "en": { "stringUnit": { "state": "translated", "value": "All-time PR · %1$@ %2$@" } }
+      }
+    },
+    "exercise_history_pr_label": {
+      "extractionState": "manual",
+      "localizations": {
+        "sv": { "stringUnit": { "state": "translated", "value": "PB" } },
+        "en": { "stringUnit": { "state": "translated", "value": "PR" } }
+      }
+    },
     "exercise_history_need_two_weeks": {
       "extractionState": "manual",
       "localizations": {

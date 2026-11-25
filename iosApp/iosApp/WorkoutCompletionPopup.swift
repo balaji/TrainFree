@@ -64,7 +64,12 @@ private struct WorkoutCompletionCard: View {
                     .lineLimit(2)
             }
 
-            if celebration.exerciseCount > 0 && celebration.completedSets > 0 {
+            if !celebration.newOneRepMaxes.isEmpty {
+                OneRepMaxHighlightCard(
+                    achievements: celebration.newOneRepMaxes,
+                    weightUnit: celebration.weightUnit
+                )
+            } else if celebration.exerciseCount > 0 && celebration.completedSets > 0 {
                 Text(summaryText)
                     .font(.subheadline.weight(.medium))
                     .foregroundStyle(.secondary)
@@ -113,6 +118,75 @@ private struct WorkoutCompletionCard: View {
             return String(format: "%d:%02d:%02d", hours, minutes, seconds)
         } else {
             return String(format: "%02d:%02d", minutes, seconds)
+        }
+    }
+}
+
+private struct OneRepMaxHighlightCard: View {
+    let achievements: [NewOneRepMaxAchievement]
+    let weightUnit: WeightUnit
+
+    private var unitLabel: String {
+        weightUnit == .imperial ? L10n.unitLb : L10n.unitKg
+    }
+
+    var body: some View {
+        VStack(spacing: 8) {
+            Text(L10n.workoutCompleteNew1RmHeader(achievements.count))
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(Color.accentColor)
+                .multilineTextAlignment(.center)
+
+            if achievements.count > 4 {
+                ScrollView {
+                    achievementRows
+                }
+                .frame(maxHeight: 200)
+            } else {
+                achievementRows
+            }
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 12)
+        .frame(maxWidth: .infinity)
+        .background(
+            Color.accentColor.opacity(0.10),
+            in: RoundedRectangle(cornerRadius: 16, style: .continuous)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .strokeBorder(Color.accentColor.opacity(0.22), lineWidth: 1)
+        )
+    }
+
+    private var achievementRows: some View {
+        VStack(spacing: 8) {
+            ForEach(Array(achievements.enumerated()), id: \.element.exerciseId) { index, achievement in
+                if index > 0 {
+                    Divider()
+                }
+                HStack(alignment: .center, spacing: 12) {
+                    Text(achievement.exerciseName)
+                        .font(.subheadline.weight(.medium))
+                        .lineLimit(2)
+                        .multilineTextAlignment(.leading)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+
+                    VStack(alignment: .trailing, spacing: 1) {
+                        Text(
+                            weightUnit == .imperial
+                                ? L10n.weightLbValue(achievement.formattedNewOneRm)
+                                : L10n.weightKgValue(achievement.formattedNewOneRm)
+                        )
+                        .font(.subheadline.weight(.bold))
+                        .foregroundStyle(Color.accentColor)
+
+                        Text(L10n.workoutComplete1RmGain(achievement.formattedGain, unitLabel))
+                            .font(.caption.weight(.medium))
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            }
         }
     }
 }

@@ -132,6 +132,15 @@ struct ExerciseDetailView: View {
                                 let effectiveZoomedIn = zoomedIn || !canZoom
                                 let nonZeroPoints = effectiveZoomedIn ? HistoryWindow.shared.recent(points: allPoints) : allPoints
                                 let showYear = HistoryWindow.shared.spansYears(points: nonZeroPoints)
+                                let prPoint: SparkPoint? = (selectedMetric == .oneRm ? historyUiState.allTimeBestOneRm : nil)
+                                    .flatMap { $0.value > 0 ? $0 : nil }
+                                let visiblePrDay: Int64? = prPoint.flatMap { pr in
+                                    guard let firstDay = nonZeroPoints.first?.epochDay,
+                                          let lastDay = nonZeroPoints.last?.epochDay,
+                                          pr.epochDay >= firstDay,
+                                          pr.epochDay <= lastDay else { return nil }
+                                    return pr.epochDay
+                                }
                                 if applicableMetrics.count > 1 {
                                     Picker("", selection: $selectedMetric) {
                                         ForEach(applicableMetrics, id: \.self) { metric in
@@ -140,6 +149,10 @@ struct ExerciseDetailView: View {
                                     }
                                     .pickerStyle(.segmented)
                                     .listRowSeparator(.hidden)
+                                }
+                                if let pr = prPoint {
+                                    prStatBadge(value: pr.value)
+                                        .listRowSeparator(.hidden)
                                 }
                                 if nonZeroPoints.count >= 2 {
                                     VStack(alignment: .leading, spacing: 8) {
@@ -162,6 +175,16 @@ struct ExerciseDetailView: View {
                                             .disabled(!canZoom)
                                         }
                                         Chart {
+                                            if let prDay = visiblePrDay {
+                                                RuleMark(x: .value(L10n.exerciseHistoryPrLabel, prDay))
+                                                    .foregroundStyle(Color.orange.opacity(0.85))
+                                                    .lineStyle(StrokeStyle(lineWidth: 1.5, dash: [4, 3]))
+                                                    .annotation(position: .top, alignment: .center, spacing: 2) {
+                                                        Text(L10n.exerciseHistoryPrLabel)
+                                                            .font(.caption2.weight(.semibold))
+                                                            .foregroundStyle(Color.orange)
+                                                    }
+                                            }
                                             ForEach(nonZeroPoints, id: \.epochDay) { point in
                                                 LineMark(
                                                     x: .value("Week", point.epochDay),
@@ -187,6 +210,7 @@ struct ExerciseDetailView: View {
                                         .chartXScale(domain: xDomain(nonZeroPoints))
                                         .chartYScale(domain: yDomain(nonZeroPoints))
                                         .frame(height: 120)
+                                        .padding(.top, visiblePrDay != nil ? 12 : 0)
                                         // Room for the centered last date label past the plot edge.
                                         .padding(.trailing, 20)
                                     }
@@ -246,6 +270,23 @@ struct ExerciseDetailView: View {
         } else {
             return String(format: "%@-%02d", month, Int(parts.dayOfMonth))
         }
+    }
+
+    private func prStatBadge(value: Double) -> some View {
+        HStack(spacing: 6) {
+            Path { path in
+                path.move(to: CGPoint(x: 1, y: 0))
+                path.addLine(to: CGPoint(x: 1, y: 12))
+            }
+            .stroke(Color.orange, style: StrokeStyle(lineWidth: 1.5, dash: [3, 2]))
+            .frame(width: 2, height: 12)
+            Text(L10n.exerciseHistoryPrBadge(InsightMath.shared.formatNumber(value: value, maxDecimals: 1), selectedUnit))
+                .font(.caption.weight(.medium))
+                .foregroundStyle(.primary)
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 5)
+        .background(Color.orange.opacity(0.12), in: Capsule())
     }
 
     private func xDomain(_ points: [SparkPoint]) -> ClosedRange<Int64> {

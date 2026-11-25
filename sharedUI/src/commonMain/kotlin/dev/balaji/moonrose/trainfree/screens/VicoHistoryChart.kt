@@ -1,10 +1,14 @@
 package dev.balaji.moonrose.trainfree.screens
 
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.unit.dp
+import com.patrykandpatrick.vico.compose.cartesian.CartesianDrawingContext
 import com.patrykandpatrick.vico.compose.cartesian.CartesianChartHost
 import com.patrykandpatrick.vico.compose.cartesian.axis.HorizontalAxis
 import com.patrykandpatrick.vico.compose.cartesian.axis.VerticalAxis
@@ -16,12 +20,16 @@ import com.patrykandpatrick.vico.compose.cartesian.data.CartesianChartModelProdu
 import com.patrykandpatrick.vico.compose.cartesian.data.CartesianLayerRangeProvider
 import com.patrykandpatrick.vico.compose.cartesian.data.CartesianValueFormatter
 import com.patrykandpatrick.vico.compose.cartesian.data.lineSeries
+import com.patrykandpatrick.vico.compose.cartesian.decoration.Decoration
 import com.patrykandpatrick.vico.compose.cartesian.layer.LineCartesianLayer
 import com.patrykandpatrick.vico.compose.cartesian.layer.rememberLine
 import com.patrykandpatrick.vico.compose.cartesian.layer.rememberLineCartesianLayer
 import com.patrykandpatrick.vico.compose.cartesian.rememberCartesianChart
 import com.patrykandpatrick.vico.compose.cartesian.rememberVicoScrollState
+import com.patrykandpatrick.vico.compose.common.DashedShape
 import com.patrykandpatrick.vico.compose.common.Fill
+import com.patrykandpatrick.vico.compose.common.component.LineComponent
+import com.patrykandpatrick.vico.compose.common.component.rememberLineComponent
 import com.patrykandpatrick.vico.compose.common.data.ExtraStore
 import dev.balaji.moonrose.trainfree.insights.HistoryWindow
 import dev.balaji.moonrose.trainfree.insights.InsightMath
@@ -33,6 +41,7 @@ import kotlin.math.round
 private val LabelSpacingKey = ExtraStore.Key<Int>()
 private val LabelOffsetKey = ExtraStore.Key<Int>()
 private val ShowYearKey = ExtraStore.Key<Boolean>()
+private val HighlightXKey = ExtraStore.Key<Double>()
 
 /**
  * Ensures at least a 2-unit span on integer boundaries so 3 integer-formatted
@@ -47,6 +56,54 @@ internal fun yAxisBounds(minY: Double, maxY: Double): Pair<Double, Double> {
     val lo = floor(minY).coerceAtLeast(0.0)
     val hi = maxOf(ceil(maxY), lo + 2.0)
     return lo to hi
+}
+
+/**
+ * Maps a chart x-value ([targetX]) onto canvas x-coordinates along Vico's
+ * uniform x-grid, or returns null when [xStep] is non-positive.
+ */
+internal fun verticalLineCanvasX(
+    targetX: Double,
+    minX: Double,
+    xStep: Double,
+    drawingStart: Float,
+    xSpacing: Float,
+    layoutDirectionMultiplier: Int,
+): Float? {
+    if (xStep <= 0.0) return null
+    return drawingStart +
+        layoutDirectionMultiplier.toFloat() *
+        ((targetX - minX) / xStep).toFloat() *
+        xSpacing
+}
+
+private class VerticalLine(
+    private val x: (ExtraStore) -> Double?,
+    private val line: LineComponent,
+) : Decoration {
+    override fun drawUnderLayers(context: CartesianDrawingContext) {
+        val targetX = x(context.model.extraStore)?.takeIf { it.isFinite() } ?: return
+        val ranges = context.ranges
+        if (targetX < ranges.minX || targetX > ranges.maxX || ranges.xStep <= 0.0) return
+        val dir = context.layoutDirectionMultiplier.toFloat()
+        val startEdge = if (context.isLtr) context.layerBounds.left else context.layerBounds.right
+        val drawingStart = startEdge + dir * context.layerDimensions.startPadding - context.scroll
+        val canvasX = verticalLineCanvasX(
+            targetX = targetX,
+            minX = ranges.minX,
+            xStep = ranges.xStep,
+            drawingStart = drawingStart,
+            xSpacing = context.layerDimensions.xSpacing,
+            layoutDirectionMultiplier = context.layoutDirectionMultiplier,
+        ) ?: return
+        if (canvasX < context.layerBounds.left - 1f || canvasX > context.layerBounds.right + 1f) return
+        line.drawVertical(
+            context,
+            canvasX,
+            context.layerBounds.top,
+            context.layerBounds.bottom,
+        )
+    }
 }
 
 private val YRangeProvider = object : CartesianLayerRangeProvider {
@@ -68,6 +125,8 @@ private val YRangeProvider = object : CartesianLayerRangeProvider {
 internal fun VicoHistoryChart(
     points: List<SparkPoint>,
     modifier: Modifier = Modifier,
+    highlightEpochDay: Long? = null,
+    highlightColor: Color = seriesColor(2),
 ) {
     val lineColor = seriesColor(0)
     val axisColor = MaterialTheme.colorScheme.outlineVariant
@@ -85,7 +144,7 @@ internal fun VicoHistoryChart(
     val showYear = HistoryWindow.spansYears(points)
 
     val modelProducer = remember { CartesianChartModelProducer() }
-    LaunchedEffect(points, labelSpacing, labelOffset, showYear) {
+    LaunchedEffect(points, labelSpacing, labelOffset, showYear, highlightEpochDay) {
         modelProducer.runTransaction {
             lineSeries {
                 series(x = points.map { it.epochDay.toDouble() }, y = points.map { it.value })
@@ -94,7 +153,21 @@ internal fun VicoHistoryChart(
                 it[LabelSpacingKey] = labelSpacing
                 it[LabelOffsetKey] = labelOffset
                 it[ShowYearKey] = showYear
+                it[HighlightXKey] = highlightEpochDay?.toDouble() ?: Double.NaN
             }
+        }
+    }
+
+    val prLineComponent = rememberLineComponent(
+        fill = Fill(highlightColor),
+        thickness = 1.5.dp,
+        shape = remember { DashedShape(shape = RoundedCornerShape(0.dp), dashLength = 4.dp, gapLength = 3.dp) },
+    )
+    val decorations = remember(highlightEpochDay, prLineComponent) {
+        if (highlightEpochDay != null) {
+            listOf(VerticalLine(x = { it.getOrNull(HighlightXKey) }, line = prLineComponent))
+        } else {
+            emptyList()
         }
     }
 
@@ -136,6 +209,7 @@ internal fun VicoHistoryChart(
                 )
             },
         ),
+        decorations = decorations,
         getXStep = { _, _, _ -> HistoryWindow.WEEK_DAYS.toDouble() },
     )
 

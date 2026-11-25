@@ -1,10 +1,15 @@
 package dev.balaji.moonrose.trainfree.db
 
+import dev.balaji.moonrose.trainfree.insights.InsightMath
+import dev.balaji.moonrose.trainfree.insights.OneRmFormula
 import dev.balaji.moonrose.trainfree.model.ExerciseType
+import dev.balaji.moonrose.trainfree.model.NewOneRepMaxAchievement
 import dev.balaji.moonrose.trainfree.model.SetType
+import dev.balaji.moonrose.trainfree.model.WeightUnit
 import dev.balaji.moonrose.trainfree.model.WorkoutCompletionCelebration
 import dev.balaji.moonrose.trainfree.model.buildWorkoutCompletionCelebration
 import dev.balaji.moonrose.trainfree.model.isSetComplete
+import kotlin.math.round
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -24,12 +29,65 @@ data class ActiveWorkoutSession(
     val startedAt: Long,
 )
 
+internal fun detectNewOneRepMaxes(
+    keptDetails: List<WorkoutSessionDetailEntity>,
+    priorSets: List<ExerciseSetLoadRow>,
+    exerciseNames: Map<Long, String>,
+    formula: OneRmFormula,
+    displayUnit: WeightUnit,
+): List<NewOneRepMaxAchievement> {
+    val priorBestByExercise = priorSets
+        .filter { it.actualWeight > 0.0 && it.actualReps > 0 }
+        .groupBy { it.exerciseId }
+        .mapValues { (_, sets) ->
+            sets.maxOf { row ->
+                val weight = row.weightUnit.convertWeight(row.actualWeight, displayUnit)
+                formula.estimate(weight, row.actualReps)
+            }
+        }
+    if (priorBestByExercise.isEmpty()) return emptyList()
+
+    val currentByExercise = keptDetails
+        .filter { detail ->
+            detail.setType != SetType.WARMUP &&
+                (detail.actualWeight ?: 0.0) > 0.0 &&
+                (detail.actualReps ?: 0) > 0
+        }
+        .groupBy { it.exerciseId }
+
+    val achievements = mutableListOf<NewOneRepMaxAchievement>()
+    for ((exerciseId, sets) in currentByExercise) {
+        val priorBest = priorBestByExercise[exerciseId] ?: continue
+        val exerciseName = exerciseNames[exerciseId]?.takeIf { it.isNotBlank() } ?: continue
+        val currentBest = sets.maxOf { detail ->
+            val weight = detail.weightUnit.convertWeight(detail.actualWeight!!, displayUnit)
+            formula.estimate(weight, detail.actualReps!!)
+        }
+        val currentTenths = round(currentBest * 10.0).toLong()
+        val priorTenths = round(priorBest * 10.0).toLong()
+        if (currentTenths > priorTenths) {
+            val gainDisplay = (currentTenths - priorTenths) / 10.0
+            achievements += NewOneRepMaxAchievement(
+                exerciseId = exerciseId,
+                exerciseName = exerciseName,
+                formattedNewOneRm = InsightMath.formatNumber(currentBest, 1),
+                formattedGain = InsightMath.formatNumber(gainDisplay, 1),
+                newOneRm = currentBest,
+                previousOneRm = priorBest,
+            )
+        }
+    }
+    return achievements
+}
+
 internal fun summarizeCompletedSession(
     sessionId: Long,
     workoutTitle: String,
     performedAtMillis: Long,
     completedAtMillis: Long,
     keptDetails: List<WorkoutSessionDetailEntity>,
+    newOneRepMaxes: List<NewOneRepMaxAchievement> = emptyList(),
+    weightUnit: WeightUnit = WeightUnit.METRIC,
 ): WorkoutCompletionCelebration {
     val workingDetails = keptDetails.filter { it.setType != SetType.WARMUP }
     val countedDetails = workingDetails.ifEmpty { keptDetails }
@@ -41,6 +99,8 @@ internal fun summarizeCompletedSession(
         exerciseCount = countedDetails.map { it.exerciseId }.distinct().size,
         durationSeconds = durationSeconds,
         seed = completedAtMillis,
+        newOneRepMaxes = newOneRepMaxes,
+        weightUnit = weightUnit,
     )
 }
 
@@ -283,8 +343,11 @@ object WorkoutSessionRepository {
     internal suspend fun finishPersisted(sessionId: Long) {
         val now = nowMillis()
         val details = AppDb.db.workoutSessionDetailDao().getForSession(sessionId)
-        val typeByExercise = details.map { it.exerciseId }.distinct().associateWith { id ->
-            ExerciseType.fromValue(ExerciseRepository.findById(id)?.exerciseType) ?: ExerciseType.STRENGTH
+        val exercisesById = details.map { it.exerciseId }.distinct().associateWith { id ->
+            ExerciseRepository.findById(id)
+        }
+        val typeByExercise = exercisesById.mapValues { (_, exercise) ->
+            ExerciseType.fromValue(exercise?.exerciseType) ?: ExerciseType.STRENGTH
         }
         val (keptDetails, emptyDetails) = details.partition { d ->
             val type = typeByExercise.getValue(d.exerciseId)
@@ -299,12 +362,36 @@ object WorkoutSessionRepository {
         if (session != null && keptDetails.isNotEmpty()) {
             val routineName = session.routineId?.let { AppDb.db.routineDao().findById(it)?.name }
             val title = resolveWorkoutTitle(session.title, routineName, session.performedAt)
+            val settings = UserSettingsRepository.settings.first()
+            val candidateExerciseIds = keptDetails
+                .filter { it.setType != SetType.WARMUP && (it.actualWeight ?: 0.0) > 0.0 && (it.actualReps ?: 0) > 0 }
+                .map { it.exerciseId }
+                .distinct()
+            val priorSets = if (candidateExerciseIds.isNotEmpty()) {
+                AppDb.db.workoutSessionDetailDao().getPriorWeightedSetsForExercises(
+                    profileId = PROFILE_ID,
+                    excludeSessionId = sessionId,
+                    exerciseIds = candidateExerciseIds,
+                )
+            } else {
+                emptyList()
+            }
+            val exerciseNames = exercisesById.mapNotNull { (id, ex) -> ex?.let { id to it.name } }.toMap()
+            val newOneRepMaxes = detectNewOneRepMaxes(
+                keptDetails = keptDetails,
+                priorSets = priorSets,
+                exerciseNames = exerciseNames,
+                formula = settings.oneRmFormula,
+                displayUnit = settings.weightUnit,
+            )
             _completionCelebration.value = summarizeCompletedSession(
                 sessionId = sessionId,
                 workoutTitle = title,
                 performedAtMillis = session.performedAt,
                 completedAtMillis = now,
                 keptDetails = keptDetails,
+                newOneRepMaxes = newOneRepMaxes,
+                weightUnit = settings.weightUnit,
             )
         }
     }

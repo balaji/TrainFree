@@ -63,6 +63,14 @@ enum L10n {
     static let restOverTitle = String(localized: "rest_over_title", defaultValue: "Rest is over")
     static let restOverMessage = String(localized: "rest_over_message", defaultValue: "Time for your next set.")
     static let workoutCompleteTitle = String(localized: "workout_complete_title", defaultValue: "Workout Complete!")
+    static func workoutCompleteNew1RmHeader(_ count: Int) -> String {
+        count == 1
+            ? String(localized: "workout_complete_new_1rm_header_one", defaultValue: "New Personal Record")
+            : String(localized: "workout_complete_new_1rm_header_other", defaultValue: "New Personal Records")
+    }
+    static func workoutComplete1RmGain(_ gain: String, _ unit: String) -> String {
+        String(localized: "workout_complete_1rm_gain", defaultValue: "+\(gain) \(unit)")
+    }
 
     // MARK: - Workout session / routine editor
     static let addExercise = String(localized: "add_exercise_cd", defaultValue: "Add Exercise")
@@ -178,12 +186,16 @@ enum L10n {
     static let exerciseHistorySection = String(localized: "exercise_history_section", defaultValue: "Recent history")
     static let exerciseHistoryNoData = String(localized: "exercise_history_no_data", defaultValue: "Log some sets to see history here.")
     static let exerciseHistoryNeedTwoWeeks = String(localized: "exercise_history_need_two_weeks", defaultValue: "Need at least 2 weeks of data.")
-    static let exerciseHistoryMetric1rm = String(localized: "exercise_history_metric_1rm", defaultValue: "1RM")
+    static let exerciseHistoryMetric1rm = String(localized: "exercise_history_metric_1rm", defaultValue: "Est. 1RM")
     static let exerciseHistoryMetricVolume = String(localized: "exercise_history_metric_volume", defaultValue: "Volume")
     static let exerciseHistoryMetricDuration = String(localized: "exercise_history_metric_duration", defaultValue: "Duration")
     static let exerciseHistoryMetricDistance = String(localized: "exercise_history_metric_distance", defaultValue: "Distance")
     static let exerciseHistoryZoomIn = String(localized: "exercise_history_zoom_in", defaultValue: "Zoom in to recent weeks")
     static let exerciseHistoryZoomOut = String(localized: "exercise_history_zoom_out", defaultValue: "Zoom out to all history")
+    static func exerciseHistoryPrBadge(_ value: String, _ unit: String) -> String {
+        String(localized: "exercise_history_pr_badge", defaultValue: "All-time PR · \(value) \(unit)")
+    }
+    static let exerciseHistoryPrLabel = String(localized: "exercise_history_pr_label", defaultValue: "PR")
     static func exerciseSetCount(_ count: Int) -> String {
         count == 1
             ? String(localized: "exercise_set_count_one", defaultValue: "1 set")
