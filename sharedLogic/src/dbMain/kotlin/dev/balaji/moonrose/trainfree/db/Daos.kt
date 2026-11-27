@@ -5,6 +5,7 @@ import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.Query
 import androidx.room.Upsert
+import dev.balaji.moonrose.trainfree.model.SetType
 import dev.balaji.moonrose.trainfree.model.WeightUnit
 import kotlinx.coroutines.flow.Flow
 
@@ -23,6 +24,7 @@ data class PreviousSetRow(
     @ColumnInfo(name = "actual_duration") val actualDuration: Int?,
     @ColumnInfo(name = "actual_distance") val actualDistance: Double?,
     @ColumnInfo(name = "weight_unit") val weightUnit: WeightUnit,
+    @ColumnInfo(name = "set_type") val setType: SetType = SetType.NORMAL,
 )
 
 /** Projection for comparing historical estimated 1RMs against a newly completed session. */
@@ -33,7 +35,7 @@ data class ExerciseSetLoadRow(
     @ColumnInfo(name = "weight_unit") val weightUnit: WeightUnit,
 )
 
-/** Projection for insights: one row per completed working set in a completed session. */
+/** Projection for insights: one row per completed non-warmup set in a completed session. */
 data class CompletedSetRow(
     @ColumnInfo(name = "performed_at") val performedAt: Long,
     @ColumnInfo(name = "exercise_id") val exerciseId: Long,
@@ -45,6 +47,7 @@ data class CompletedSetRow(
     @ColumnInfo(name = "actual_duration") val actualDuration: Int?,
     @ColumnInfo(name = "actual_distance") val actualDistance: Double?,
     @ColumnInfo(name = "weight_unit") val weightUnit: WeightUnit,
+    @ColumnInfo(name = "set_type") val setType: SetType = SetType.NORMAL,
 )
 
 /** Projection for the exercises list badge: completed set count per exercise. */
@@ -79,7 +82,7 @@ data class SessionDetailWithExerciseRow(
     @ColumnInfo(name = "actual_reps") val actualReps: Int?,
     @ColumnInfo(name = "actual_duration") val actualDuration: Int?,
     @ColumnInfo(name = "actual_distance") val actualDistance: Double?,
-    @ColumnInfo(name = "set_type") val setType: dev.balaji.moonrose.trainfree.model.SetType,
+    @ColumnInfo(name = "set_type") val setType: SetType,
     @ColumnInfo(name = "weight_unit") val weightUnit: WeightUnit,
 )
 
@@ -457,17 +460,17 @@ interface WorkoutSessionDetailDao {
     suspend fun hasCompletedSets(sessionId: Long): Boolean
 
     /**
-     * The source for every volume, PR and est-1RM number. Warm-ups are excluded
-     * here rather than downstream — CompletedSetRow deliberately carries no set
-     * type, so nothing can forget to filter. Drop sets are work at a reduced
-     * load and stay in.
+     * The source for every volume, set-count, PR and est-1RM number. Warm-ups
+     * are excluded here; `set_type` is carried so downstream analytics keep
+     * drop sets in volume/duration/distance while excluding them from working
+     * set counts and est-1RM / PRs.
      */
     @Query(
         "SELECT s.performed_at AS performed_at, d.exercise_id AS exercise_id, " +
             "e.name AS exercise_name, e.body_part AS body_part, " +
             "d.actual_weight AS actual_weight, d.actual_reps AS actual_reps, " +
             "d.actual_duration AS actual_duration, d.actual_distance AS actual_distance, " +
-            "d.weight_unit AS weight_unit " +
+            "d.weight_unit AS weight_unit, d.set_type AS set_type " +
             "FROM workout_session_details d " +
             "JOIN workout_sessions s ON s.id = d.workout_session_id " +
             "JOIN exercises e ON e.id = d.exercise_id " +
@@ -482,7 +485,7 @@ interface WorkoutSessionDetailDao {
             "e.name AS exercise_name, e.body_part AS body_part, " +
             "d.actual_weight AS actual_weight, d.actual_reps AS actual_reps, " +
             "d.actual_duration AS actual_duration, d.actual_distance AS actual_distance, " +
-            "d.weight_unit AS weight_unit " +
+            "d.weight_unit AS weight_unit, d.set_type AS set_type " +
             "FROM workout_session_details d " +
             "JOIN workout_sessions s ON s.id = d.workout_session_id " +
             "JOIN exercises e ON e.id = d.exercise_id " +
@@ -497,7 +500,7 @@ interface WorkoutSessionDetailDao {
             "e.name AS exercise_name, e.body_part AS body_part, " +
             "d.actual_weight AS actual_weight, d.actual_reps AS actual_reps, " +
             "d.actual_duration AS actual_duration, d.actual_distance AS actual_distance, " +
-            "d.weight_unit AS weight_unit " +
+            "d.weight_unit AS weight_unit, d.set_type AS set_type " +
             "FROM workout_session_details d " +
             "JOIN workout_sessions s ON s.id = d.workout_session_id " +
             "JOIN exercises e ON e.id = d.exercise_id " +
@@ -517,7 +520,7 @@ interface WorkoutSessionDetailDao {
             "e.name AS exercise_name, e.body_part AS body_part, " +
             "d.actual_weight AS actual_weight, d.actual_reps AS actual_reps, " +
             "d.actual_duration AS actual_duration, d.actual_distance AS actual_distance, " +
-            "d.weight_unit AS weight_unit " +
+            "d.weight_unit AS weight_unit, d.set_type AS set_type " +
             "FROM workout_session_details d " +
             "JOIN workout_sessions s ON s.id = d.workout_session_id " +
             "JOIN exercises e ON e.id = d.exercise_id " +
@@ -537,7 +540,7 @@ interface WorkoutSessionDetailDao {
             "FROM workout_session_details d " +
             "JOIN workout_sessions s ON s.id = d.workout_session_id " +
             "WHERE s.profile_id = :profileId AND s.completed_at IS NOT NULL " +
-            "AND d.completed != 0 AND d.set_type != 'warmup' " +
+            "AND d.completed != 0 AND d.set_type = 'normal' " +
             "GROUP BY d.exercise_id",
     )
     fun observeCompletedSetCountsByExercise(profileId: Long): Flow<List<ExerciseSetCountRow>>
@@ -547,7 +550,7 @@ interface WorkoutSessionDetailDao {
             "FROM workout_session_details d " +
             "JOIN workout_sessions s ON s.id = d.workout_session_id " +
             "WHERE s.profile_id = :profileId AND s.completed_at IS NOT NULL " +
-            "AND d.completed != 0 AND d.set_type != 'warmup' " +
+            "AND d.completed != 0 AND d.set_type = 'normal' " +
             "GROUP BY d.exercise_id",
     )
     suspend fun getCompletedSetCountsByExercise(profileId: Long): List<ExerciseSetCountRow>
@@ -573,7 +576,7 @@ interface WorkoutSessionDetailDao {
     @Query(
         "SELECT d.actual_weight AS actual_weight, d.actual_reps AS actual_reps, " +
             "d.actual_duration AS actual_duration, d.actual_distance AS actual_distance, " +
-            "d.weight_unit AS weight_unit " +
+            "d.weight_unit AS weight_unit, d.set_type AS set_type " +
             "FROM workout_session_details d " +
             "JOIN workout_sessions s ON s.id = d.workout_session_id " +
             "WHERE d.exercise_id = :exerciseId AND d.completed != 0 AND d.set_type != 'warmup' " +
@@ -595,7 +598,7 @@ interface WorkoutSessionDetailDao {
             "WHERE s.profile_id = :profileId AND s.completed_at IS NOT NULL " +
             "AND s.id != :excludeSessionId " +
             "AND d.exercise_id IN (:exerciseIds) " +
-            "AND d.completed != 0 AND d.set_type != 'warmup' " +
+            "AND d.completed != 0 AND d.set_type = 'normal' " +
             "AND d.actual_weight IS NOT NULL AND d.actual_weight > 0 " +
             "AND d.actual_reps IS NOT NULL AND d.actual_reps > 0",
     )

@@ -1,6 +1,8 @@
 package dev.balaji.moonrose.trainfree
 
 import dev.balaji.moonrose.trainfree.model.Profile
+import dev.balaji.moonrose.trainfree.notifications.shouldPromptExactAlarmOnRestTimerStart
+import dev.balaji.moonrose.trainfree.notifications.shouldShowProfileExactAlarmRow
 import dev.balaji.moonrose.trainfree.screens.formatCountdown
 import dev.balaji.moonrose.trainfree.screens.formatMonthDay
 import dev.balaji.moonrose.trainfree.screens.formatMonthYear
@@ -11,6 +13,7 @@ import dev.balaji.moonrose.trainfree.screens.verticalLineCanvasX
 import dev.balaji.moonrose.trainfree.screens.yAxisBounds
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
@@ -139,5 +142,57 @@ class SharedUICommonTest {
         assertNull(initialBmiInputs(complete.copy(height = -1.0)))
         assertNull(initialBmiInputs(complete.copy(height = Double.NaN)))
         assertNull(initialBmiInputs(complete.copy(height = Double.POSITIVE_INFINITY)))
+    }
+
+    @Test
+    fun shouldShowProfileExactAlarmRowRequiresNotificationsOnAndSettingSupported() {
+        assertTrue(shouldShowProfileExactAlarmRow(notificationsEnabled = true, exactAlarmSettingSupported = true))
+        assertFalse(shouldShowProfileExactAlarmRow(notificationsEnabled = false, exactAlarmSettingSupported = true))
+        assertFalse(shouldShowProfileExactAlarmRow(notificationsEnabled = true, exactAlarmSettingSupported = false))
+        assertFalse(shouldShowProfileExactAlarmRow(notificationsEnabled = false, exactAlarmSettingSupported = false))
+    }
+
+    @Test
+    fun shouldPromptExactAlarmOnRestTimerStartRequiresAllConditions() {
+        assertTrue(
+            shouldPromptExactAlarmOnRestTimerStart(
+                hasActiveRestTimer = true,
+                notificationsEnabled = true,
+                canScheduleExactAlarms = false,
+                exactAlarmPrompted = false,
+            ),
+        )
+        assertFalse(
+            shouldPromptExactAlarmOnRestTimerStart(
+                hasActiveRestTimer = false,
+                notificationsEnabled = true,
+                canScheduleExactAlarms = false,
+                exactAlarmPrompted = false,
+            ),
+        )
+        assertFalse(
+            shouldPromptExactAlarmOnRestTimerStart(
+                hasActiveRestTimer = true,
+                notificationsEnabled = false,
+                canScheduleExactAlarms = false,
+                exactAlarmPrompted = false,
+            ),
+        )
+        assertFalse(
+            shouldPromptExactAlarmOnRestTimerStart(
+                hasActiveRestTimer = true,
+                notificationsEnabled = true,
+                canScheduleExactAlarms = true,
+                exactAlarmPrompted = false,
+            ),
+        )
+        assertFalse(
+            shouldPromptExactAlarmOnRestTimerStart(
+                hasActiveRestTimer = true,
+                notificationsEnabled = true,
+                canScheduleExactAlarms = false,
+                exactAlarmPrompted = true,
+            ),
+        )
     }
 }

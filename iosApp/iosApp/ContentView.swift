@@ -267,7 +267,7 @@ private struct FloatingWorkoutMenuClearance: ViewModifier {
 
     func body(content: Content) -> some View {
         if hasFloatingWorkoutMenu {
-            content.contentMargins(.bottom, 80, for: .scrollContent)
+            content.contentMargins(.bottom, 92, for: .scrollContent)
         } else {
             content
         }
@@ -360,12 +360,12 @@ private struct FloatingWorkoutMenuOverlay: View {
                                 isExpanded.toggle()
                             }
                         } label: {
-                            Image(systemName: isExpanded ? "xmark" : "list.clipboard")
+                            Image(systemName: isExpanded ? "xmark" : "dumbbell.fill")
                                 .font(.title2.weight(.semibold))
-                                .scaleEffect(1.1)
+                                .scaleEffect(1.32)
                                 .foregroundStyle(.white)
                                 .contentTransition(.symbolEffect(.replace))
-                                .frame(width: 61.6, height: 61.6)
+                                .frame(width: 73.92, height: 73.92)
                                 .glassEffect(.regular.tint(.blue).interactive(), in: .circle)
                                 .shadow(color: .black.opacity(0.18), radius: 8, y: 4)
                         }

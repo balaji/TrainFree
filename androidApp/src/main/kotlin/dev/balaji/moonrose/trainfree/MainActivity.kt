@@ -1,7 +1,9 @@
 package dev.balaji.moonrose.trainfree
 
+import android.Manifest
 import android.app.LocaleManager
 import android.content.pm.ApplicationInfo
+import android.content.pm.PackageManager
 import android.content.res.Resources
 import android.os.Build
 import android.os.Bundle
@@ -9,15 +11,29 @@ import android.os.LocaleList
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.lifecycle.lifecycleScope
 import dev.balaji.moonrose.trainfree.db.DbContextHolder
 import dev.balaji.moonrose.trainfree.db.DevSeed
 import dev.balaji.moonrose.trainfree.db.HealthSyncManager
+import dev.balaji.moonrose.trainfree.db.UserSettingsRepository
 import dev.balaji.moonrose.trainfree.health.AndroidHealthSyncProvider
+import kotlinx.coroutines.launch
 import java.util.Locale
 
+private const val PREFS_NAME = "trainfree_prefs"
+private const val KEY_NOTIFICATION_PERMISSION_PROMPTED = "notification_permission_prompted"
+
 class MainActivity : ComponentActivity() {
+    private val initialNotificationPermissionLauncher =
+        registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+            lifecycleScope.launch {
+                UserSettingsRepository.setNotificationsEnabled(granted)
+            }
+        }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         sanitizeDefaultLocale()
         enableEdgeToEdge()
@@ -29,6 +45,19 @@ class MainActivity : ComponentActivity() {
         setContent {
             App(showDeveloperTools = BuildConfig.ENABLE_TEST_DATA)
         }
+        requestInitialNotificationPermissionIfNeeded()
+    }
+
+    private fun requestInitialNotificationPermissionIfNeeded() {
+        val prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
+        if (prefs.getBoolean(KEY_NOTIFICATION_PERMISSION_PROMPTED, false)) return
+        prefs.edit().putBoolean(KEY_NOTIFICATION_PERMISSION_PROMPTED, true).apply()
+
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return
+        if (checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED) {
+            return
+        }
+        initialNotificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
     }
 
     // Compose Multiplatform's PluralRuleList.getInstance returns an empty rule

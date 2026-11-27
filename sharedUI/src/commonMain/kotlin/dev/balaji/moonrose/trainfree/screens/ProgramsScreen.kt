@@ -87,7 +87,7 @@ fun ProgramsScreen(onNavigate: (Route) -> Unit, onGoBack: () -> Unit = {}) {
     var expandedProgramId by remember { mutableStateOf(lastExpandedProgramId) }
     var expandedSampleId by remember { mutableStateOf<String?>(null) }
     var myProgramsExpanded by remember { mutableStateOf(true) }
-    var sampleProgramsExpanded by remember { mutableStateOf(true) }
+    var sampleProgramsExpanded by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
     val couldNotSaveMessage = stringResource(Res.string.could_not_save)
 

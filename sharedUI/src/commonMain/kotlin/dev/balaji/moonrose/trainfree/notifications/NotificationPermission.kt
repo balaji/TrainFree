@@ -37,8 +37,26 @@ expect fun rememberNotificationSettingsOpener(): () -> Unit
 expect fun rememberCanScheduleExactAlarms(): Boolean
 
 /**
+ * Returns whether the OS exposes a system settings toggle for exact alarms
+ * (Android 12+, API 31+).
+ */
+expect fun isExactAlarmSettingSupported(): Boolean
+
+/**
  * Returns a callback that opens the OS "Alarms & reminders" permission screen
  * for this app on Android 12+ (falling back to app details if unavailable).
  */
 @Composable
 expect fun rememberExactAlarmSettingsOpener(): () -> Unit
+
+internal fun shouldShowProfileExactAlarmRow(
+    notificationsEnabled: Boolean,
+    exactAlarmSettingSupported: Boolean,
+): Boolean = notificationsEnabled && exactAlarmSettingSupported
+
+internal fun shouldPromptExactAlarmOnRestTimerStart(
+    hasActiveRestTimer: Boolean,
+    notificationsEnabled: Boolean,
+    canScheduleExactAlarms: Boolean,
+    exactAlarmPrompted: Boolean,
+): Boolean = hasActiveRestTimer && notificationsEnabled && !canScheduleExactAlarms && !exactAlarmPrompted

@@ -51,5 +51,7 @@ actual fun rememberNotificationSettingsOpener(): () -> Unit = {
 @Composable
 actual fun rememberCanScheduleExactAlarms(): Boolean = true
 
+actual fun isExactAlarmSettingSupported(): Boolean = false
+
 @Composable
 actual fun rememberExactAlarmSettingsOpener(): () -> Unit = {}

@@ -15,6 +15,7 @@ import dev.balaji.moonrose.trainfree.insights.SparkSeries
 import dev.balaji.moonrose.trainfree.insights.TrainingFrequency
 import dev.balaji.moonrose.trainfree.insights.WeeklyVolumePoint
 import dev.balaji.moonrose.trainfree.model.ProgressionCardConfig
+import dev.balaji.moonrose.trainfree.model.SetType
 import dev.balaji.moonrose.trainfree.model.WeightUnit
 import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
@@ -41,6 +42,7 @@ internal data class SetPoint(
     val duration: Int,
     val distance: Double,
     val weightUnit: WeightUnit = WeightUnit.METRIC,
+    val setType: SetType = SetType.NORMAL,
 )
 
 internal fun SetPoint.convertedTo(targetUnit: WeightUnit): SetPoint =
@@ -153,10 +155,10 @@ object InsightsRepository {
         return bodyPartBreakdownFrom(completedSetsSince(startMillis))
     }
 
-    /** Exercises that have at least one completed working set, most trained first. */
+    /** Exercises that have at least one completed normal working set, most trained first. */
     suspend fun trainedExerciseNames(limit: Int = 10): List<String> =
         completedSetsSince(0)
-            .filter { it.weight > 0 && it.reps > 0 }
+            .filter { it.setType == SetType.NORMAL && it.weight > 0 && it.reps > 0 }
             .groupBy { it.exerciseName }
             .entries
             .sortedByDescending { it.value.size }
@@ -241,6 +243,7 @@ internal fun CompletedSetRow.toSetPoint(zone: TimeZone): SetPoint =
         duration = actualDuration ?: 0,
         distance = actualDistance ?: 0.0,
         weightUnit = weightUnit,
+        setType = setType,
     )
 
 @OptIn(ExperimentalTime::class)
@@ -276,7 +279,7 @@ internal fun weeklyVolumeFrom(
         WeeklyVolumePoint(
             weekStartEpochDay = windowStart,
             totalVolume = windowSets.sumOf { it.weight * it.reps },
-            setCount = windowSets.size,
+            setCount = windowSets.count { it.setType == SetType.NORMAL },
             sessionCount = windowSets.distinctBy { it.sessionKey }.size,
         )
     }
@@ -284,6 +287,7 @@ internal fun weeklyVolumeFrom(
 
 internal fun bodyPartBreakdownFrom(sets: List<SetPoint>): List<BodyPartSlice> =
     sets
+        .filter { it.setType == SetType.NORMAL }
         .mapNotNull { it.bodyPart }
         .groupingBy { it }
         .eachCount()
@@ -297,7 +301,7 @@ internal fun personalRecordsFrom(
     formula: OneRmFormula,
 ): List<ExercisePr> =
     sets
-        .filter { it.weight > 0 && it.reps > 0 }
+        .filter { it.setType == SetType.NORMAL && it.weight > 0 && it.reps > 0 }
         .filter { exerciseName == null || it.exerciseName.equals(exerciseName, ignoreCase = true) }
         .groupBy { it.exerciseId }
         .map { (_, exerciseSets) ->
@@ -322,7 +326,10 @@ internal fun progressionFrom(
     formula: OneRmFormula,
 ): ExerciseProgression? {
     val relevant = sets.filter {
-        it.exerciseName.equals(exerciseName, ignoreCase = true) && it.weight > 0 && it.reps > 0
+        it.setType == SetType.NORMAL &&
+            it.exerciseName.equals(exerciseName, ignoreCase = true) &&
+            it.weight > 0 &&
+            it.reps > 0
     }
     if (relevant.isEmpty()) return null
     val weeklyBest = relevant
@@ -349,7 +356,7 @@ internal fun singleExerciseWeeklyOneRm(
     formula: OneRmFormula,
 ): List<SparkPoint> {
     val firstWeekStart = WeekMath.weekStartOnOrBefore(todayEpochDay, weekStart) - 7L * (weeks - 1)
-    val eligible = sets.filter { it.weight > 0 && it.reps > 0 }
+    val eligible = sets.filter { it.setType == SetType.NORMAL && it.weight > 0 && it.reps > 0 }
     val byWeek = eligible.groupBy { WeekMath.weekStartOnOrBefore(it.epochDay, weekStart) }
     return (0 until weeks).map { i ->
         val ws = firstWeekStart + 7L * i
@@ -477,7 +484,7 @@ internal fun eligibleProgressionExercises(
     weekStart: WeekStart,
 ): List<String> =
     sets
-        .filter { it.weight > 0 && it.reps > 0 && it.epochDay >= todayEpochDay - 7L * 12 }
+        .filter { it.setType == SetType.NORMAL && it.weight > 0 && it.reps > 0 && it.epochDay >= todayEpochDay - 7L * 12 }
         .groupBy { it.exerciseName }
         .filterValues { exerciseSets ->
             exerciseSets.distinctBy { WeekMath.weekStartOnOrBefore(it.epochDay, weekStart) }.size >= 2
@@ -597,7 +604,7 @@ private fun progressionCard(
     formula: OneRmFormula,
 ): InsightCard? {
     val window = todayEpochDay - 7L * 12
-    val recent = sets.filter { it.weight > 0 && it.reps > 0 && it.epochDay >= window }
+    val recent = sets.filter { it.setType == SetType.NORMAL && it.weight > 0 && it.reps > 0 && it.epochDay >= window }
     val progressions = config.exercises
         .mapNotNull { progressionFrom(recent, it, todayEpochDay, weekStart, formula) }
         .filter { it.weeklyBest1Rm.size >= 2 }

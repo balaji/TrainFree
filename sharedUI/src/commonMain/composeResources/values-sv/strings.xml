@@ -175,6 +175,9 @@
     <string name="notifications_denied_title">Aviseringar är avstängda</string>
     <string name="notifications_denied_message">Train Free har inte tillåtelse att skicka aviseringar. Tillåt aviseringar för Train Free i systeminställningarna för att slå på detta.</string>
     <string name="open_settings">Öppna inställningar</string>
+    <string name="enable_background_timer_alerts">Aktivera bakgrundsaviseringar för timer</string>
+    <string name="exact_alarm_prompt_title">Bakgrundsaviseringar för timer</string>
+    <string name="not_now">Inte nu</string>
     <string name="exact_alarm_hint_message">Tillåt Larm och påminnelser i systeminställningarna för exakta vilotimeraviseringar i bakgrunden.</string>
     <string name="week_starts_on">Veckan börjar på</string>
     <string name="appearance">Utseende</string>

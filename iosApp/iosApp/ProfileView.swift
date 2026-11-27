@@ -49,10 +49,9 @@ struct ProfileView: View {
                             LabeledContent(L10n.height, value: profile.height.map { heightValueText($0.doubleValue) } ?? "—")
                         }
                         if let settings {
-                            // Standalone calculators that don't belong to a
-                            // saved setting — 1RM and BMI today, with room
-                            // for more later. Sits above Settings so the
-                            // profile's own numbers flow into the tools.
+                            // Standalone calculators (1RM, BMI) and general
+                            // workout/app preferences (week start, appearance,
+                            // weight units, rest timer) sitting above Settings.
                             Section(L10n.tools) {
                                 toolRow(L10n.oneRmCalculator, value: formulaName(settings.oneRmFormula)) {
                                     showOneRmCalculator = true
@@ -60,13 +59,6 @@ struct ProfileView: View {
                                 toolRow(L10n.bmiCalculator, value: bmiFormulaName(settings.bmiFormula)) {
                                     showBmiCalculator = true
                                 }
-                            }
-                            // Always-editable app settings backed by
-                            // user_settings; each change saves immediately, no
-                            // Edit mode. Display labels live only here — the DB
-                            // stores language-neutral keys, so they can be
-                            // regionalized later.
-                            Section(L10n.settings) {
                                 segmentedSettingRow(
                                     L10n.weekStartsOn,
                                     current: settings.weekStart,
@@ -126,6 +118,13 @@ struct ProfileView: View {
                                         Text(L10n.restTimerSoundLabel(sound)).tag(sound)
                                     }
                                 }
+                            }
+                            // Always-editable app settings backed by
+                            // user_settings; each change saves immediately, no
+                            // Edit mode. Display labels live only here — the DB
+                            // stores language-neutral keys, so they can be
+                            // regionalized later.
+                            Section(L10n.settings) {
                                 // Opting in first asks the OS for notification
                                 // permission and only persists as on when the
                                 // grant succeeds; the repository echo snaps the
@@ -148,6 +147,14 @@ struct ProfileView: View {
                                     }
                                     try await UserSettingsRepository.shared.setNotificationsEnabled(enabled: granted)
                                 }))
+                                Button(backupController.uiState.working && backupController.uiState.pendingImport == nil ? L10n.exporting : L10n.exportBackup) {
+                                    backupController.startExport()
+                                }
+                                .disabled(backupController.uiState.working)
+                                Button(L10n.importBackup) {
+                                    backupController.startImport()
+                                }
+                                .disabled(backupController.uiState.working)
                             }
                         }
                         if HKHealthStore.isHealthDataAvailable(), let settings {
@@ -193,16 +200,6 @@ struct ProfileView: View {
                                     }
                                 }
                             }
-                        }
-                        Section(L10n.backupSection) {
-                            Button(backupController.uiState.working && backupController.uiState.pendingImport == nil ? L10n.exporting : L10n.exportBackup) {
-                                backupController.startExport()
-                            }
-                            .disabled(backupController.uiState.working)
-                            Button(L10n.importBackup) {
-                                backupController.startImport()
-                            }
-                            .disabled(backupController.uiState.working)
                         }
                         #if DEBUG || ENABLE_TEST_DATA
                         // Test-data tooling for development, gated behind

@@ -37,8 +37,8 @@ data class DraftWorkSet(
     /** Which measured fields this exercise's sets take; unrecognized types fall back to strength (reps). */
     val type: ExerciseType get() = ExerciseType.fromValue(exercise.exerciseType) ?: ExerciseType.STRENGTH
 
-    /** Count of non-warmup sets, used by read-only routine summaries ("3 x Bench Press"). */
-    val workingSetCount: Int get() = sets.count { it.setType != SetType.WARMUP }
+    /** Count of normal working sets (excluding warm-up and drop sets), used by read-only routine summaries ("3 x Bench Press"). */
+    val workingSetCount: Int get() = sets.count { it.setType == SetType.NORMAL }
 }
 
 data class RoutineDetailUiState(
@@ -46,7 +46,49 @@ data class RoutineDetailUiState(
     val name: String = "",
     val workSets: List<DraftWorkSet> = emptyList(),
     val saving: Boolean = false,
-)
+) {
+    internal fun setSetTypeAt(
+        workSetIndex: Int,
+        setIndex: Int,
+        setType: SetType,
+        displayUnit: WeightUnit = WeightUnit.METRIC,
+    ): RoutineDetailUiState {
+        val ws = workSets.getOrNull(workSetIndex) ?: return this
+        val set = ws.sets.getOrNull(setIndex) ?: return this
+        if (set.setType == setType) return this
+
+        var nextSet = set.copy(setType = setType)
+        if (setType == SetType.DROP && set.weight.isBlank() && set.rawWeight == null) {
+            val prev = ws.sets.getOrNull(setIndex - 1)?.takeIf { it.setType != SetType.WARMUP }
+            val prevWeight = prev?.let { p ->
+                (p.rawWeight ?: p.weight.toDoubleOrNull())?.let { p.recordedUnit.convertWeight(it, displayUnit) }
+            }
+            val suggested = prevWeight?.let { suggestDropSetWeight(it, displayUnit) }
+            if (suggested != null) {
+                val convertedDistance = if (nextSet.recordedUnit != displayUnit) {
+                    nextSet.rawDistance?.let { nextSet.recordedUnit.convertDistance(it, displayUnit) }
+                } else {
+                    nextSet.rawDistance
+                }
+                nextSet = nextSet.copy(
+                    weight = WeightUnit.formatWeight(suggested, displayUnit, displayUnit),
+                    rawWeight = suggested,
+                    rawDistance = convertedDistance,
+                    recordedUnit = displayUnit,
+                )
+            }
+        }
+        return copy(
+            workSets = workSets.mapIndexed { i, item ->
+                if (i == workSetIndex) {
+                    item.copy(sets = item.sets.mapIndexed { sIdx, s -> if (sIdx == setIndex) nextSet else s })
+                } else {
+                    item
+                }
+            },
+        )
+    }
+}
 
 class RoutineFormState(private val routineId: Long, initialName: String) {
     private val _uiState = MutableStateFlow(RoutineDetailUiState(name = initialName))
@@ -185,9 +227,7 @@ class RoutineFormState(private val routineId: Long, initialName: String) {
     }
 
     fun setSetType(workSetIndex: Int, setIndex: Int, setType: SetType) {
-        updateWorkSet(workSetIndex) { ws ->
-            ws.copy(sets = ws.sets.mapIndexed { i, s -> if (i == setIndex) s.copy(setType = setType) else s })
-        }
+        _uiState.value = _uiState.value.setSetTypeAt(workSetIndex, setIndex, setType, currentWeightUnit)
     }
 
     fun moveExercise(from: Int, to: Int) {

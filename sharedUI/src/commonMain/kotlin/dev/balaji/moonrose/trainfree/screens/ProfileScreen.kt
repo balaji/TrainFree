@@ -99,11 +99,13 @@ import dev.balaji.moonrose.trainfree.navigation.LocalBottomFabPadding
 import dev.balaji.moonrose.trainfree.navigation.LocalUseNativeNavigation
 import dev.balaji.moonrose.trainfree.navigation.PlatformBackHandler
 import dev.balaji.moonrose.trainfree.notifications.NotificationPermissionResult
+import dev.balaji.moonrose.trainfree.notifications.isExactAlarmSettingSupported
 import dev.balaji.moonrose.trainfree.notifications.rememberCanScheduleExactAlarms
 import dev.balaji.moonrose.trainfree.notifications.rememberExactAlarmSettingsOpener
 import dev.balaji.moonrose.trainfree.notifications.rememberNotificationPermissionRequester
 import dev.balaji.moonrose.trainfree.notifications.rememberNotificationSettingsOpener
 import dev.balaji.moonrose.trainfree.notifications.rememberRestTimerNotifier
+import dev.balaji.moonrose.trainfree.notifications.shouldShowProfileExactAlarmRow
 import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.stringResource
 import dev.balaji.moonrose.trainfree.sharedui.resources.*
@@ -199,7 +201,6 @@ private fun ProfileDetails(profile: Profile, onEdit: () -> Unit) {
         ToolsSection(profile = profile)
         SettingsSection()
         HealthSyncSection()
-        BackupSection()
         if (LocalShowDeveloperTools.current) {
             DeveloperSection()
         }
@@ -216,7 +217,6 @@ private fun ProfileDetails(profile: Profile, onEdit: () -> Unit) {
 private fun SettingsSection() {
     val settings by UserSettingsRepository.settings.collectAsState(initial = null)
     val scope = rememberCoroutineScope()
-    val restNotifier = rememberRestTimerNotifier()
     var showNotificationsDeniedHint by remember { mutableStateOf(false) }
     val requestNotificationPermission = rememberNotificationPermissionRequester { result ->
         if (result == NotificationPermissionResult.DeniedPermanently) showNotificationsDeniedHint = true
@@ -234,27 +234,6 @@ private fun SettingsSection() {
         color = MaterialTheme.colorScheme.primary,
         modifier = Modifier.padding(top = 24.dp, bottom = 4.dp),
     )
-    SettingRow(stringResource(Res.string.week_starts_on), WeekStart.entries, current.weekStart, { weekStartLabel(it) }) {
-        scope.launch { UserSettingsRepository.setWeekStart(it) }
-    }
-    HorizontalDivider()
-    AppearanceSettingRow(current.appearance) {
-        scope.launch { UserSettingsRepository.setAppearance(it) }
-    }
-    HorizontalDivider()
-    SettingRow(stringResource(Res.string.weight_units), WeightUnit.entries, current.weightUnit, { weightUnitSettingLabel(it) }) {
-        scope.launch { UserSettingsRepository.setWeightUnit(it) }
-    }
-    HorizontalDivider()
-    RestTimerDurationRow(current.restTimerDurationSeconds) { seconds ->
-        scope.launch { UserSettingsRepository.setRestTimerDurationSeconds(seconds) }
-    }
-    HorizontalDivider()
-    RestTimerSoundRow(current.restTimerSound) { sound ->
-        restNotifier.previewSound(sound)
-        scope.launch { UserSettingsRepository.setRestTimerSound(sound) }
-    }
-    HorizontalDivider()
     SettingSwitchRow(stringResource(Res.string.send_notifications), current.notificationsEnabled) { enabled ->
         // Opting in persists only once the OS grants permission — the switch
         // renders the stored value, so a denied prompt leaves it off.
@@ -264,8 +243,11 @@ private fun SettingsSection() {
             scope.launch { UserSettingsRepository.setNotificationsEnabled(false) }
         }
     }
-    if (!canScheduleExactAlarms) {
-        ExactAlarmHintRow(onOpenSettings = openExactAlarmSettings)
+    if (shouldShowProfileExactAlarmRow(current.notificationsEnabled, isExactAlarmSettingSupported())) {
+        ExactAlarmHintRow(
+            canScheduleExactAlarms = canScheduleExactAlarms,
+            onOpenSettings = openExactAlarmSettings,
+        )
     }
     HorizontalDivider()
     AppFontRow(current.appFont) { font ->
@@ -275,6 +257,8 @@ private fun SettingsSection() {
     AppFontSizeRow(current.appFontSize) { size ->
         scope.launch { UserSettingsRepository.setAppFontSize(size) }
     }
+    HorizontalDivider()
+    BackupControls()
     if (showNotificationsDeniedHint) {
         val openNotificationSettings = rememberNotificationSettingsOpener()
         AlertDialog(
@@ -442,12 +426,14 @@ private fun HealthSyncSection() {
 }
 
 /**
- * Standalone calculators that don't belong to a saved setting — 1RM and BMI
- * today, with room for more (e.g. macro or plate-math calculators) later.
+ * Standalone calculators (1RM, BMI) and general workout/app preferences
+ * (week start, appearance, weight units, rest timer) that sit above Settings.
  */
 @Composable
 private fun ToolsSection(profile: Profile) {
     val settings by UserSettingsRepository.settings.collectAsState(initial = null)
+    val scope = rememberCoroutineScope()
+    val restNotifier = rememberRestTimerNotifier()
     var showOneRmCalculator by remember { mutableStateOf(false) }
     var showBmiCalculator by remember { mutableStateOf(false) }
     val currentSettings = settings ?: return
@@ -469,6 +455,27 @@ private fun ToolsSection(profile: Profile) {
         value = bmiFormulaLabel(currentSettings.bmiFormula),
         onClick = { showBmiCalculator = true },
     )
+    HorizontalDivider()
+    SettingRow(stringResource(Res.string.week_starts_on), WeekStart.entries, currentSettings.weekStart, { weekStartLabel(it) }) {
+        scope.launch { UserSettingsRepository.setWeekStart(it) }
+    }
+    HorizontalDivider()
+    AppearanceSettingRow(currentSettings.appearance) {
+        scope.launch { UserSettingsRepository.setAppearance(it) }
+    }
+    HorizontalDivider()
+    SettingRow(stringResource(Res.string.weight_units), WeightUnit.entries, currentSettings.weightUnit, { weightUnitSettingLabel(it) }) {
+        scope.launch { UserSettingsRepository.setWeightUnit(it) }
+    }
+    HorizontalDivider()
+    RestTimerDurationRow(currentSettings.restTimerDurationSeconds) { seconds ->
+        scope.launch { UserSettingsRepository.setRestTimerDurationSeconds(seconds) }
+    }
+    HorizontalDivider()
+    RestTimerSoundRow(currentSettings.restTimerSound) { sound ->
+        restNotifier.previewSound(sound)
+        scope.launch { UserSettingsRepository.setRestTimerSound(sound) }
+    }
     if (showOneRmCalculator) {
         OneRmCalculatorSheet(settings = currentSettings, onDismiss = { showOneRmCalculator = false })
     }
@@ -504,7 +511,7 @@ private fun ToolRow(
 }
 
 @Composable
-private fun BackupSection() {
+private fun BackupControls() {
     val backupState = remember { BackupTransferState() }
     val state by backupState.uiState.collectAsState()
     val launchExport = rememberBackupExporter(onCompleted = backupState::onExportCompleted)
@@ -513,12 +520,6 @@ private fun BackupSection() {
         onReadError = backupState::onFileReadError,
     )
 
-    Text(
-        stringResource(Res.string.backup_section),
-        style = MaterialTheme.typography.titleMedium,
-        color = MaterialTheme.colorScheme.primary,
-        modifier = Modifier.padding(top = 24.dp, bottom = 4.dp),
-    )
     Row(
         modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
         horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -542,7 +543,6 @@ private fun BackupSection() {
             Text(stringResource(Res.string.import_backup))
         }
     }
-    HorizontalDivider()
 
     BackupDialogs(state = state, backupState = backupState)
 }
@@ -779,18 +779,31 @@ private fun SettingSwitchRow(
 }
 
 @Composable
-private fun ExactAlarmHintRow(onOpenSettings: () -> Unit) {
+private fun ExactAlarmHintRow(
+    canScheduleExactAlarms: Boolean,
+    onOpenSettings: () -> Unit,
+) {
     Column(
         modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        Text(
-            text = stringResource(Res.string.exact_alarm_hint_message),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
+        if (!canScheduleExactAlarms) {
+            Text(
+                text = stringResource(Res.string.exact_alarm_hint_message),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
         OutlinedButton(onClick = onOpenSettings) {
-            Text(stringResource(Res.string.open_settings))
+            Text(
+                stringResource(
+                    if (canScheduleExactAlarms) {
+                        Res.string.exact_alarm_prompt_title
+                    } else {
+                        Res.string.enable_background_timer_alerts
+                    },
+                ),
+            )
         }
     }
 }

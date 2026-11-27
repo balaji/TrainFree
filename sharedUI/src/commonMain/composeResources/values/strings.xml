@@ -177,6 +177,9 @@
     <string name="notifications_denied_title">Notifications are off</string>
     <string name="notifications_denied_message">Train Free is not allowed to send notifications. Allow notifications for Train Free in system settings to turn this on.</string>
     <string name="open_settings">Open settings</string>
+    <string name="enable_background_timer_alerts">Enable background timer alerts</string>
+    <string name="exact_alarm_prompt_title">Background timer alerts</string>
+    <string name="not_now">Not now</string>
     <string name="exact_alarm_hint_message">Allow Alarms &amp; reminders in system settings for exact rest timer alerts in the background.</string>
     <string name="health_sync_section">Health Connect</string>
     <string name="health_sync_workouts">Sync completed workouts</string>

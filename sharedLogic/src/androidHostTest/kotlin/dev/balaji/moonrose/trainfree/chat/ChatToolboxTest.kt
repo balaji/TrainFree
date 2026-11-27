@@ -195,6 +195,7 @@ class ChatToolboxTest {
                 WorkSetDetailEntity(1L, 100L, 1, 40.0, 10, null, null, SetType.WARMUP, WeightUnit.METRIC, 0L, 0L),
                 WorkSetDetailEntity(2L, 100L, 2, 80.0, 8, null, null, SetType.NORMAL, WeightUnit.METRIC, 0L, 0L),
                 WorkSetDetailEntity(3L, 100L, 3, 80.0, 8, null, null, SetType.NORMAL, WeightUnit.METRIC, 0L, 0L),
+                WorkSetDetailEntity(4L, 100L, 4, 60.0, 10, null, null, SetType.DROP, WeightUnit.METRIC, 0L, 0L),
             ),
         )
         val lastPerformed = listOf(RoutineLastPerformedRow(10L, lastMillis))
@@ -209,7 +210,7 @@ class ChatToolboxTest {
             unit = WeightUnit.METRIC,
             zone = zone,
         )
-        assertTrue(out.summary.contains("Push (last done Nov 8, 2026): Barbell Bench Press 2 sets (target 80 kg x 8r)"))
+        assertTrue(out.summary.contains("Push (last done Nov 8, 2026): Barbell Bench Press 2 sets + 1 drop (target 80 kg x 8r)"))
         assertTrue(out.summary.contains("Pull (never performed): no exercises"))
 
         val imperialOut = ChatToolbox.programsAndRoutinesFrom(

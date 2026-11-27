@@ -443,10 +443,8 @@ private object AndroidRestTimerCoordinator {
                     .setPriority(android.app.Notification.PRIORITY_LOW)
             }
 
-            val iconRes = context.applicationInfo.icon.takeIf { it != 0 }
-                ?: android.R.drawable.ic_lock_idle_alarm
             builder
-                .setSmallIcon(iconRes)
+                .setSmallIcon(R.drawable.ic_stat_trainfree)
                 .setContentTitle(channelName)
                 .setWhen(endsAtMillis)
                 .setShowWhen(true)
@@ -515,10 +513,8 @@ private object AndroidRestTimerCoordinator {
                     .apply { if (soundUri != null) setSound(soundUri) }
             }
 
-            val iconRes = context.applicationInfo.icon.takeIf { it != 0 }
-                ?: android.R.drawable.ic_lock_idle_alarm
             builder
-                .setSmallIcon(iconRes)
+                .setSmallIcon(R.drawable.ic_stat_trainfree)
                 .setContentTitle(title)
                 .setContentText(message)
                 .setAutoCancel(true)

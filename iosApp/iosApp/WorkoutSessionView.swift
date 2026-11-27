@@ -749,11 +749,7 @@ private struct SessionSetRow: View {
             }
         }
         .scaleEffect(pop ? 1.04 : 1)
-        .listRowBackground(
-            (isLiveSession && set.completed)
-                ? (set.setType == .warmup ? Color.purple.opacity(0.15) : Color.green.opacity(0.15))
-                : nil
-        )
+        .listRowBackground(completedRowBackground)
         .onChange(of: focusedColumn) { _, newValue in
             if newValue != nil {
                 onFieldFocused()
@@ -766,6 +762,15 @@ private struct SessionSetRow: View {
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.12) {
                 withAnimation(.easeOut(duration: 0.18)) { pop = false }
             }
+        }
+    }
+
+    private var completedRowBackground: Color? {
+        guard isLiveSession && set.completed else { return nil }
+        switch set.setType {
+        case .warmup: return Color.purple.opacity(0.15)
+        case .drop: return Color.red.opacity(0.15)
+        default: return Color.green.opacity(0.15)
         }
     }
 

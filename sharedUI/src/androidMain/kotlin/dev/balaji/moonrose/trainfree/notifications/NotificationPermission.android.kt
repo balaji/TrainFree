@@ -86,6 +86,8 @@ actual fun rememberCanScheduleExactAlarms(): Boolean {
     return canSchedule
 }
 
+actual fun isExactAlarmSettingSupported(): Boolean = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
+
 @Composable
 actual fun rememberExactAlarmSettingsOpener(): () -> Unit {
     val context = LocalContext.current

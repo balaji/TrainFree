@@ -189,6 +189,11 @@ data class UserSettings(
      * push notification is sent when the between-set rest timer finishes.
      */
     val notificationsEnabled: Boolean = false,
+    /**
+     * Whether the one-time prompt to allow Android exact alarms has already
+     * been shown when starting a rest timer with notifications enabled.
+     */
+    val exactAlarmPrompted: Boolean = false,
     /** Whether live completed workouts are written to Apple Health / Health Connect. */
     val healthSyncWorkouts: Boolean = false,
     /** Whether body weight is synced two-way with Apple Health / Health Connect. */

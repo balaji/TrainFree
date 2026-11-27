@@ -40,7 +40,7 @@ data class SampleWorkSet(
      */
     val repsSummary: String
         get() {
-            val workingSets = sets.filter { it.setType != SetType.WARMUP }
+            val workingSets = sets.filter { it.setType == SetType.NORMAL }
             if (workingSets.isEmpty()) return ""
             val reps = workingSets.map { it.targetReps }
             return if (reps.distinct().size == 1) "${workingSets.size}×${reps.first()}" else reps.joinToString("/")

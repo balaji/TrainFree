@@ -76,7 +76,7 @@ class WorkoutCompletionCelebrationTest {
     }
 
     @Test
-    fun summarizeCompletedSessionExcludesWarmupsWhenWorkingSetsExist() {
+    fun summarizeCompletedSessionExcludesWarmupsAndDropSetsWhenNormalSetsExist() {
         val details = listOf(
             detail(exerciseId = 10L, position = 1, setType = SetType.WARMUP),
             detail(exerciseId = 10L, position = 2, setType = SetType.NORMAL),
@@ -95,10 +95,30 @@ class WorkoutCompletionCelebrationTest {
 
         assertEquals(42L, celebration.sessionId)
         assertEquals("Upper Body", celebration.workoutTitle)
-        assertEquals(3, celebration.completedSets)
+        assertEquals(2, celebration.completedSets)
         assertEquals(2, celebration.exerciseCount)
         assertEquals(2400L, celebration.durationSeconds)
         assertTrue(celebration.emoji in CELEBRATORY_EMOJIS)
+    }
+
+    @Test
+    fun summarizeCompletedSessionCountsDropSetsWhenNoNormalSetsExist() {
+        val details = listOf(
+            detail(exerciseId = 10L, position = 1, setType = SetType.WARMUP),
+            detail(exerciseId = 10L, position = 2, setType = SetType.DROP),
+            detail(exerciseId = 20L, position = 3, setType = SetType.DROP),
+        )
+
+        val celebration = summarizeCompletedSession(
+            sessionId = 6L,
+            workoutTitle = "Finisher",
+            performedAtMillis = 10_000L,
+            completedAtMillis = 610_000L,
+            keptDetails = details,
+        )
+
+        assertEquals(2, celebration.completedSets)
+        assertEquals(2, celebration.exerciseCount)
     }
 
     @Test
@@ -210,19 +230,22 @@ class WorkoutCompletionCelebrationTest {
     }
 
     @Test
-    fun detectNewOneRepMaxesIgnoresWarmupsAndIncludesDropSets() {
+    fun detectNewOneRepMaxesIgnoresWarmupsAndDropSets() {
         val details = listOf(
             // Heavy warmup on exercise 10 must be ignored
             detail(exerciseId = 10L, position = 1, setType = SetType.WARMUP, actualWeight = 200.0, actualReps = 1),
             detail(exerciseId = 10L, position = 2, setType = SetType.NORMAL, actualWeight = 90.0, actualReps = 1),
-            // Drop set on exercise 20 beats prior 100
+            // Heavy / high-rep drop set on exercise 20 must also be ignored
             detail(exerciseId = 20L, position = 3, setType = SetType.DROP, actualWeight = 105.0, actualReps = 1),
+            // Normal set on exercise 30 beats prior 100
+            detail(exerciseId = 30L, position = 4, setType = SetType.NORMAL, actualWeight = 105.0, actualReps = 1),
         )
         val prior = listOf(
             ExerciseSetLoadRow(exerciseId = 10L, actualWeight = 100.0, actualReps = 1, weightUnit = WeightUnit.METRIC),
             ExerciseSetLoadRow(exerciseId = 20L, actualWeight = 100.0, actualReps = 1, weightUnit = WeightUnit.METRIC),
+            ExerciseSetLoadRow(exerciseId = 30L, actualWeight = 100.0, actualReps = 1, weightUnit = WeightUnit.METRIC),
         )
-        val names = mapOf(10L to "Squat", 20L to "Lat Pulldown")
+        val names = mapOf(10L to "Squat", 20L to "Lat Pulldown", 30L to "Cable Row")
 
         val result = detectNewOneRepMaxes(
             keptDetails = details,
@@ -233,7 +256,7 @@ class WorkoutCompletionCelebrationTest {
         )
 
         assertEquals(1, result.size)
-        assertEquals(20L, result[0].exerciseId)
+        assertEquals(30L, result[0].exerciseId)
         assertEquals("105", result[0].formattedNewOneRm)
         assertEquals("5", result[0].formattedGain)
     }

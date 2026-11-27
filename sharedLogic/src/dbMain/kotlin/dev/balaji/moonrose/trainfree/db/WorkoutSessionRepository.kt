@@ -49,7 +49,7 @@ internal fun detectNewOneRepMaxes(
 
     val currentByExercise = keptDetails
         .filter { detail ->
-            detail.setType != SetType.WARMUP &&
+            detail.setType == SetType.NORMAL &&
                 (detail.actualWeight ?: 0.0) > 0.0 &&
                 (detail.actualReps ?: 0) > 0
         }
@@ -89,14 +89,20 @@ internal fun summarizeCompletedSession(
     newOneRepMaxes: List<NewOneRepMaxAchievement> = emptyList(),
     weightUnit: WeightUnit = WeightUnit.METRIC,
 ): WorkoutCompletionCelebration {
-    val workingDetails = keptDetails.filter { it.setType != SetType.WARMUP }
-    val countedDetails = workingDetails.ifEmpty { keptDetails }
+    val nonWarmupDetails = keptDetails.filter { it.setType != SetType.WARMUP }
+    val normalDetails = nonWarmupDetails.filter { it.setType == SetType.NORMAL }
+    val setCount = when {
+        normalDetails.isNotEmpty() -> normalDetails.size
+        nonWarmupDetails.isNotEmpty() -> nonWarmupDetails.size
+        else -> keptDetails.size
+    }
+    val exerciseSource = nonWarmupDetails.ifEmpty { keptDetails }
     val durationSeconds = ((completedAtMillis - performedAtMillis) / 1000L).coerceAtLeast(0L)
     return buildWorkoutCompletionCelebration(
         sessionId = sessionId,
         workoutTitle = workoutTitle,
-        completedSets = countedDetails.size,
-        exerciseCount = countedDetails.map { it.exerciseId }.distinct().size,
+        completedSets = setCount,
+        exerciseCount = exerciseSource.map { it.exerciseId }.distinct().size,
         durationSeconds = durationSeconds,
         seed = completedAtMillis,
         newOneRepMaxes = newOneRepMaxes,
@@ -364,7 +370,7 @@ object WorkoutSessionRepository {
             val title = resolveWorkoutTitle(session.title, routineName, session.performedAt)
             val settings = UserSettingsRepository.settings.first()
             val candidateExerciseIds = keptDetails
-                .filter { it.setType != SetType.WARMUP && (it.actualWeight ?: 0.0) > 0.0 && (it.actualReps ?: 0) > 0 }
+                .filter { it.setType == SetType.NORMAL && (it.actualWeight ?: 0.0) > 0.0 && (it.actualReps ?: 0) > 0 }
                 .map { it.exerciseId }
                 .distinct()
             val priorSets = if (candidateExerciseIds.isNotEmpty()) {
