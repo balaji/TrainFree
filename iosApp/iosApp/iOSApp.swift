@@ -6,6 +6,7 @@ import UserNotifications
 struct iOSApp: App {
     private static let notificationPermissionPromptedKey = "notification_permission_prompted"
 
+    @Environment(\.scenePhase) private var scenePhase
     @State private var appearance: Appearance = .system
     @State private var systemColorScheme: ColorScheme = .light
 
@@ -16,15 +17,28 @@ struct iOSApp: App {
                 .preferredColorScheme(preferredScheme)
                 .task {
                     HealthSyncManager.shared.register(provider: IosHealthSyncProvider.shared)
+                    GoogleDriveBackupManager.shared.register(provider: IosGoogleDriveBackupProvider.shared)
                     seedTestDataIfRequested()
                     Task {
                         await requestInitialNotificationPermissionIfNeeded()
                     }
                     Task {
+                        try? await HealthSyncManager.shared.reconcilePermissions()
                         _ = try? await HealthSyncManager.shared.syncBodyWeightsFromHealth(lookbackDays: 90)
+                    }
+                    Task {
+                        _ = try? await GoogleDriveBackupManager.shared.retryPendingSyncIfNeeded()
                     }
                     for await settings in UserSettingsRepository.shared.settings {
                         appearance = settings.appearance
+                    }
+                }
+                .onChange(of: scenePhase) { _, newPhase in
+                    if newPhase == .active {
+                        Task {
+                            try? await HealthSyncManager.shared.reconcilePermissions()
+                            _ = try? await GoogleDriveBackupManager.shared.retryPendingSyncIfNeeded()
+                        }
                     }
                 }
         }

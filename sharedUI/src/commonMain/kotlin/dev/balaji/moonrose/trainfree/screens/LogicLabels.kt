@@ -1,14 +1,17 @@
 package dev.balaji.moonrose.trainfree.screens
 
 import androidx.compose.runtime.Composable
+import dev.balaji.moonrose.trainfree.backup.DriveErrorKind
 import dev.balaji.moonrose.trainfree.calendar.WeekMath
 import dev.balaji.moonrose.trainfree.chat.AiContentReportReason
 import dev.balaji.moonrose.trainfree.chat.ChatMessage
 import dev.balaji.moonrose.trainfree.chat.ChatSuggestedPrompt
 import dev.balaji.moonrose.trainfree.db.BackupError
 import dev.balaji.moonrose.trainfree.db.BackupNotice
+import dev.balaji.moonrose.trainfree.db.DriveBackupNotice
 import dev.balaji.moonrose.trainfree.db.MAX_AGE
 import dev.balaji.moonrose.trainfree.db.MIN_AGE
+import dev.balaji.moonrose.trainfree.db.driveSyncTimeParts
 import dev.balaji.moonrose.trainfree.insights.BmiCategory
 import dev.balaji.moonrose.trainfree.insights.BmiClassification
 import dev.balaji.moonrose.trainfree.insights.BmiFormula
@@ -413,6 +416,37 @@ internal fun backupNoticeLabel(notice: BackupNotice): String = stringResource(
         BackupNotice.IMPORT_SUCCEEDED -> Res.string.backup_import_succeeded
     },
 )
+
+@Composable
+internal fun driveErrorLabel(error: DriveErrorKind): String = stringResource(
+    when (error) {
+        DriveErrorKind.AUTH_REQUIRED -> Res.string.google_drive_error_auth
+        DriveErrorKind.CANCELLED -> Res.string.google_drive_error_auth
+        DriveErrorKind.OFFLINE -> Res.string.google_drive_error_offline
+        DriveErrorKind.NOT_FOUND -> Res.string.google_drive_error_not_found
+        DriveErrorKind.NOT_CONFIGURED -> Res.string.google_drive_error_not_configured
+        DriveErrorKind.QUOTA_EXCEEDED -> Res.string.google_drive_error_quota_exceeded
+        DriveErrorKind.UNKNOWN -> Res.string.google_drive_error_unknown
+    },
+)
+
+@Composable
+internal fun driveNoticeLabel(notice: DriveBackupNotice): String = stringResource(
+    when (notice) {
+        DriveBackupNotice.ENABLED -> Res.string.google_drive_notice_enabled
+        DriveBackupNotice.SYNCED -> Res.string.google_drive_notice_synced
+        DriveBackupNotice.RESTORED -> Res.string.google_drive_notice_restored
+    },
+)
+
+@Composable
+internal fun formatDriveSyncTimestamp(millis: Long): String {
+    val parts = driveSyncTimeParts(millis)
+    val date = formatDayTitle(parts.epochDay)
+    val hh = parts.hour.toString().padStart(2, '0')
+    val mm = parts.minute.toString().padStart(2, '0')
+    return "$date, $hh:$mm"
+}
 
 @Composable
 internal fun aiReportReasonLabel(reasonKey: String): String = stringResource(

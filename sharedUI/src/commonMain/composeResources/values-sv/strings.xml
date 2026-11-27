@@ -485,4 +485,27 @@
     <string name="backup_error_missing_profile">Den här säkerhetskopian innehåller ingen profil.</string>
     <string name="backup_error_export_failed">Det gick inte att exportera säkerhetskopian.</string>
     <string name="backup_error_import_failed">Det gick inte att återställa säkerhetskopian. Din befintliga data ändrades inte.</string>
+
+    <!-- Google Drive backup & restore -->
+    <string name="google_drive_auto_backup">Säkerhetskopiera automatiskt till Google Drive</string>
+    <string name="google_drive_sync_now">Synkronisera nu</string>
+    <string name="google_drive_syncing">Synkroniserar till Google Drive…</string>
+    <string name="google_drive_restore">Återställ från Google Drive</string>
+    <string name="google_drive_reconnect">Återanslut Google Drive</string>
+    <string name="google_drive_last_synced">Senast synkroniserad %1$s</string>
+    <string name="google_drive_pending_sync">Säkerhetskopiering väntar — synkroniseras när du är online</string>
+    <string name="google_drive_reconnect_needed">Google Drive-sessionen har gått ut. Återanslut för att återuppta säkerhetskopiering.</string>
+    <string name="google_drive_conflict_title">Säkerhetskopia hittades i Google Drive</string>
+    <string name="google_drive_conflict_message">En Train Free-säkerhetskopia från %1$s (%2$d pass, %3$d program, %4$d dagboksanteckningar) finns redan på din Google Drive. Vill du återställa den eller skriva över den med den här enhetens data?</string>
+    <string name="google_drive_overwrite">Skriv över Drive-säkerhetskopia</string>
+    <string name="google_drive_notice_enabled">Automatisk säkerhetskopiering till Google Drive aktiverad.</string>
+    <string name="google_drive_notice_synced">Säkerhetskopierad till Google Drive.</string>
+    <string name="google_drive_notice_restored">Säkerhetskopia återställd från Google Drive.</string>
+    <string name="google_drive_error_title">Google Drive-fel</string>
+    <string name="google_drive_error_auth">Det gick inte att logga in på Google Drive. Försök igen.</string>
+    <string name="google_drive_error_offline">Ingen internetanslutning. Din säkerhetskopia försöker igen automatiskt när du är online.</string>
+    <string name="google_drive_error_not_found">Ingen Train Free-säkerhetskopia hittades i det här Google Drive-kontot.</string>
+    <string name="google_drive_error_not_configured">Google Drive OAuth-klient-ID är inte konfigurerat i den här versionen.</string>
+    <string name="google_drive_error_quota_exceeded">Ditt Google Drive-utrymme är fullt.</string>
+    <string name="google_drive_error_unknown">Google Drive-synkroniseringen misslyckades. Försök igen.</string>
 </resources>

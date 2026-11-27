@@ -743,4 +743,53 @@ enum L10n {
         case .importSucceeded: return backupImportSucceeded
         }
     }
+
+    // MARK: - Google Drive backup & restore
+    static let googleDriveAutoBackup = String(localized: "google_drive_auto_backup", defaultValue: "Auto-backup to Google Drive")
+    static let googleDriveSyncNow = String(localized: "google_drive_sync_now", defaultValue: "Sync now")
+    static let googleDriveSyncing = String(localized: "google_drive_syncing", defaultValue: "Syncing to Google Drive…")
+    static let googleDriveRestore = String(localized: "google_drive_restore", defaultValue: "Restore from Google Drive")
+    static let googleDriveReconnect = String(localized: "google_drive_reconnect", defaultValue: "Reconnect Google Drive")
+    static func googleDriveLastSynced(_ timestamp: String) -> String {
+        String(localized: "google_drive_last_synced", defaultValue: "Last synced \(timestamp)")
+    }
+    static let googleDrivePendingSync = String(localized: "google_drive_pending_sync", defaultValue: "Backup pending — will sync when online")
+    static let googleDriveReconnectNeeded = String(localized: "google_drive_reconnect_needed", defaultValue: "Google Drive session expired. Reconnect to resume backups.")
+    static let googleDriveConflictTitle = String(localized: "google_drive_conflict_title", defaultValue: "Backup found in Google Drive")
+    static func googleDriveConflictMessage(_ date: String, _ workouts: Int, _ programs: Int, _ journalEntries: Int) -> String {
+        String(
+            localized: "google_drive_conflict_message",
+            defaultValue: "A Train Free backup from \(date) (\(workouts) workouts, \(programs) programs, \(journalEntries) journal entries) already exists in your Google Drive. Would you like to restore it or overwrite it with this device's data?"
+        )
+    }
+    static let googleDriveOverwrite = String(localized: "google_drive_overwrite", defaultValue: "Overwrite Drive backup")
+    static let googleDriveNoticeEnabled = String(localized: "google_drive_notice_enabled", defaultValue: "Automatic Google Drive backup enabled.")
+    static let googleDriveNoticeSynced = String(localized: "google_drive_notice_synced", defaultValue: "Backed up to Google Drive.")
+    static let googleDriveNoticeRestored = String(localized: "google_drive_notice_restored", defaultValue: "Backup restored from Google Drive.")
+    static let googleDriveErrorTitle = String(localized: "google_drive_error_title", defaultValue: "Google Drive error")
+    static let googleDriveErrorAuth = String(localized: "google_drive_error_auth", defaultValue: "Could not sign in to Google Drive. Please try again.")
+    static let googleDriveErrorOffline = String(localized: "google_drive_error_offline", defaultValue: "No internet connection. Your backup will retry automatically when you are back online.")
+    static let googleDriveErrorNotFound = String(localized: "google_drive_error_not_found", defaultValue: "No Train Free backup was found in this Google Drive account.")
+    static let googleDriveErrorNotConfigured = String(localized: "google_drive_error_not_configured", defaultValue: "Google Drive OAuth client ID is not configured in this build.")
+    static let googleDriveErrorQuotaExceeded = String(localized: "google_drive_error_quota_exceeded", defaultValue: "Your Google Drive storage is full.")
+    static let googleDriveErrorUnknown = String(localized: "google_drive_error_unknown", defaultValue: "Google Drive sync failed. Please try again.")
+
+    static func driveErrorLabel(_ error: DriveErrorKind) -> String {
+        switch error {
+        case .authRequired, .cancelled: return googleDriveErrorAuth
+        case .offline: return googleDriveErrorOffline
+        case .notFound: return googleDriveErrorNotFound
+        case .notConfigured: return googleDriveErrorNotConfigured
+        case .quotaExceeded: return googleDriveErrorQuotaExceeded
+        case .unknown: return googleDriveErrorUnknown
+        }
+    }
+
+    static func driveNoticeLabel(_ notice: DriveBackupNotice) -> String {
+        switch notice {
+        case .enabled: return googleDriveNoticeEnabled
+        case .synced: return googleDriveNoticeSynced
+        case .restored: return googleDriveNoticeRestored
+        }
+    }
 }

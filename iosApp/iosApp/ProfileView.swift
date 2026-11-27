@@ -7,6 +7,7 @@ import UserNotifications
 /// saved profile with an Edit link that swaps in `ProfileFormView`. Owns the
 /// Edit / Back nav-bar buttons for switching between view and edit mode.
 struct ProfileView: View {
+    @Environment(\.scenePhase) private var scenePhase
     @State private var profile: Profile?
     @State private var settings: UserSettings?
     @State private var editing = false
@@ -24,6 +25,7 @@ struct ProfileView: View {
     @State private var syncingHealthWeight = false
     @State private var healthSyncImportedCount: Int?
     @State private var backupController = BackupTransferController()
+    @State private var driveController = GoogleDriveBackupController()
 
     private static let feedbackEmail = "hello@balaji.dev"
     private static let feedbackMailtoURL = URL(string: "mailto:hello@balaji.dev?subject=Train%20Free%20Feedback")!
@@ -155,6 +157,57 @@ struct ProfileView: View {
                                     backupController.startImport()
                                 }
                                 .disabled(backupController.uiState.working)
+                                Toggle(
+                                    L10n.googleDriveAutoBackup,
+                                    isOn: Binding(
+                                        get: { settings.googleDriveSyncEnabled },
+                                        set: { enabled in
+                                            if enabled {
+                                                driveController.startEnable()
+                                            } else {
+                                                driveController.disable()
+                                            }
+                                        }
+                                    )
+                                )
+                                .disabled(driveController.uiState.working)
+                                if settings.googleDriveSyncEnabled {
+                                    if let email = settings.googleDriveAccountEmail {
+                                        Text(email)
+                                            .font(.footnote)
+                                            .foregroundStyle(.secondary)
+                                    }
+                                    let needsReconnect = settings.googleDriveLastError == .authRequired
+                                    if driveController.busy {
+                                        Text(L10n.googleDriveSyncing)
+                                            .font(.footnote)
+                                            .foregroundStyle(.secondary)
+                                    } else if needsReconnect {
+                                        Text(L10n.googleDriveReconnectNeeded)
+                                            .font(.footnote)
+                                            .foregroundStyle(.red)
+                                    } else if settings.googleDrivePendingSync {
+                                        Text(L10n.googleDrivePendingSync)
+                                            .font(.footnote)
+                                            .foregroundStyle(.secondary)
+                                    } else if let syncedAt = settings.googleDriveLastSyncedAt?.int64Value {
+                                        Text(L10n.googleDriveLastSynced(GoogleDriveBackupController.formatTimestamp(syncedAt)))
+                                            .font(.footnote)
+                                            .foregroundStyle(.secondary)
+                                    }
+                                    Button(needsReconnect ? L10n.googleDriveReconnect : L10n.googleDriveSyncNow) {
+                                        if needsReconnect {
+                                            driveController.startReconnect()
+                                        } else {
+                                            driveController.syncNow()
+                                        }
+                                    }
+                                    .disabled(driveController.busy)
+                                    Button(L10n.googleDriveRestore) {
+                                        driveController.startRestore(fromOnboarding: false)
+                                    }
+                                    .disabled(driveController.busy)
+                                }
                             }
                         }
                         if HKHealthStore.isHealthDataAvailable(), let settings {
@@ -227,6 +280,7 @@ struct ProfileView: View {
                     }
                     .floatingWorkoutMenuClearance()
                     .backupTransferSupport(backupController)
+                    .googleDriveBackupSupport(driveController)
                     .alert(L10n.notificationsDeniedTitle, isPresented: $showNotificationsDeniedAlert) {
                         Button(L10n.openSettings) {
                             if let url = URL(string: UIApplication.openNotificationSettingsURLString) {
@@ -318,6 +372,19 @@ struct ProfileView: View {
         .task {
             for await value in UserSettingsRepository.shared.settings {
                 settings = value
+                if !value.healthSyncWeight {
+                    healthSyncImportedCount = nil
+                }
+            }
+        }
+        .task {
+            try? await HealthSyncManager.shared.reconcilePermissions()
+        }
+        .onChange(of: scenePhase) { _, phase in
+            if phase == .active {
+                Task {
+                    try? await HealthSyncManager.shared.reconcilePermissions()
+                }
             }
         }
         #if DEBUG || ENABLE_TEST_DATA

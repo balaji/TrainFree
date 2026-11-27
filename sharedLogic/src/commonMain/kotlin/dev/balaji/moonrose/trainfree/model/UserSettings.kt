@@ -1,5 +1,6 @@
 package dev.balaji.moonrose.trainfree.model
 
+import dev.balaji.moonrose.trainfree.backup.DriveErrorKind
 import dev.balaji.moonrose.trainfree.calendar.WeekStart
 import dev.balaji.moonrose.trainfree.insights.BmiClassification
 import dev.balaji.moonrose.trainfree.insights.BmiFormula
@@ -212,4 +213,14 @@ data class UserSettings(
      * to one card charting the top-volume exercise.
      */
     val progressionCards: List<ProgressionCardConfig> = emptyList(),
+    /** Whether workouts/journal changes are automatically backed up to Google Drive. */
+    val googleDriveSyncEnabled: Boolean = false,
+    /** Google account the Drive backup is connected to, when known. */
+    val googleDriveAccountEmail: String? = null,
+    /** Epoch millis of the last successful Drive upload. */
+    val googleDriveLastSyncedAt: Long? = null,
+    /** Whether local changes are waiting to be uploaded to Drive. */
+    val googleDrivePendingSync: Boolean = false,
+    /** Most recent Drive failure, cleared on the next successful upload. */
+    val googleDriveLastError: DriveErrorKind? = null,
 )

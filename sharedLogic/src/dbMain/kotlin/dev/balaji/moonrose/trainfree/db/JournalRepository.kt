@@ -14,10 +14,12 @@ object JournalRepository {
 
     suspend fun save(epochDay: Long, content: String) {
         AppDb.db.saveJournal(epochDay, content, nowMillis())
+        GoogleDriveBackupManager.onWorkoutOrJournalChanged()
     }
 
     suspend fun delete(epochDay: Long) {
         AppDb.db.journalEntryDao().deleteForDay(PROFILE_ID, epochDay)
+        GoogleDriveBackupManager.onWorkoutOrJournalChanged()
     }
 }
 

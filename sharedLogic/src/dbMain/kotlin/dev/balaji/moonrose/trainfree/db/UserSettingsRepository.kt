@@ -1,5 +1,6 @@
 package dev.balaji.moonrose.trainfree.db
 
+import dev.balaji.moonrose.trainfree.backup.DriveErrorKind
 import dev.balaji.moonrose.trainfree.calendar.WeekStart
 import dev.balaji.moonrose.trainfree.insights.BmiClassification
 import dev.balaji.moonrose.trainfree.insights.BmiFormula
@@ -34,6 +35,35 @@ internal const val SETTING_BMI_CLASSIFICATION = "bmi_classification"
 internal const val SETTING_PROGRESSION_CARDS = "progression_cards"
 internal const val SETTING_BARBELL_BAR_WEIGHTS = "barbell_bar_weights"
 internal const val SETTING_AI_CONTENT_REPORTS = "ai_content_reports"
+
+// Device-local Google Drive sync state. Never exported into backup files and
+// preserved across restores (see BackupRepository).
+internal const val SETTING_GOOGLE_DRIVE_SYNC_ENABLED = "google_drive_sync_enabled"
+internal const val SETTING_GOOGLE_DRIVE_ACCOUNT_EMAIL = "google_drive_account_email"
+internal const val SETTING_GOOGLE_DRIVE_FILE_ID = "google_drive_file_id"
+internal const val SETTING_GOOGLE_DRIVE_LAST_SYNCED_AT = "google_drive_last_synced_at"
+internal const val SETTING_GOOGLE_DRIVE_PENDING_SYNC = "google_drive_pending_sync"
+internal const val SETTING_GOOGLE_DRIVE_LAST_ERROR = "google_drive_last_error"
+
+internal val GOOGLE_DRIVE_SETTING_KEYS: Set<String> = setOf(
+    SETTING_GOOGLE_DRIVE_SYNC_ENABLED,
+    SETTING_GOOGLE_DRIVE_ACCOUNT_EMAIL,
+    SETTING_GOOGLE_DRIVE_FILE_ID,
+    SETTING_GOOGLE_DRIVE_LAST_SYNCED_AT,
+    SETTING_GOOGLE_DRIVE_PENDING_SYNC,
+    SETTING_GOOGLE_DRIVE_LAST_ERROR,
+)
+
+// Device-local Health Sync state. Never exported into backup files and
+// preserved across restores (see BackupRepository).
+internal val HEALTH_SYNC_SETTING_KEYS: Set<String> = setOf(
+    SETTING_HEALTH_SYNC_WORKOUTS,
+    SETTING_HEALTH_SYNC_WEIGHT,
+    SETTING_HEALTH_LAST_WEIGHT_SYNC,
+)
+
+internal val DEVICE_LOCAL_SETTING_KEYS: Set<String> =
+    GOOGLE_DRIVE_SETTING_KEYS + HEALTH_SYNC_SETTING_KEYS
 
 internal const val MAX_PROGRESSION_CARDS = 3
 internal const val MAX_PROGRESSION_EXERCISES = 3
@@ -147,6 +177,11 @@ internal fun List<UserSettingEntity>.toUserSettings(): UserSettings {
         appFont = AppFont.fromValue(byKey[SETTING_APP_FONT]),
         appFontSize = AppFontSize.fromValue(byKey[SETTING_APP_FONT_SIZE]),
         progressionCards = decodeProgressionCards(byKey[SETTING_PROGRESSION_CARDS]),
+        googleDriveSyncEnabled = byKey[SETTING_GOOGLE_DRIVE_SYNC_ENABLED].toBoolean(),
+        googleDriveAccountEmail = byKey[SETTING_GOOGLE_DRIVE_ACCOUNT_EMAIL]?.takeIf { it.isNotBlank() },
+        googleDriveLastSyncedAt = byKey[SETTING_GOOGLE_DRIVE_LAST_SYNCED_AT]?.toLongOrNull(),
+        googleDrivePendingSync = byKey[SETTING_GOOGLE_DRIVE_PENDING_SYNC].toBoolean(),
+        googleDriveLastError = DriveErrorKind.fromValue(byKey[SETTING_GOOGLE_DRIVE_LAST_ERROR]),
     )
 }
 

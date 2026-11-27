@@ -364,6 +364,7 @@ object WorkoutSessionRepository {
         }
         AppDb.db.workoutSessionDao().setCompletedAt(sessionId, now, now)
         HealthSyncManager.onWorkoutFinished(sessionId)
+        GoogleDriveBackupManager.onWorkoutOrJournalChanged()
         val session = AppDb.db.workoutSessionDao().findById(sessionId)
         if (session != null && keptDetails.isNotEmpty()) {
             val routineName = session.routineId?.let { AppDb.db.routineDao().findById(it)?.name }
@@ -417,6 +418,7 @@ object WorkoutSessionRepository {
     suspend fun deleteCompletedSession(sessionId: Long) {
         AppDb.db.workoutSessionDao().delete(sessionId)
         HealthSyncManager.onWorkoutDeleted(sessionId)
+        GoogleDriveBackupManager.onWorkoutOrJournalChanged()
     }
 
     /** Renames an existing workout session (used by the Journal day screen). */
@@ -429,5 +431,6 @@ object WorkoutSessionRepository {
             performedAtMillis = session.performedAt,
         )
         AppDb.db.workoutSessionDao().updateTitle(sessionId, resolved, nowMillis())
+        GoogleDriveBackupManager.onWorkoutOrJournalChanged()
     }
 }

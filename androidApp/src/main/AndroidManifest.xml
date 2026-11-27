@@ -8,12 +8,11 @@
     <uses-permission android:name="android.permission.health.WRITE_EXERCISE"/>
     <uses-permission android:name="android.permission.health.READ_WEIGHT"/>
     <uses-permission android:name="android.permission.health.WRITE_WEIGHT"/>
-    <!-- ML Kit's transitive datatransport dependency merges INTERNET/ACCESS_NETWORK_STATE
-         and Clearcut telemetry components. Train Free is strictly offline; removing both
-         the network permissions and the datatransport backend/schedulers keeps the app
-         offline and avoids an uncaught SecurityException in Uploader.isNetworkAvailable(). -->
-    <uses-permission android:name="android.permission.INTERNET" tools:node="remove"/>
-    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" tools:node="remove"/>
+    <!-- Network access is used solely for the optional, user-enabled Google Drive
+         backup & restore. ML Kit's transitive datatransport Clearcut telemetry
+         backend/schedulers stay removed below, so on-device AI still sends nothing. -->
+    <uses-permission android:name="android.permission.INTERNET"/>
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
 
     <queries>
         <package android:name="com.google.android.apps.healthdata"/>

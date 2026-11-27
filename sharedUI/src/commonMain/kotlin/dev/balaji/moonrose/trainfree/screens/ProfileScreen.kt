@@ -45,19 +45,18 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.produceState
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalUriHandler
@@ -259,6 +258,8 @@ private fun SettingsSection() {
     }
     HorizontalDivider()
     BackupControls()
+    HorizontalDivider()
+    GoogleDriveBackupControls(settings = current)
     if (showNotificationsDeniedHint) {
         val openNotificationSettings = rememberNotificationSettingsOpener()
         AlertDialog(
@@ -282,18 +283,32 @@ private fun SettingsSection() {
 
 @Composable
 private fun HealthSyncSection() {
-    val availability by produceState(HealthSyncAvailability.UNAVAILABLE) {
-        value = HealthSyncManager.availability()
+    var availability by remember { mutableStateOf(HealthSyncAvailability.UNAVAILABLE) }
+    val scope = rememberCoroutineScope()
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                scope.launch {
+                    availability = HealthSyncManager.availability()
+                    HealthSyncManager.reconcilePermissions()
+                }
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
     if (availability == HealthSyncAvailability.UNAVAILABLE) return
 
     val settings by UserSettingsRepository.settings.collectAsState(initial = null)
     val current = settings ?: return
-    val scope = rememberCoroutineScope()
     val openHealthSettings = rememberHealthSettingsOpener()
     var showDeniedHint by remember { mutableStateOf(false) }
     var syncingWeight by remember { mutableStateOf(false) }
     var lastImportedCount by remember { mutableStateOf<Int?>(null) }
+    LaunchedEffect(current.healthSyncWeight) {
+        if (!current.healthSyncWeight) lastImportedCount = null
+    }
 
     val requestWorkoutPermission = rememberHealthWorkoutPermissionRequester { granted ->
         scope.launch {

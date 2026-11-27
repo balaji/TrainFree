@@ -15,8 +15,10 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.lifecycle.lifecycleScope
+import dev.balaji.moonrose.trainfree.backup.AndroidGoogleDriveBackupProvider
 import dev.balaji.moonrose.trainfree.db.DbContextHolder
 import dev.balaji.moonrose.trainfree.db.DevSeed
+import dev.balaji.moonrose.trainfree.db.GoogleDriveBackupManager
 import dev.balaji.moonrose.trainfree.db.HealthSyncManager
 import dev.balaji.moonrose.trainfree.db.UserSettingsRepository
 import dev.balaji.moonrose.trainfree.health.AndroidHealthSyncProvider
@@ -40,12 +42,27 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         DbContextHolder.appContext = applicationContext
         HealthSyncManager.register(AndroidHealthSyncProvider(applicationContext))
+        GoogleDriveBackupManager.register(AndroidGoogleDriveBackupProvider(applicationContext))
         maybeSeedTestData()
 
         setContent {
             App(showDeveloperTools = BuildConfig.ENABLE_TEST_DATA)
         }
         requestInitialNotificationPermissionIfNeeded()
+    }
+
+    override fun onStart() {
+        super.onStart()
+        lifecycleScope.launch {
+            GoogleDriveBackupManager.retryPendingSyncIfNeeded()
+        }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        lifecycleScope.launch {
+            HealthSyncManager.reconcilePermissions()
+        }
     }
 
     private fun requestInitialNotificationPermissionIfNeeded() {

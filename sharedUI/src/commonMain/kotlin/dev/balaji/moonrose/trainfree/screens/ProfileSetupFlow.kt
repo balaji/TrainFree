@@ -15,12 +15,17 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import dev.balaji.moonrose.trainfree.backup.DriveBackupAvailability
+import dev.balaji.moonrose.trainfree.backup.rememberGoogleDriveAuthRequester
 import dev.balaji.moonrose.trainfree.db.BackupTransferState
+import dev.balaji.moonrose.trainfree.db.GoogleDriveBackupManager
+import dev.balaji.moonrose.trainfree.db.GoogleDriveBackupState
 import org.jetbrains.compose.resources.stringResource
 import dev.balaji.moonrose.trainfree.sharedui.resources.*
 
@@ -39,6 +44,14 @@ fun ProfileSetupFlow() {
         onReadSuccess = backupState::inspectImport,
         onReadError = backupState::onFileReadError,
     )
+    val driveAvailability by produceState(DriveBackupAvailability.UNAVAILABLE) {
+        value = GoogleDriveBackupManager.availability()
+    }
+    val driveState = remember { GoogleDriveBackupState() }
+    val driveUiState by driveState.uiState.collectAsState()
+    val requestDriveRestoreAuth = rememberGoogleDriveAuthRequester { authorized, error ->
+        driveState.onRestoreAuthResult(authorized, error, fromOnboarding = true)
+    }
 
     Scaffold { padding ->
         if (showForm) {
@@ -72,14 +85,23 @@ fun ProfileSetupFlow() {
                         Text(stringResource(Res.string.create_a_profile))
                     }
                     TextButton(
-                        enabled = !backupUiState.working,
+                        enabled = !backupUiState.working && !driveUiState.working,
                         onClick = launchImport,
                     ) {
                         Text(stringResource(Res.string.restore_from_backup))
+                    }
+                    if (driveAvailability != DriveBackupAvailability.UNAVAILABLE) {
+                        TextButton(
+                            enabled = !backupUiState.working && !driveUiState.working,
+                            onClick = requestDriveRestoreAuth,
+                        ) {
+                            Text(stringResource(Res.string.google_drive_restore))
+                        }
                     }
                 }
             }
         }
         BackupDialogs(state = backupUiState, backupState = backupState)
+        GoogleDriveBackupDialogs(state = driveUiState, driveState = driveState)
     }
 }

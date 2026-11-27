@@ -9,6 +9,7 @@ struct ProfileSetupView: View {
     @State private var showForm = false
     @State private var unit: WeightUnit = .metric
     @State private var backupController = BackupTransferController()
+    @State private var driveController = GoogleDriveBackupController()
 
     var body: some View {
         Group {
@@ -33,12 +34,17 @@ struct ProfileSetupView: View {
                     Button(L10n.restoreFromBackup) {
                         backupController.startImport()
                     }
-                    .disabled(backupController.uiState.working)
+                    .disabled(backupController.uiState.working || driveController.busy)
+                    Button(L10n.googleDriveRestore) {
+                        driveController.startRestore(fromOnboarding: true)
+                    }
+                    .disabled(backupController.uiState.working || driveController.busy)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
         .backupTransferSupport(backupController)
+        .googleDriveBackupSupport(driveController)
         .task {
             for await settings in UserSettingsRepository.shared.settings {
                 unit = settings.weightUnit

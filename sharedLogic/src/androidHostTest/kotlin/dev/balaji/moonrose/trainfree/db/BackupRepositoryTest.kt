@@ -287,10 +287,19 @@ class BackupRepositoryTest {
     }
 
     @Test
-    fun backupExportExcludesLocalAiContentReportsSetting() {
+    fun backupExportExcludesLocalAiContentReportsDriveAndHealthSyncSettings() {
         val entities = listOf(
             UserSettingEntity(SETTING_WEIGHT_UNIT, "metric", 1_000L, 1_000L),
             UserSettingEntity(SETTING_AI_CONTENT_REPORTS, "[{\"source\":\"chat\"}]", 2_000L, 2_000L),
+            UserSettingEntity(SETTING_GOOGLE_DRIVE_SYNC_ENABLED, "true", 2_000L, 2_000L),
+            UserSettingEntity(SETTING_GOOGLE_DRIVE_ACCOUNT_EMAIL, "athlete@example.com", 2_000L, 2_000L),
+            UserSettingEntity(SETTING_GOOGLE_DRIVE_FILE_ID, "drive-file-1", 2_000L, 2_000L),
+            UserSettingEntity(SETTING_GOOGLE_DRIVE_LAST_SYNCED_AT, "3000", 2_000L, 2_000L),
+            UserSettingEntity(SETTING_GOOGLE_DRIVE_PENDING_SYNC, "true", 2_000L, 2_000L),
+            UserSettingEntity(SETTING_GOOGLE_DRIVE_LAST_ERROR, "offline", 2_000L, 2_000L),
+            UserSettingEntity(SETTING_HEALTH_SYNC_WORKOUTS, "true", 2_000L, 2_000L),
+            UserSettingEntity(SETTING_HEALTH_SYNC_WEIGHT, "true", 2_000L, 2_000L),
+            UserSettingEntity(SETTING_HEALTH_LAST_WEIGHT_SYNC, "4000", 2_000L, 2_000L),
         )
         val exported = entities.toBackupUserSettings()
         assertEquals(listOf(SETTING_WEIGHT_UNIT), exported.map { it.key })

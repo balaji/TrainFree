@@ -8,5 +8,18 @@
 	<string>TrainFree reads your body weight from Apple Health so smart-scale measurements appear automatically.</string>
 	<key>NSHealthUpdateUsageDescription</key>
 	<string>TrainFree saves your completed strength workouts and logged body weight to Apple Health.</string>
+	<key>GoogleDriveClientId</key>
+	<string>$(GOOGLE_DRIVE_CLIENT_ID)</string>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>$(GOOGLE_DRIVE_REVERSED_CLIENT_ID)</string>
+			</array>
+		</dict>
+	</array>
 </dict>
 </plist>

@@ -3,6 +3,7 @@ package dev.balaji.moonrose.trainfree.db
 import dev.balaji.moonrose.trainfree.health.ExternalWeightSample
 import dev.balaji.moonrose.trainfree.health.HealthSyncAvailability
 import dev.balaji.moonrose.trainfree.health.HealthSyncProvider
+import dev.balaji.moonrose.trainfree.model.UserSettings
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -10,7 +11,11 @@ import kotlin.test.assertTrue
 import kotlinx.coroutines.runBlocking
 
 class HealthSyncSettingsTest {
-    private class FakeHealthSyncProvider : HealthSyncProvider {
+    private class FakeHealthSyncProvider(
+        private val availabilityResult: HealthSyncAvailability = HealthSyncAvailability.AVAILABLE,
+        private val workoutWritePermitted: Boolean = true,
+        private val weightPermitted: Boolean = true,
+    ) : HealthSyncProvider {
         data class WrittenWorkout(
             val sessionId: Long,
             val title: String,
@@ -21,11 +26,11 @@ class HealthSyncSettingsTest {
         val writtenWorkouts = mutableListOf<WrittenWorkout>()
         val deletedSessionIds = mutableListOf<Long>()
 
-        override suspend fun availability(): HealthSyncAvailability = HealthSyncAvailability.AVAILABLE
+        override suspend fun availability(): HealthSyncAvailability = availabilityResult
 
-        override suspend fun hasWorkoutWritePermission(): Boolean = true
+        override suspend fun hasWorkoutWritePermission(): Boolean = workoutWritePermitted
 
-        override suspend fun hasWeightPermissions(): Boolean = true
+        override suspend fun hasWeightPermissions(): Boolean = weightPermitted
 
         override suspend fun writeStrengthWorkout(
             sessionId: Long,
@@ -144,5 +149,92 @@ class HealthSyncSettingsTest {
             ),
             provider.writtenWorkouts,
         )
+    }
+
+    @Test
+    fun reconcilePermissionsDisablesBothWhenBothPermissionsRevoked() = runBlocking {
+        var workoutsDisabled = false
+        var weightDisabled = false
+        HealthSyncManager.reconcilePermissions(
+            settings = UserSettings(healthSyncWorkouts = true, healthSyncWeight = true),
+            activeProvider = FakeHealthSyncProvider(
+                workoutWritePermitted = false,
+                weightPermitted = false,
+            ),
+            disableWorkouts = { workoutsDisabled = true },
+            disableWeight = { weightDisabled = true },
+        )
+        assertTrue(workoutsDisabled)
+        assertTrue(weightDisabled)
+    }
+
+    @Test
+    fun reconcilePermissionsDisablesOnlyRevokedSetting() = runBlocking {
+        var workoutsDisabled = false
+        var weightDisabled = false
+        HealthSyncManager.reconcilePermissions(
+            settings = UserSettings(healthSyncWorkouts = true, healthSyncWeight = true),
+            activeProvider = FakeHealthSyncProvider(
+                workoutWritePermitted = false,
+                weightPermitted = true,
+            ),
+            disableWorkouts = { workoutsDisabled = true },
+            disableWeight = { weightDisabled = true },
+        )
+        assertTrue(workoutsDisabled)
+        assertFalse(weightDisabled)
+    }
+
+    @Test
+    fun reconcilePermissionsDisablesBothWhenHealthUnavailable() = runBlocking {
+        var workoutsDisabled = false
+        var weightDisabled = false
+        HealthSyncManager.reconcilePermissions(
+            settings = UserSettings(healthSyncWorkouts = true, healthSyncWeight = true),
+            activeProvider = FakeHealthSyncProvider(
+                availabilityResult = HealthSyncAvailability.NOT_INSTALLED,
+                workoutWritePermitted = true,
+                weightPermitted = true,
+            ),
+            disableWorkouts = { workoutsDisabled = true },
+            disableWeight = { weightDisabled = true },
+        )
+        assertTrue(workoutsDisabled)
+        assertTrue(weightDisabled)
+    }
+
+    @Test
+    fun reconcilePermissionsKeepsBothWhenPermissionsGranted() = runBlocking {
+        var workoutsDisabled = false
+        var weightDisabled = false
+        HealthSyncManager.reconcilePermissions(
+            settings = UserSettings(healthSyncWorkouts = true, healthSyncWeight = true),
+            activeProvider = FakeHealthSyncProvider(
+                workoutWritePermitted = true,
+                weightPermitted = true,
+            ),
+            disableWorkouts = { workoutsDisabled = true },
+            disableWeight = { weightDisabled = true },
+        )
+        assertFalse(workoutsDisabled)
+        assertFalse(weightDisabled)
+    }
+
+    @Test
+    fun reconcilePermissionsNoOpsWhenSettingsAlreadyDisabled() = runBlocking {
+        var workoutsDisabled = false
+        var weightDisabled = false
+        HealthSyncManager.reconcilePermissions(
+            settings = UserSettings(healthSyncWorkouts = false, healthSyncWeight = false),
+            activeProvider = FakeHealthSyncProvider(
+                availabilityResult = HealthSyncAvailability.UNAVAILABLE,
+                workoutWritePermitted = false,
+                weightPermitted = false,
+            ),
+            disableWorkouts = { workoutsDisabled = true },
+            disableWeight = { weightDisabled = true },
+        )
+        assertFalse(workoutsDisabled)
+        assertFalse(weightDisabled)
     }
 }

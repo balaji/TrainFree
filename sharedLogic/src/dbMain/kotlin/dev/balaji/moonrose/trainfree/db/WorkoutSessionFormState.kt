@@ -838,6 +838,7 @@ class WorkoutSessionFormState internal constructor(
                     now = nowMillis(),
                 )
             }
+            GoogleDriveBackupManager.onWorkoutOrJournalChanged()
             _uiState.value = _uiState.value.copy(
                 saving = false,
                 finished = true,

@@ -5,16 +5,16 @@ permalink: /privacy/
 
 # Privacy Policy
 
-**Effective date:** November 19, 2026  
+**Effective date:** November 27, 2026  
 **App:** Train Free (Android & iOS)  
 **Developer:** Balaji Damodaran  
 
-Train Free is a free, open-source, 100% offline workout logger. Your training data belongs to you and stays on your device.
+Train Free is a free, open-source, local-first workout logger. Your training data belongs to you and stays on your device unless you choose to back it up.
 
 ## 1. Summary
 
-- **No accounts or sign-in.** Train Free does not ask for an email address, login, or cloud account.
-- **No servers or network transmission.** Train Free does not connect to any developer server, does not use third-party analytics, crash reporting, or advertising SDKs, and strips Android network permissions (`INTERNET` and `ACCESS_NETWORK_STATE`) from its Android manifest.
+- **No developer accounts or servers.** Train Free does not operate any backend server, does not require a Train Free account, and does not use third-party analytics, crash reporting, or advertising SDKs.
+- **Offline by default.** Network permissions (`INTERNET` and `ACCESS_NETWORK_STATE`) on Android are used solely for optional user-initiated or user-enabled Google Drive backups; ML Kit Clearcut telemetry components remain removed from the Android build.
 - **No data selling or sharing.** Because we never collect your data, we never sell, rent, or share it with third parties.
 
 ## 2. Data Stored Locally on Your Device
@@ -57,6 +57,7 @@ On supported devices, Train Free uses your operating system's built-in on-device
 
 - **OS Backups**: On Android, if you have Android Auto Backup or device-to-device transfer enabled in your system settings, Android may back up Train Free's local database file (`trainfree.db`) under your Google account according to Google's backup privacy policies. On iOS, backups are governed by your device and iCloud backup settings. The developer cannot access your OS backups.
 - **Manual Export / Import**: If you use Train Free's manual export feature, you choose where to save or share the exported file.
+- **Optional Google Drive Backup & Restore**: If you enable **Auto-backup to Google Drive** or choose **Restore from Google Drive**, Train Free authenticates directly with Google using the limited `https://www.googleapis.com/auth/drive.file` scope (which grants access only to the `TrainFree/trainfree-backup.json` file created by Train Free, never to your other Drive files). Your workout, program, body-weight, profile, and journal backup JSON is sent directly between your device and your own Google Drive account—no developer server sits in between. Local AI content-report flags and Google Drive connection metadata are excluded from exported backups. You can turn off auto-backup at any time in Settings to disconnect your Google account from the device.
 
 ## 6. Device Permissions (Notifications & Rest Timer)
 

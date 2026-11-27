@@ -3,6 +3,7 @@ package dev.balaji.moonrose.trainfree.db
 import dev.balaji.moonrose.trainfree.health.ExternalWeightSample
 import dev.balaji.moonrose.trainfree.health.HealthSyncAvailability
 import dev.balaji.moonrose.trainfree.health.HealthSyncProvider
+import dev.balaji.moonrose.trainfree.model.UserSettings
 import dev.balaji.moonrose.trainfree.model.WeightUnit
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.first
@@ -28,6 +29,7 @@ object HealthSyncManager {
     private var provider: HealthSyncProvider? = null
     private val workoutSyncMutex = Mutex()
     private val weightImportMutex = Mutex()
+    private val reconcileMutex = Mutex()
 
     fun register(provider: HealthSyncProvider) {
         this.provider = provider
@@ -41,6 +43,54 @@ object HealthSyncManager {
 
     suspend fun hasWeightPermissions(): Boolean =
         provider?.hasWeightPermissions() ?: false
+
+    /**
+     * Reconciles persisted health-sync opt-in flags against the OS's currently
+     * granted permissions. If the user revoked Health Connect / Apple Health
+     * access externally (or Health is unavailable), flips the affected setting(s)
+     * back to `false` so the Settings UI reflects actual sync state and tapping
+     * the toggle again re-prompts for permission.
+     *
+     * Never auto-enables a setting that is currently `false`.
+     */
+    suspend fun reconcilePermissions() {
+        val activeProvider = provider ?: return
+        reconcileMutex.withLock {
+            try {
+                val settings = UserSettingsRepository.settings.first()
+                reconcilePermissions(
+                    settings = settings,
+                    activeProvider = activeProvider,
+                    disableWorkouts = { UserSettingsRepository.setHealthSyncWorkouts(false) },
+                    disableWeight = { UserSettingsRepository.setHealthSyncWeight(false) },
+                )
+            } catch (ce: CancellationException) {
+                throw ce
+            } catch (_: Throwable) {
+                // Best-effort; never fail UI lifecycle callbacks on transient OS errors.
+            }
+        }
+    }
+
+    internal suspend fun reconcilePermissions(
+        settings: UserSettings,
+        activeProvider: HealthSyncProvider,
+        disableWorkouts: suspend () -> Unit,
+        disableWeight: suspend () -> Unit,
+    ) {
+        if (!settings.healthSyncWorkouts && !settings.healthSyncWeight) return
+        if (activeProvider.availability() != HealthSyncAvailability.AVAILABLE) {
+            if (settings.healthSyncWorkouts) disableWorkouts()
+            if (settings.healthSyncWeight) disableWeight()
+            return
+        }
+        if (settings.healthSyncWorkouts && !activeProvider.hasWorkoutWritePermission()) {
+            disableWorkouts()
+        }
+        if (settings.healthSyncWeight && !activeProvider.hasWeightPermissions()) {
+            disableWeight()
+        }
+    }
 
     /**
      * Writes a live completed workout session to Apple Health / Health Connect.

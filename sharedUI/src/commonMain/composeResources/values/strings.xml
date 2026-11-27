@@ -505,4 +505,27 @@
     <string name="backup_error_missing_profile">This backup does not contain a profile.</string>
     <string name="backup_error_export_failed">Could not export the backup file.</string>
     <string name="backup_error_import_failed">Could not restore the backup. Your existing data was left unchanged.</string>
+
+    <!-- Google Drive backup & restore -->
+    <string name="google_drive_auto_backup">Auto-backup to Google Drive</string>
+    <string name="google_drive_sync_now">Sync now</string>
+    <string name="google_drive_syncing">Syncing to Google Drive…</string>
+    <string name="google_drive_restore">Restore from Google Drive</string>
+    <string name="google_drive_reconnect">Reconnect Google Drive</string>
+    <string name="google_drive_last_synced">Last synced %1$s</string>
+    <string name="google_drive_pending_sync">Backup pending — will sync when online</string>
+    <string name="google_drive_reconnect_needed">Google Drive session expired. Reconnect to resume backups.</string>
+    <string name="google_drive_conflict_title">Backup found in Google Drive</string>
+    <string name="google_drive_conflict_message">A Train Free backup from %1$s (%2$d workouts, %3$d programs, %4$d journal entries) already exists in your Google Drive. Would you like to restore it or overwrite it with this device's data?</string>
+    <string name="google_drive_overwrite">Overwrite Drive backup</string>
+    <string name="google_drive_notice_enabled">Automatic Google Drive backup enabled.</string>
+    <string name="google_drive_notice_synced">Backed up to Google Drive.</string>
+    <string name="google_drive_notice_restored">Backup restored from Google Drive.</string>
+    <string name="google_drive_error_title">Google Drive error</string>
+    <string name="google_drive_error_auth">Could not sign in to Google Drive. Please try again.</string>
+    <string name="google_drive_error_offline">No internet connection. Your backup will retry automatically when you are back online.</string>
+    <string name="google_drive_error_not_found">No Train Free backup was found in this Google Drive account.</string>
+    <string name="google_drive_error_not_configured">Google Drive OAuth client ID is not configured in this build.</string>
+    <string name="google_drive_error_quota_exceeded">Your Google Drive storage is full.</string>
+    <string name="google_drive_error_unknown">Google Drive sync failed. Please try again.</string>
 </resources>

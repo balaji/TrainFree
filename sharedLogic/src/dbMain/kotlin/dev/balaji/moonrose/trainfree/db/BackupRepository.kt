@@ -322,7 +322,7 @@ private fun hasValidReferences(backup: TrainFreeBackup): Boolean {
 }
 
 internal fun List<UserSettingEntity>.toBackupUserSettings(): List<BackupUserSetting> =
-    filterNot { it.key == SETTING_AI_CONTENT_REPORTS }
+    filterNot { it.key == SETTING_AI_CONTENT_REPORTS || it.key in DEVICE_LOCAL_SETTING_KEYS }
         .map {
             BackupUserSetting(
                 key = it.key,
@@ -476,6 +476,11 @@ internal suspend fun AppDatabase.importBackup(backup: TrainFreeBackup) {
 
     useWriterConnection { transactor ->
         transactor.immediateTransaction {
+            // Drive sync state and Health Sync flags are device-local (tied to
+            // on-device accounts and OS permissions): keep this device's values
+            // across the restore instead of wiping or importing them.
+            val preservedLocalSettings = userSettingDao().getAll().filter { it.key in DEVICE_LOCAL_SETTING_KEYS }
+
             // Clear user tables before deleting custom exercises because work_sets
             // and workout_session_details reference exercises with NO ACTION.
             workoutSessionDao().deleteAll()
@@ -645,6 +650,7 @@ internal suspend fun AppDatabase.importBackup(backup: TrainFreeBackup) {
             }
 
             for (setting in backup.settings) {
+                if (setting.key in DEVICE_LOCAL_SETTING_KEYS) continue
                 val value = if (setting.key == SETTING_BARBELL_BAR_WEIGHTS) {
                     val remapped = decodeBarWeights(setting.value)
                         .mapNotNull { (key, weight) ->
@@ -665,6 +671,9 @@ internal suspend fun AppDatabase.importBackup(backup: TrainFreeBackup) {
                         updatedAt = setting.updatedAt,
                     ),
                 )
+            }
+            for (setting in preservedLocalSettings) {
+                userSettingDao().upsert(setting)
             }
         }
     }
