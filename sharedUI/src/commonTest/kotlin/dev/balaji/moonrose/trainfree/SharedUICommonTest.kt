@@ -1,15 +1,19 @@
 package dev.balaji.moonrose.trainfree
 
 import dev.balaji.moonrose.trainfree.model.Profile
+import dev.balaji.moonrose.trainfree.notifications.shouldPromptExactAlarmOnRestTimerStart
+import dev.balaji.moonrose.trainfree.notifications.shouldShowProfileExactAlarmRow
 import dev.balaji.moonrose.trainfree.screens.formatCountdown
 import dev.balaji.moonrose.trainfree.screens.formatMonthDay
 import dev.balaji.moonrose.trainfree.screens.formatMonthYear
 import dev.balaji.moonrose.trainfree.screens.initialBmiInputs
 import dev.balaji.moonrose.trainfree.screens.progressionYAxisBounds
 import dev.balaji.moonrose.trainfree.screens.remainingSecondsUntil
+import dev.balaji.moonrose.trainfree.screens.verticalLineCanvasX
 import dev.balaji.moonrose.trainfree.screens.yAxisBounds
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
@@ -57,6 +61,64 @@ class SharedUICommonTest {
     }
 
     @Test
+    fun verticalLineCanvasXAlignsTargetXToGrid() {
+        assertEquals(
+            20f,
+            verticalLineCanvasX(
+                targetX = 100.0,
+                minX = 100.0,
+                xStep = 7.0,
+                drawingStart = 20f,
+                xSpacing = 40f,
+                layoutDirectionMultiplier = 1,
+            ),
+        )
+        assertEquals(
+            100f,
+            verticalLineCanvasX(
+                targetX = 114.0,
+                minX = 100.0,
+                xStep = 7.0,
+                drawingStart = 20f,
+                xSpacing = 40f,
+                layoutDirectionMultiplier = 1,
+            ),
+        )
+        assertEquals(
+            140f,
+            verticalLineCanvasX(
+                targetX = 121.0,
+                minX = 100.0,
+                xStep = 7.0,
+                drawingStart = 20f,
+                xSpacing = 40f,
+                layoutDirectionMultiplier = 1,
+            ),
+        )
+        assertEquals(
+            120f,
+            verticalLineCanvasX(
+                targetX = 114.0,
+                minX = 100.0,
+                xStep = 7.0,
+                drawingStart = 200f,
+                xSpacing = 40f,
+                layoutDirectionMultiplier = -1,
+            ),
+        )
+        assertNull(
+            verticalLineCanvasX(
+                targetX = 114.0,
+                minX = 100.0,
+                xStep = 0.0,
+                drawingStart = 20f,
+                xSpacing = 40f,
+                layoutDirectionMultiplier = 1,
+            ),
+        )
+    }
+
+    @Test
     fun progressionYAxisBoundsSupportsNegativePctChangeRanges() {
         assertEquals(-6.0 to -4.0, progressionYAxisBounds(-5.0, -5.0))
         val (lo, hi) = progressionYAxisBounds(-1.2, 0.3)
@@ -80,5 +142,57 @@ class SharedUICommonTest {
         assertNull(initialBmiInputs(complete.copy(height = -1.0)))
         assertNull(initialBmiInputs(complete.copy(height = Double.NaN)))
         assertNull(initialBmiInputs(complete.copy(height = Double.POSITIVE_INFINITY)))
+    }
+
+    @Test
+    fun shouldShowProfileExactAlarmRowRequiresNotificationsOnAndSettingSupported() {
+        assertTrue(shouldShowProfileExactAlarmRow(notificationsEnabled = true, exactAlarmSettingSupported = true))
+        assertFalse(shouldShowProfileExactAlarmRow(notificationsEnabled = false, exactAlarmSettingSupported = true))
+        assertFalse(shouldShowProfileExactAlarmRow(notificationsEnabled = true, exactAlarmSettingSupported = false))
+        assertFalse(shouldShowProfileExactAlarmRow(notificationsEnabled = false, exactAlarmSettingSupported = false))
+    }
+
+    @Test
+    fun shouldPromptExactAlarmOnRestTimerStartRequiresAllConditions() {
+        assertTrue(
+            shouldPromptExactAlarmOnRestTimerStart(
+                hasActiveRestTimer = true,
+                notificationsEnabled = true,
+                canScheduleExactAlarms = false,
+                exactAlarmPrompted = false,
+            ),
+        )
+        assertFalse(
+            shouldPromptExactAlarmOnRestTimerStart(
+                hasActiveRestTimer = false,
+                notificationsEnabled = true,
+                canScheduleExactAlarms = false,
+                exactAlarmPrompted = false,
+            ),
+        )
+        assertFalse(
+            shouldPromptExactAlarmOnRestTimerStart(
+                hasActiveRestTimer = true,
+                notificationsEnabled = false,
+                canScheduleExactAlarms = false,
+                exactAlarmPrompted = false,
+            ),
+        )
+        assertFalse(
+            shouldPromptExactAlarmOnRestTimerStart(
+                hasActiveRestTimer = true,
+                notificationsEnabled = true,
+                canScheduleExactAlarms = true,
+                exactAlarmPrompted = false,
+            ),
+        )
+        assertFalse(
+            shouldPromptExactAlarmOnRestTimerStart(
+                hasActiveRestTimer = true,
+                notificationsEnabled = true,
+                canScheduleExactAlarms = false,
+                exactAlarmPrompted = true,
+            ),
+        )
     }
 }

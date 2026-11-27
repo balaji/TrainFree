@@ -117,7 +117,7 @@ struct ProgramsView: View {
     @State private var expandedProgramId: Int64?
     @State private var expandedSampleId: String?
     @State private var myProgramsExpanded = true
-    @State private var sampleProgramsExpanded = true
+    @State private var sampleProgramsExpanded = false
     @State private var prompt: TextPrompt?
     @State private var promptText = ""
     @State private var deleteTarget: DeleteTarget?

@@ -82,7 +82,10 @@ import dev.balaji.moonrose.trainfree.navigation.WorkoutEditRoute
 import dev.balaji.moonrose.trainfree.navigation.WorkoutLogRoute
 import dev.balaji.moonrose.trainfree.navigation.WorkoutSessionRoute
 import dev.balaji.moonrose.trainfree.navigation.WorkoutsRoute
+import dev.balaji.moonrose.trainfree.notifications.rememberCanScheduleExactAlarms
+import dev.balaji.moonrose.trainfree.notifications.rememberExactAlarmSettingsOpener
 import dev.balaji.moonrose.trainfree.notifications.rememberRestTimerNotifier
+import dev.balaji.moonrose.trainfree.notifications.shouldPromptExactAlarmOnRestTimerStart
 import dev.balaji.moonrose.trainfree.screens.ChatSheet
 import dev.balaji.moonrose.trainfree.screens.ProfileSetupFlow
 import dev.balaji.moonrose.trainfree.screens.WorkoutCompletionDialog
@@ -187,7 +190,29 @@ private fun MainTabs() {
     }
 
     val activeRestTimer by WorkoutSessionRepository.activeRestTimer.collectAsState()
-    val restRemainingSeconds = rememberRestTimerRemainingSeconds()
+    val loadedSettings by UserSettingsRepository.settings.collectAsState(initial = null)
+    val canScheduleExactAlarms = rememberCanScheduleExactAlarms()
+    val openExactAlarmSettings = rememberExactAlarmSettingsOpener()
+    var showExactAlarmPrompt by rememberSaveable { mutableStateOf(false) }
+
+    LaunchedEffect(activeRestTimer, loadedSettings, canScheduleExactAlarms) {
+        val timer = activeRestTimer ?: return@LaunchedEffect
+        val currentSettings = loadedSettings ?: return@LaunchedEffect
+        val hasActiveTimer = remainingSecondsUntil(timer.endsAtMillis) > 0L
+        if (
+            shouldPromptExactAlarmOnRestTimerStart(
+                hasActiveRestTimer = hasActiveTimer,
+                notificationsEnabled = currentSettings.notificationsEnabled,
+                canScheduleExactAlarms = canScheduleExactAlarms,
+                exactAlarmPrompted = currentSettings.exactAlarmPrompted,
+            )
+        ) {
+            showExactAlarmPrompt = true
+            UserSettingsRepository.setExactAlarmPrompted(true)
+        }
+    }
+
+    val restRemainingSeconds = rememberRestTimerRemainingSeconds(canScheduleExactAlarms)
     val restTotalSeconds = activeRestTimer?.durationSeconds ?: REST_TIMER_DURATION_SECONDS
 
     // Once a session ends from the overlay, any WorkoutSessionRoute still
@@ -309,7 +334,7 @@ private fun MainTabs() {
                 .consumeWindowInsets(padding),
         ) {
             CompositionLocalProvider(
-                LocalBottomFabPadding provides if (!sessionScreenVisible && !showWorkouts) 78.dp else 0.dp,
+                LocalBottomFabPadding provides if (!sessionScreenVisible && !showWorkouts) 90.dp else 0.dp,
             ) {
                 ScreenContent(
                     route = stack.current,
@@ -510,6 +535,27 @@ private fun MainTabs() {
             onDismiss = { WorkoutSessionRepository.dismissCompletionCelebration() },
         )
     }
+
+    if (showExactAlarmPrompt && !canScheduleExactAlarms) {
+        AlertDialog(
+            onDismissRequest = { showExactAlarmPrompt = false },
+            title = { Text(stringResource(Res.string.exact_alarm_prompt_title)) },
+            text = { Text(stringResource(Res.string.exact_alarm_hint_message)) },
+            confirmButton = {
+                TextButton(onClick = {
+                    showExactAlarmPrompt = false
+                    openExactAlarmSettings()
+                }) {
+                    Text(stringResource(Res.string.enable_background_timer_alerts))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showExactAlarmPrompt = false }) {
+                    Text(stringResource(Res.string.not_now))
+                }
+            },
+        )
+    }
 }
 
 /**
@@ -519,7 +565,7 @@ private fun MainTabs() {
  * and exposes the remaining seconds for [ActiveSessionOverlay]'s bottom progress bar.
  */
 @Composable
-private fun rememberRestTimerRemainingSeconds(): Long {
+private fun rememberRestTimerRemainingSeconds(canScheduleExactAlarms: Boolean): Long {
     val activeRestTimer by WorkoutSessionRepository.activeRestTimer.collectAsState()
     val settings by UserSettingsRepository.settings.collectAsState(initial = UserSettings())
     val restNotifier = rememberRestTimerNotifier()
@@ -546,6 +592,7 @@ private fun rememberRestTimerRemainingSeconds(): Long {
         activeRestTimer,
         settings.notificationsEnabled,
         settings.restTimerSound,
+        canScheduleExactAlarms,
         restOverTitle,
         restOverMessage,
         restChannelName,
@@ -716,15 +763,15 @@ private fun WorkoutFloatingMenu(
         }
         FloatingActionButton(
             onClick = onToggle,
-            modifier = Modifier.size(61.6.dp),
+            modifier = Modifier.size(73.92.dp),
             containerColor = MaterialTheme.colorScheme.primary,
             contentColor = MaterialTheme.colorScheme.onPrimary,
         ) {
             AnimatedContent(targetState = expanded) { isExpanded ->
                 Icon(
-                    imageVector = if (isExpanded) Icons.Filled.Close else Icons.AutoMirrored.Filled.Assignment,
+                    imageVector = if (isExpanded) Icons.Filled.Close else Icons.Filled.FitnessCenter,
                     contentDescription = stringResource(if (isExpanded) Res.string.close else Res.string.tab_workouts),
-                    modifier = Modifier.size(26.4.dp),
+                    modifier = Modifier.size(31.68.dp),
                 )
             }
         }

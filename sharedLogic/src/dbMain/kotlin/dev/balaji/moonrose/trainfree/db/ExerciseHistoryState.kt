@@ -2,6 +2,7 @@ package dev.balaji.moonrose.trainfree.db
 
 import dev.balaji.moonrose.trainfree.calendar.WeekMath
 import dev.balaji.moonrose.trainfree.insights.ExerciseHistoryUiState
+import dev.balaji.moonrose.trainfree.insights.SparkPoint
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -44,6 +45,9 @@ class ExerciseHistoryState(private val exerciseId: Long) {
                     ?: 1
 
                 val oneRm = singleExerciseWeeklyOneRm(sets, weeks, todayDay, settings.weekStart, settings.oneRmFormula)
+                val allTimeBestOneRm = oneRm
+                    .filter { it.value > 0.0 }
+                    .maxWithOrNull(compareBy<SparkPoint> { it.value }.thenBy { it.epochDay })
                 val volume = singleExerciseWeeklyVolume(sets, weeks, todayDay, settings.weekStart)
                 val duration = singleExerciseWeeklyDuration(sets, weeks, todayDay, settings.weekStart)
                 val distance = singleExerciseWeeklyDistance(sets, weeks, todayDay, settings.weekStart)
@@ -51,6 +55,7 @@ class ExerciseHistoryState(private val exerciseId: Long) {
                 ExerciseHistoryUiState(
                     loading = false,
                     weeklyOneRm = oneRm,
+                    allTimeBestOneRm = allTimeBestOneRm,
                     weeklyVolume = volume,
                     weeklyDuration = duration,
                     weeklyDistance = distance,

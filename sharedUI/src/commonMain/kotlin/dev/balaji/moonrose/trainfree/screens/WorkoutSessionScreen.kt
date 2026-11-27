@@ -1121,6 +1121,7 @@ private fun SessionSetRow(
         when {
             !isLiveSession || !set.completed -> Color.Transparent
             set.setType == SetType.WARMUP -> CompletedWarmupPurple.copy(alpha = 0.20f)
+            set.setType == SetType.DROP -> CompletedDropRed.copy(alpha = 0.20f)
             else -> CompletedGreen.copy(alpha = 0.20f)
         },
     )
@@ -1288,6 +1289,9 @@ private val CompletedGreen = Color(0xFF43A047)
 
 /** Purple tint used for a completed warm-up set row background. */
 private val CompletedWarmupPurple = Color(0xFF8E24AA)
+
+/** Red tint used for a completed drop set row background. */
+private val CompletedDropRed = Color(0xFFE53935)
 
 /**
  * Returns a callback that starts [WorkoutSessionRoute] immediately when idle,

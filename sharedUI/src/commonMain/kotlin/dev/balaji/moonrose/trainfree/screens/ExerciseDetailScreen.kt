@@ -1,5 +1,6 @@
 package dev.balaji.moonrose.trainfree.screens
 
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -17,6 +18,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.width
@@ -43,6 +45,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -54,7 +57,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import dev.balaji.moonrose.trainfree.db.ExerciseFormState
@@ -62,6 +69,7 @@ import dev.balaji.moonrose.trainfree.db.ExerciseFormUiState
 import dev.balaji.moonrose.trainfree.db.ExerciseHistoryState
 import dev.balaji.moonrose.trainfree.insights.HistoryWindow
 import dev.balaji.moonrose.trainfree.insights.ExerciseHistoryUiState
+import dev.balaji.moonrose.trainfree.insights.InsightMath
 import dev.balaji.moonrose.trainfree.insights.SparkPoint
 import dev.balaji.moonrose.trainfree.insights.SparkSeries
 import dev.balaji.moonrose.trainfree.model.ExerciseType
@@ -425,7 +433,12 @@ private fun ExerciseEditForm(
     }
 }
 
-private data class HistoryMetricEntry(val label: String, val unitLabel: String, val points: List<SparkPoint>)
+private data class HistoryMetricEntry(
+    val label: String,
+    val unitLabel: String,
+    val points: List<SparkPoint>,
+    val highlightPoint: SparkPoint? = null,
+)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -446,7 +459,14 @@ private fun ExerciseHistorySection(
 
     val metrics = buildList {
         if (showOneRmVolume) {
-            add(HistoryMetricEntry(stringResource(Res.string.exercise_history_metric_1rm), weightUnitText, historyUiState.weeklyOneRm))
+            add(
+                HistoryMetricEntry(
+                    label = stringResource(Res.string.exercise_history_metric_1rm),
+                    unitLabel = weightUnitText,
+                    points = historyUiState.weeklyOneRm,
+                    highlightPoint = historyUiState.allTimeBestOneRm,
+                ),
+            )
             add(HistoryMetricEntry(stringResource(Res.string.exercise_history_metric_volume), weightUnitText, historyUiState.weeklyVolume))
         }
         if (showDuration) add(HistoryMetricEntry(stringResource(Res.string.exercise_history_metric_duration), durationUnitText, historyUiState.weeklyDuration))
@@ -459,6 +479,8 @@ private fun ExerciseHistorySection(
     var zoomedIn by remember { mutableStateOf(true) }
     val selectedEntry = metrics.firstOrNull { it.label == selectedLabel } ?: metrics.first()
     val selectedPoints = selectedEntry.points
+    val prColor = seriesColor(2)
+    val prPoint = selectedEntry.highlightPoint?.takeIf { it.value > 0.0 }
 
     Column(
         modifier = Modifier.fillMaxWidth(),
@@ -489,6 +511,13 @@ private fun ExerciseHistorySection(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         } else {
+            if (prPoint != null) {
+                ExercisePrStatBadge(
+                    valueText = InsightMath.formatNumber(prPoint.value, 1),
+                    unitLabel = selectedEntry.unitLabel,
+                    color = prColor,
+                )
+            }
             val allPoints = selectedPoints.filter { it.value > 0.0 }
             val canZoom = HistoryWindow.canZoom(allPoints)
             val effectiveZoomedIn = zoomedIn || !canZoom
@@ -536,6 +565,8 @@ private fun ExerciseHistorySection(
                 VicoHistoryChart(
                     points = nonZeroPoints,
                     modifier = Modifier.fillMaxWidth().height(160.dp),
+                    highlightEpochDay = prPoint?.epochDay,
+                    highlightColor = prColor,
                 )
             } else {
                 Text(
@@ -544,6 +575,42 @@ private fun ExerciseHistorySection(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
+        }
+    }
+}
+
+@Composable
+private fun ExercisePrStatBadge(
+    valueText: String,
+    unitLabel: String,
+    color: Color,
+) {
+    Surface(
+        shape = RoundedCornerShape(50),
+        color = color.copy(alpha = 0.14f),
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+        ) {
+            Canvas(modifier = Modifier.width(2.dp).height(12.dp)) {
+                drawLine(
+                    color = color,
+                    start = Offset(size.width / 2f, 0f),
+                    end = Offset(size.width / 2f, size.height),
+                    strokeWidth = size.width,
+                    pathEffect = PathEffect.dashPathEffect(
+                        floatArrayOf(3.dp.toPx(), 2.dp.toPx()),
+                    ),
+                )
+            }
+            Text(
+                text = stringResource(Res.string.exercise_history_pr_badge, valueText, unitLabel),
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = FontWeight.Medium,
+                color = MaterialTheme.colorScheme.onSurface,
+            )
         }
     }
 }

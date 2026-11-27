@@ -459,7 +459,7 @@ internal suspend fun ProgramAiStore.updateAiRoutine(
             val oldItem = items[idx]
             val newExInput = AiExerciseInput(
                 exerciseName = rep.newExerciseName,
-                sets = rep.sets ?: oldItem.details.count { it.setType != SetType.WARMUP }.coerceAtLeast(1),
+                sets = rep.sets ?: oldItem.details.count { it.setType == SetType.NORMAL }.coerceAtLeast(1),
                 reps = rep.reps,
                 weight = rep.weight,
                 durationSeconds = rep.durationSeconds,
@@ -751,7 +751,9 @@ private fun adaptDetailsForReplacement(
     unit: WeightUnit,
 ): List<DetailSpec> {
     val newType = ExerciseType.fromValue(newExercise.exerciseType) ?: ExerciseType.STRENGTH
-    val working = previous.filter { it.setType != SetType.WARMUP }
+    val working = previous.filter { it.setType == SetType.NORMAL }.ifEmpty {
+        previous.filter { it.setType != SetType.WARMUP }
+    }
     val warmups = previous.filter { it.setType == SetType.WARMUP }
     if (working.isEmpty()) return defaultDetailsFor(newExercise, AiExerciseInput(newExercise.name), unit)
 

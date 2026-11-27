@@ -953,11 +953,12 @@ object ChatToolbox {
                 val exSummary = workSets.joinToString("; ") { ws ->
                     val exercise = exercisesById[ws.exerciseId]
                     val name = exercise?.name ?: "Exercise #${ws.exerciseId}"
-                    val details = detailsByWorkSet[ws.id].orEmpty().filter { it.setType != SetType.WARMUP }
                     val allDetails = detailsByWorkSet[ws.id].orEmpty()
-                    val workingCount = details.size
+                    val normalDetails = allDetails.filter { it.setType == SetType.NORMAL }
+                    val dropCount = allDetails.count { it.setType == SetType.DROP }
+                    val targetDetails = normalDetails.ifEmpty { allDetails.filter { it.setType != SetType.WARMUP } }
                     val type = ExerciseType.fromValue(exercise?.exerciseType) ?: ExerciseType.STRENGTH
-                    val formattedTargets = details.map { d ->
+                    val formattedTargets = targetDetails.map { d ->
                         formatSetValues(
                             weight = d.targetWeight?.let { d.weightUnit.convertWeight(it, unit) } ?: 0.0,
                             reps = d.targetReps ?: 0,
@@ -973,7 +974,13 @@ object ChatToolbox {
                         formattedTargets.distinct().size == 1 -> " (target ${formattedTargets.first()})"
                         else -> " (targets ${formattedTargets.joinToString(" / ")})"
                     }
-                    val countLabel = if (workingCount > 0) "$workingCount sets" else "${allDetails.size} warmup/empty"
+                    val countLabel = when {
+                        normalDetails.isNotEmpty() && dropCount > 0 ->
+                            "${normalDetails.size} sets + $dropCount ${if (dropCount == 1) "drop" else "drops"}"
+                        normalDetails.isNotEmpty() -> "${normalDetails.size} sets"
+                        dropCount > 0 -> "$dropCount ${if (dropCount == 1) "drop set" else "drop sets"}"
+                        else -> "${allDetails.size} warmup/empty"
+                    }
                     val bodyPartSuffix = exercise?.bodyPart?.let { " [$it]" }.orEmpty()
                     "$name $countLabel$targetPreview$bodyPartSuffix"
                 }
@@ -1142,9 +1149,10 @@ object ChatToolbox {
         val unitText = weightUnitLabel(unit)
         val distText = distanceUnitLabel(unit)
         return exercises.joinToString("; ") { (exercise, details) ->
-            val working = details.filter { it.setType != SetType.WARMUP }
+            val normal = details.filter { it.setType == SetType.NORMAL }
+            val dropCount = details.count { it.setType == SetType.DROP }
             val type = ExerciseType.fromValue(exercise.exerciseType) ?: ExerciseType.STRENGTH
-            val preview = working.firstOrNull()?.let { d ->
+            val preview = (normal.firstOrNull() ?: details.firstOrNull { it.setType != SetType.WARMUP })?.let { d ->
                 formatSetValues(
                     weight = d.targetWeight?.let { d.weightUnit.convertWeight(it, unit) } ?: 0.0,
                     reps = d.targetReps ?: 0,
@@ -1155,7 +1163,13 @@ object ChatToolbox {
                     distText = distText,
                 )
             }.orEmpty()
-            val setsLabel = if (preview.isNotEmpty()) "${working.size}x $preview" else "${working.size} sets"
+            val baseCount = if (normal.isNotEmpty()) normal.size else dropCount
+            val baseLabel = if (preview.isNotEmpty()) "${baseCount}x $preview" else "$baseCount sets"
+            val setsLabel = if (normal.isNotEmpty() && dropCount > 0) {
+                "$baseLabel + $dropCount ${if (dropCount == 1) "drop" else "drops"}"
+            } else {
+                baseLabel
+            }
             "${exercise.name} ($setsLabel)"
         }
     }

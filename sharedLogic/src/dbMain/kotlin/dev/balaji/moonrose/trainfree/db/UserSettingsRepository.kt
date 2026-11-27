@@ -20,6 +20,7 @@ internal const val SETTING_WEEK_START = "week_start"
 internal const val SETTING_APPEARANCE = "appearance"
 internal const val SETTING_WEIGHT_UNIT = "weight_unit"
 internal const val SETTING_NOTIFICATIONS_ENABLED = "notifications_enabled"
+internal const val SETTING_EXACT_ALARM_PROMPTED = "exact_alarm_prompted"
 internal const val SETTING_HEALTH_SYNC_WORKOUTS = "health_sync_workouts"
 internal const val SETTING_HEALTH_SYNC_WEIGHT = "health_sync_weight"
 internal const val SETTING_HEALTH_LAST_WEIGHT_SYNC = "health_last_weight_sync_at"
@@ -55,6 +56,9 @@ object UserSettingsRepository {
 
     suspend fun setNotificationsEnabled(enabled: Boolean) =
         set(SETTING_NOTIFICATIONS_ENABLED, enabled.toString())
+
+    suspend fun setExactAlarmPrompted(prompted: Boolean) =
+        set(SETTING_EXACT_ALARM_PROMPTED, prompted.toString())
 
     suspend fun setHealthSyncWorkouts(enabled: Boolean) {
         set(SETTING_HEALTH_SYNC_WORKOUTS, enabled.toString())
@@ -133,6 +137,7 @@ internal fun List<UserSettingEntity>.toUserSettings(): UserSettings {
         bmiFormula = BmiFormula.fromValue(byKey[SETTING_BMI_FORMULA]),
         bmiClassification = BmiClassification.fromValue(byKey[SETTING_BMI_CLASSIFICATION]),
         notificationsEnabled = byKey[SETTING_NOTIFICATIONS_ENABLED].toBoolean(),
+        exactAlarmPrompted = byKey[SETTING_EXACT_ALARM_PROMPTED].toBoolean(),
         healthSyncWorkouts = byKey[SETTING_HEALTH_SYNC_WORKOUTS].toBoolean(),
         healthSyncWeight = byKey[SETTING_HEALTH_SYNC_WEIGHT].toBoolean(),
         restTimerDurationSeconds = byKey[SETTING_REST_TIMER_DURATION]?.toIntOrNull()

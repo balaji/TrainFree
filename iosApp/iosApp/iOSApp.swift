@@ -1,8 +1,11 @@
 import SwiftUI
 import SharedUI
+import UserNotifications
 
 @main
 struct iOSApp: App {
+    private static let notificationPermissionPromptedKey = "notification_permission_prompted"
+
     @State private var appearance: Appearance = .system
     @State private var systemColorScheme: ColorScheme = .light
 
@@ -15,12 +18,30 @@ struct iOSApp: App {
                     HealthSyncManager.shared.register(provider: IosHealthSyncProvider.shared)
                     seedTestDataIfRequested()
                     Task {
+                        await requestInitialNotificationPermissionIfNeeded()
+                    }
+                    Task {
                         _ = try? await HealthSyncManager.shared.syncBodyWeightsFromHealth(lookbackDays: 90)
                     }
                     for await settings in UserSettingsRepository.shared.settings {
                         appearance = settings.appearance
                     }
                 }
+        }
+    }
+
+    private func requestInitialNotificationPermissionIfNeeded() async {
+        let defaults = UserDefaults.standard
+        guard !defaults.bool(forKey: Self.notificationPermissionPromptedKey) else { return }
+        defaults.set(true, forKey: Self.notificationPermissionPromptedKey)
+
+        let center = UNUserNotificationCenter.current()
+        let settings = await center.notificationSettings()
+        guard settings.authorizationStatus == .notDetermined else { return }
+
+        let granted = (try? await center.requestAuthorization(options: [.alert, .badge, .sound])) ?? false
+        if granted {
+            try? await UserSettingsRepository.shared.setNotificationsEnabled(enabled: true)
         }
     }
 

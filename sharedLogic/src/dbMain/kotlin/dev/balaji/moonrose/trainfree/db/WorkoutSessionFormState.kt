@@ -10,6 +10,8 @@ import dev.balaji.moonrose.trainfree.model.SetType
 import dev.balaji.moonrose.trainfree.model.WeightUnit
 import dev.balaji.moonrose.trainfree.model.isSetComplete
 import dev.balaji.moonrose.trainfree.model.requiredSetFields
+import kotlin.math.floor
+import kotlin.math.round
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -107,18 +109,29 @@ data class DraftSessionExercise(
     /**
      * Formatted previous-session performance for the set at [setIndex], or null
      * when the placeholder ("—") should be shown. Warm-up sets never show a
-     * previous value; normal sets index into [previousSets] by their 1-based
-     * working-set number so switching a set between warm-up and normal populates
-     * or shifts the previous value for that specific set number's count.
+     * previous value; normal and drop sets match against prior sets of the same
+     * [SetType] by their 1-based ordinal within that type so drop sets and
+     * interleaved sets align cleanly without shifting or colliding.
      */
     fun previousSet(setIndex: Int): String? {
         val set = sets.getOrNull(setIndex) ?: return null
-        val previousIndex = when (set.setType) {
-            SetType.WARMUP -> return null
-            SetType.NORMAL -> workingSetNumber(setIndex) - 1
-            SetType.DROP -> sets.take(setIndex + 1).count { it.setType != SetType.WARMUP } - 1
+        if (set.setType == SetType.WARMUP) return null
+        val ordinal = sets.take(setIndex + 1).count { it.setType == set.setType } - 1
+        if (previousSetRows.size == previousSets.size && previousSetRows.isNotEmpty()) {
+            var seen = 0
+            for (i in previousSetRows.indices) {
+                if (previousSetRows[i].setType == set.setType) {
+                    if (seen == ordinal) return previousSets[i].takeIf { it.isNotBlank() }
+                    seen++
+                }
+            }
+            return null
         }
-        return previousSets.getOrNull(previousIndex)?.takeIf { it.isNotBlank() }
+        return if (set.setType == SetType.NORMAL) {
+            previousSets.getOrNull(ordinal)?.takeIf { it.isNotBlank() }
+        } else {
+            null
+        }
     }
 }
 
@@ -242,6 +255,55 @@ data class WorkoutSessionUiState(
         )
     }
 
+    internal fun setSetTypeAt(
+        exerciseIndex: Int,
+        setIndex: Int,
+        setType: SetType,
+        displayUnit: WeightUnit = WeightUnit.METRIC,
+    ): WorkoutSessionUiState {
+        val exercise = exercises.getOrNull(exerciseIndex) ?: return this
+        val set = exercise.sets.getOrNull(setIndex) ?: return this
+        if (set.setType == setType) return this
+
+        var nextSet = set.copy(setType = setType)
+        if (setType == SetType.DROP && set.actualWeight.isBlank() && set.rawActualWeight == null) {
+            val prev = exercise.sets.getOrNull(setIndex - 1)?.takeIf { it.setType != SetType.WARMUP }
+            val prevWeight = prev?.let { p ->
+                (p.rawActualWeight ?: p.actualWeight.toDoubleOrNull())?.let { p.actualUnit.convertWeight(it, displayUnit) }
+                    ?: (p.rawTargetWeight ?: p.targetWeight.toDoubleOrNull())?.let { p.targetUnit.convertWeight(it, displayUnit) }
+            }
+            val suggested = prevWeight?.let { suggestDropSetWeight(it, displayUnit) }
+            if (suggested != null) {
+                val convertedDistance = if (nextSet.actualUnit != displayUnit) {
+                    nextSet.rawActualDistance?.let { nextSet.actualUnit.convertDistance(it, displayUnit) }
+                } else {
+                    nextSet.rawActualDistance
+                }
+                nextSet = nextSet.copy(
+                    actualWeight = WeightUnit.formatWeight(suggested, displayUnit, displayUnit),
+                    rawActualWeight = suggested,
+                    rawActualDistance = convertedDistance,
+                    actualUnit = displayUnit,
+                )
+            }
+        }
+        val nextTimer = if (setType == SetType.DROP && setIndex > 0 && isRestTimerOn(exercise.id, setIndex - 1)) {
+            null
+        } else {
+            restTimer
+        }
+        return copy(
+            exercises = exercises.mapIndexed { i, ex ->
+                if (i == exerciseIndex) {
+                    ex.copy(sets = ex.sets.mapIndexed { sIdx, s -> if (sIdx == setIndex) nextSet else s })
+                } else {
+                    ex
+                }
+            },
+            restTimer = nextTimer,
+        )
+    }
+
     internal fun toggleCompletedAt(
         exerciseIndex: Int,
         setIndex: Int,
@@ -251,7 +313,9 @@ data class WorkoutSessionUiState(
         val exercise = exercises.getOrNull(exerciseIndex) ?: return this
         val set = exercise.sets.getOrNull(setIndex) ?: return this
         val nowCompleted = !set.completed && set.meetsRequirements(exercise.type)
+        val followedByDrop = exercise.sets.getOrNull(setIndex + 1)?.setType == SetType.DROP
         val nextTimer = when {
+            nowCompleted && followedByDrop -> null
             nowCompleted -> RestTimerTarget(
                 exerciseId = exercise.id,
                 setIndex = setIndex,
@@ -630,7 +694,8 @@ class WorkoutSessionFormState internal constructor(
     }
 
     fun setSetType(exerciseIndex: Int, setIndex: Int, setType: SetType) {
-        updateSet(exerciseIndex, setIndex) { set, _ -> set.copy(setType = setType) }
+        updateState(_uiState.value.setSetTypeAt(exerciseIndex, setIndex, setType, currentWeightUnit))
+        scheduleAutosave()
     }
 
     fun toggleCompleted(exerciseIndex: Int, setIndex: Int) {
@@ -1037,6 +1102,34 @@ internal suspend fun AppDatabase.saveCompletedWorkout(
 }
 
 private const val AUTOSAVE_DEBOUNCE_MS = 500L
+
+/**
+ * Suggests ~80% of [precedingWeight] rounded to a practical plate/dumbbell step
+ * in [unit], strictly below [precedingWeight]. Returns null for non-positive
+ * weights or when rounding cannot produce a lighter positive load.
+ */
+internal fun suggestDropSetWeight(precedingWeight: Double, unit: WeightUnit): Double? {
+    if (precedingWeight <= 0.0 || !precedingWeight.isFinite()) return null
+    val raw = precedingWeight * 0.8
+    val step = when (unit) {
+        WeightUnit.METRIC -> when {
+            precedingWeight >= 20.0 -> 2.5
+            precedingWeight >= 10.0 -> 1.0
+            else -> 0.5
+        }
+        WeightUnit.IMPERIAL -> when {
+            precedingWeight >= 45.0 -> 5.0
+            precedingWeight >= 15.0 -> 2.5
+            else -> 1.0
+        }
+    }
+    var snapped = round(raw / step) * step
+    if (snapped >= precedingWeight) {
+        snapped = floor(raw / step) * step
+    }
+    if (snapped <= 0.0 || snapped >= precedingWeight) return null
+    return round(snapped * 100.0) / 100.0
+}
 
 internal fun formatPreviousSets(
     rows: List<PreviousSetRow>,

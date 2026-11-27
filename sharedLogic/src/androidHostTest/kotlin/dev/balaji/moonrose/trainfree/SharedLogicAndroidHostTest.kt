@@ -2,14 +2,20 @@ package dev.balaji.moonrose.trainfree
 
 import dev.balaji.moonrose.trainfree.db.DraftSessionExercise
 import dev.balaji.moonrose.trainfree.db.DraftSessionSet
+import dev.balaji.moonrose.trainfree.db.DraftSet
+import dev.balaji.moonrose.trainfree.db.DraftWorkSet
+import dev.balaji.moonrose.trainfree.db.PreviousSetRow
 import dev.balaji.moonrose.trainfree.db.REST_TIMER_DURATION_MS
 import dev.balaji.moonrose.trainfree.db.RestTimerTarget
+import dev.balaji.moonrose.trainfree.db.RoutineDetailUiState
 import dev.balaji.moonrose.trainfree.db.SETTING_APP_FONT
 import dev.balaji.moonrose.trainfree.db.SETTING_APP_FONT_SIZE
+import dev.balaji.moonrose.trainfree.db.SETTING_EXACT_ALARM_PROMPTED
 import dev.balaji.moonrose.trainfree.db.SETTING_REST_TIMER_DURATION
 import dev.balaji.moonrose.trainfree.db.SETTING_REST_TIMER_SOUND
 import dev.balaji.moonrose.trainfree.db.UserSettingEntity
 import dev.balaji.moonrose.trainfree.db.WorkoutSessionUiState
+import dev.balaji.moonrose.trainfree.db.suggestDropSetWeight
 import dev.balaji.moonrose.trainfree.db.toUserSettings
 import dev.balaji.moonrose.trainfree.model.AppFont
 import dev.balaji.moonrose.trainfree.model.AppFontSize
@@ -17,6 +23,7 @@ import dev.balaji.moonrose.trainfree.model.DEFAULT_REST_TIMER_SECONDS
 import dev.balaji.moonrose.trainfree.model.Exercise
 import dev.balaji.moonrose.trainfree.model.RestTimerSound
 import dev.balaji.moonrose.trainfree.model.SetType
+import dev.balaji.moonrose.trainfree.model.WeightUnit
 import dev.balaji.moonrose.trainfree.model.clampRestTimerSeconds
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -250,6 +257,17 @@ class SharedLogicAndroidHostTest {
     }
 
     @Test
+    fun userSettingsDecodesExactAlarmPromptedWithDefaultFalse() {
+        val defaults = emptyList<UserSettingEntity>().toUserSettings()
+        assertFalse(defaults.exactAlarmPrompted)
+
+        val prompted = listOf(
+            UserSettingEntity(SETTING_EXACT_ALARM_PROMPTED, "true", 0L, 0L),
+        ).toUserSettings()
+        assertTrue(prompted.exactAlarmPrompted)
+    }
+
+    @Test
     fun warmupSetAlwaysHasNullPreviousAndNormalSetsIndexByWorkingSetNumber() {
         val exercise = DraftSessionExercise(
             id = 10L,
@@ -354,5 +372,232 @@ class SharedLogicAndroidHostTest {
             ),
         )
         assertFalse(normalSwitchedToWarmup.hasCompletedSets)
+    }
+
+    @Test
+    fun completingSetBeforeDropSetSkipsRestTimerUntilFinalDrop() {
+        val dropChain = WorkoutSessionUiState(
+            loading = false,
+            exercises = listOf(
+                DraftSessionExercise(
+                    id = 10L,
+                    exercise = bench,
+                    sets = listOf(
+                        DraftSessionSet(actualWeight = "80", actualReps = "8", setType = SetType.NORMAL),
+                        DraftSessionSet(actualWeight = "80", actualReps = "8", setType = SetType.NORMAL),
+                        DraftSessionSet(actualWeight = "65", actualReps = "10", setType = SetType.DROP),
+                        DraftSessionSet(actualWeight = "50", actualReps = "12", setType = SetType.DROP),
+                    ),
+                ),
+            ),
+        )
+
+        // Set 0 -> followed by NORMAL set 1: starts rest timer.
+        val afterFirst = dropChain.toggleCompletedAt(exerciseIndex = 0, setIndex = 0, now = 1_000L)
+        assertTrue(afterFirst.isRestTimerOn(exerciseId = 10L, setIndex = 0))
+
+        // Set 1 -> followed by DROP set 2: skips rest timer and clears prior timer.
+        val afterSecond = afterFirst.toggleCompletedAt(exerciseIndex = 0, setIndex = 1, now = 2_000L)
+        assertTrue(afterSecond.exercises[0].sets[1].completed)
+        assertNull(afterSecond.restTimer)
+
+        // Set 2 (DROP) -> followed by DROP set 3: still skips rest timer.
+        val afterFirstDrop = afterSecond.toggleCompletedAt(exerciseIndex = 0, setIndex = 2, now = 3_000L)
+        assertTrue(afterFirstDrop.exercises[0].sets[2].completed)
+        assertNull(afterFirstDrop.restTimer)
+
+        // Set 3 (final DROP) -> no drop set follows: starts rest timer.
+        val afterLastDrop = afterFirstDrop.toggleCompletedAt(exerciseIndex = 0, setIndex = 3, now = 4_000L)
+        assertTrue(afterLastDrop.isRestTimerOn(exerciseId = 10L, setIndex = 3))
+    }
+
+    @Test
+    fun switchingNextSetToDropCancelsPrecedingRestTimer() {
+        val state = WorkoutSessionUiState(
+            loading = false,
+            exercises = listOf(
+                DraftSessionExercise(
+                    id = 10L,
+                    exercise = bench,
+                    sets = listOf(
+                        DraftSessionSet(actualWeight = "100", actualReps = "8", setType = SetType.NORMAL),
+                        DraftSessionSet(setType = SetType.NORMAL),
+                    ),
+                ),
+            ),
+        ).toggleCompletedAt(exerciseIndex = 0, setIndex = 0, now = 1_000L)
+        assertTrue(state.isRestTimerOn(exerciseId = 10L, setIndex = 0))
+
+        val switched = state.setSetTypeAt(exerciseIndex = 0, setIndex = 1, setType = SetType.DROP)
+        assertNull(switched.restTimer)
+        assertEquals("80", switched.exercises[0].sets[1].actualWeight)
+    }
+
+    @Test
+    fun suggestDropSetWeightSnapsPracticalIncrementsAndHandlesEdges() {
+        assertEquals(80.0, suggestDropSetWeight(100.0, WeightUnit.METRIC))
+        assertEquals(47.5, suggestDropSetWeight(60.0, WeightUnit.METRIC))
+        assertEquals(8.0, suggestDropSetWeight(10.0, WeightUnit.METRIC))
+        assertEquals(0.5, suggestDropSetWeight(1.0, WeightUnit.METRIC))
+        assertEquals(110.0, suggestDropSetWeight(135.0, WeightUnit.IMPERIAL))
+        assertEquals(15.0, suggestDropSetWeight(20.0, WeightUnit.IMPERIAL))
+        assertEquals(65.0, suggestDropSetWeight(80.0, WeightUnit.METRIC))
+        assertNull(suggestDropSetWeight(0.0, WeightUnit.METRIC))
+        assertNull(suggestDropSetWeight(-20.0, WeightUnit.METRIC))
+        assertNull(suggestDropSetWeight(0.4, WeightUnit.METRIC))
+    }
+
+    @Test
+    fun setSetTypeAtDropPrefillsBlankWeightWithoutOverwritingExistingOrWarmup() {
+        val state = WorkoutSessionUiState(
+            loading = false,
+            exercises = listOf(
+                DraftSessionExercise(
+                    id = 10L,
+                    exercise = bench,
+                    sets = listOf(
+                        DraftSessionSet(actualWeight = "40", rawActualWeight = 40.0, setType = SetType.WARMUP),
+                        DraftSessionSet(targetWeight = "100", rawTargetWeight = 100.0, setType = SetType.NORMAL),
+                        DraftSessionSet(setType = SetType.NORMAL),
+                        DraftSessionSet(actualWeight = "55", rawActualWeight = 55.0, setType = SetType.NORMAL),
+                    ),
+                ),
+            ),
+        )
+
+        // At index 0 -> no preceding set, stays blank.
+        val atIndexZero = WorkoutSessionUiState(
+            loading = false,
+            exercises = listOf(
+                DraftSessionExercise(
+                    id = 10L,
+                    exercise = bench,
+                    sets = listOf(DraftSessionSet(setType = SetType.NORMAL)),
+                ),
+            ),
+        ).setSetTypeAt(exerciseIndex = 0, setIndex = 0, setType = SetType.DROP)
+        assertEquals("", atIndexZero.exercises[0].sets[0].actualWeight)
+
+        // Preceded by warmup -> stays blank.
+        val afterWarmup = state.setSetTypeAt(exerciseIndex = 0, setIndex = 1, setType = SetType.DROP)
+        assertEquals("", afterWarmup.exercises[0].sets[1].actualWeight)
+
+        // Preceded by normal set with targetWeight=100 (actual blank) -> falls back to target weight -> 80.
+        val fromTarget = state.setSetTypeAt(exerciseIndex = 0, setIndex = 2, setType = SetType.DROP)
+        assertEquals("80", fromTarget.exercises[0].sets[2].actualWeight)
+
+        // Already has actualWeight="55" -> does not overwrite.
+        val keepExisting = fromTarget.setSetTypeAt(exerciseIndex = 0, setIndex = 3, setType = SetType.DROP)
+        assertEquals("55", keepExisting.exercises[0].sets[3].actualWeight)
+
+        // Converts unit cleanly when preceding set was stored in metric and display unit is imperial.
+        val crossUnit = WorkoutSessionUiState(
+            loading = false,
+            exercises = listOf(
+                DraftSessionExercise(
+                    id = 10L,
+                    exercise = bench,
+                    sets = listOf(
+                        DraftSessionSet(
+                            actualWeight = "220.5",
+                            rawActualWeight = 100.0,
+                            actualUnit = WeightUnit.METRIC,
+                            setType = SetType.NORMAL,
+                        ),
+                        DraftSessionSet(actualUnit = WeightUnit.IMPERIAL, setType = SetType.NORMAL),
+                    ),
+                ),
+            ),
+        ).setSetTypeAt(exerciseIndex = 0, setIndex = 1, setType = SetType.DROP, displayUnit = WeightUnit.IMPERIAL)
+        // 100 kg = 220.46 lb * 0.8 = 176.37 lb -> snaps to 175 lb.
+        assertEquals("175", crossUnit.exercises[0].sets[1].actualWeight)
+        assertEquals(WeightUnit.IMPERIAL, crossUnit.exercises[0].sets[1].actualUnit)
+    }
+
+    @Test
+    fun routineSetTypeAtDropPrefillsBlankWeightAndExcludesDropFromWorkingSetCount() {
+        val routine = RoutineDetailUiState(
+            loading = false,
+            workSets = listOf(
+                DraftWorkSet(
+                    id = 1L,
+                    exercise = bench,
+                    sets = listOf(
+                        DraftSet(weight = "40", rawWeight = 40.0, setType = SetType.WARMUP),
+                        DraftSet(weight = "100", rawWeight = 100.0, setType = SetType.NORMAL),
+                        DraftSet(weight = "", setType = SetType.NORMAL),
+                    ),
+                ),
+            ),
+        )
+        assertEquals(2, routine.workSets[0].workingSetCount)
+
+        val updated = routine.setSetTypeAt(workSetIndex = 0, setIndex = 2, setType = SetType.DROP)
+        assertEquals(1, updated.workSets[0].workingSetCount)
+        assertEquals("80", updated.workSets[0].sets[2].weight)
+    }
+
+    @Test
+    fun previousSetMatchesBySetTypeOrdinalWithoutCollision() {
+        val interleaved = DraftSessionExercise(
+            id = 10L,
+            exercise = bench,
+            sets = listOf(
+                DraftSessionSet(setType = SetType.NORMAL),
+                DraftSessionSet(setType = SetType.DROP),
+                DraftSessionSet(setType = SetType.NORMAL),
+            ),
+            previousSets = listOf("80kg x 8", "60kg x 10", "80kg x 7"),
+            previousSetRows = listOf(
+                PreviousSetRow(80.0, 8, null, null, WeightUnit.METRIC, SetType.NORMAL),
+                PreviousSetRow(60.0, 10, null, null, WeightUnit.METRIC, SetType.DROP),
+                PreviousSetRow(80.0, 7, null, null, WeightUnit.METRIC, SetType.NORMAL),
+            ),
+        )
+        assertEquals("80kg x 8", interleaved.previousSet(0))
+        assertEquals("60kg x 10", interleaved.previousSet(1))
+        assertEquals("80kg x 7", interleaved.previousSet(2))
+
+        // Previous session had 3 normal sets and no drop set: drop slot is null, second normal gets N2.
+        val noPriorDrop = DraftSessionExercise(
+            id = 10L,
+            exercise = bench,
+            sets = listOf(
+                DraftSessionSet(setType = SetType.NORMAL),
+                DraftSessionSet(setType = SetType.DROP),
+                DraftSessionSet(setType = SetType.NORMAL),
+            ),
+            previousSets = listOf("80kg x 8", "80kg x 7", "80kg x 6"),
+            previousSetRows = listOf(
+                PreviousSetRow(80.0, 8, null, null, WeightUnit.METRIC, SetType.NORMAL),
+                PreviousSetRow(80.0, 7, null, null, WeightUnit.METRIC, SetType.NORMAL),
+                PreviousSetRow(80.0, 6, null, null, WeightUnit.METRIC, SetType.NORMAL),
+            ),
+        )
+        assertEquals("80kg x 8", noPriorDrop.previousSet(0))
+        assertNull(noPriorDrop.previousSet(1))
+        assertEquals("80kg x 7", noPriorDrop.previousSet(2))
+
+        // Added a 3rd normal set before the drop set: drop set still matches prior drop set.
+        val addedNormalBeforeDrop = DraftSessionExercise(
+            id = 10L,
+            exercise = bench,
+            sets = listOf(
+                DraftSessionSet(setType = SetType.NORMAL),
+                DraftSessionSet(setType = SetType.NORMAL),
+                DraftSessionSet(setType = SetType.NORMAL),
+                DraftSessionSet(setType = SetType.DROP),
+            ),
+            previousSets = listOf("80kg x 8", "80kg x 8", "60kg x 10"),
+            previousSetRows = listOf(
+                PreviousSetRow(80.0, 8, null, null, WeightUnit.METRIC, SetType.NORMAL),
+                PreviousSetRow(80.0, 8, null, null, WeightUnit.METRIC, SetType.NORMAL),
+                PreviousSetRow(60.0, 10, null, null, WeightUnit.METRIC, SetType.DROP),
+            ),
+        )
+        assertEquals("80kg x 8", addedNormalBeforeDrop.previousSet(0))
+        assertEquals("80kg x 8", addedNormalBeforeDrop.previousSet(1))
+        assertNull(addedNormalBeforeDrop.previousSet(2))
+        assertEquals("60kg x 10", addedNormalBeforeDrop.previousSet(3))
     }
 }
